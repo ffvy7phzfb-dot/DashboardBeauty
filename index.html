@@ -712,9 +712,12 @@ const now = new Date(); calYear = now.getFullYear(); calMonth = now.getMonth();
 
 // Функция сохранения в облако
 async function saveToCloud() {
-    if (!currentUser) return;
+    if (!currentUser) {
+        alert('Вы не авторизованы!');
+        return;
+    }
     try {
-        const { error } = await supabaseClient
+        const { data, error } = await supabaseClient
             .from('user_data')
             .upsert({ 
                 id: currentUser.id, 
@@ -724,10 +727,22 @@ async function saveToCloud() {
                 user_vks: userVks,
                 updated_at: new Date().toISOString()
             });
-        if (error) console.error('Ошибка сохранения:', error);
+        
+        if (error) {
+            console.error('Ошибка сохранения:', error);
+            alert('❌ Ошибка Supabase: ' + error.message);
+        }
     } catch (e) {
         console.error('Сетевая ошибка:', e);
+        alert('❌ Сетевая ошибка: ' + e.message);
     }
+}
+
+// Новая функция для ручного сохранения
+async function manualSaveToCloud() {
+    showToast('Отправляем в облако...');
+    await saveToCloud();
+    showToast('Данные отправлены в облако!');
 }
 
 // Заменяем старый persistAll на сохранение в облако
