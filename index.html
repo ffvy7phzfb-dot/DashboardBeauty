@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Дашборд: отчёты, ВКС и качество</title>
-   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22> 📊 </text></svg>">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📊</text></svg>">
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
@@ -29,10 +29,11 @@
         width: 100%; padding: 10px; margin-bottom: 15px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px;
     }
     .auth-box button {
-        width: 100%; padding: 12px; background: #2980b9; color: #fff; border: none; border-radius: 4px; font-size: 16px; cursor: pointer;
+        width: 100%; padding: 12px; background: #2980b9; color: #fff; border: none; border-radius: 4px; font-size: 16px; cursor: pointer; font-weight: bold;
     }
     .auth-box button:hover { background: #21618c; }
     .auth-error { color: #e74c3c; font-size: 13px; margin-top: 10px; display: none; }
+    .auth-loading { color: #2980b9; font-size: 14px; margin-top: 10px; display: none; }
     
     /* Основной интерфейс (скрыт до входа) */
     #appScreen { display: none; }
@@ -77,12 +78,10 @@
     .btn-load:hover { background: #2980b9; }
     .btn-export { background: #27ae60; color: #fff; display: none; }
     .btn-export:hover { background: #219150; }
-    .btn-backup { background: #8e44ad; color: #fff; }
-    .btn-backup:hover { background: #6c3483; }
-    .btn-restore { background: #e67e22; color: #fff; }
-    .btn-restore:hover { background: #d35400; }
     .btn-import-xlsx { background: #16a085; color: #fff; display: inline-block; }
     .btn-import-xlsx:hover { background: #117864; }
+    .btn-cloud { background: #8e44ad; color: #fff; }
+    .btn-cloud:hover { background: #6c3483; }
     
     .btn-calc { background: #2563eb; color: #fff; }
     .btn-calc:hover { background: #1d4ed8; }
@@ -420,6 +419,7 @@
         <input type="password" id="authPassword" placeholder="Пароль">
         <button onclick="loginUser()">Войти</button>
         <div id="authError" class="auth-error"></div>
+        <div id="authLoading" class="auth-loading">Загрузка данных из облака...</div>
     </div>
 </div>
 
@@ -429,21 +429,21 @@
     <h1>Дашборд: отчёты, ВКС и качество</h1>
 
     <div class="main-tabs">
-        <button class="main-tab-btn active" onclick="switchTab('main', this)">📊 Сводка по сотрудникам</button>
-        <button class="main-tab-btn" onclick="switchTab('vks-import', this)">📥 ВКС</button>
-        <button class="main-tab-btn" onclick="switchTab('quality', this)">🌟 Качество</button>
+        <button class="main-tab-btn active" onclick="switchTab('main', this)">📊 сводка по сотрудникам</button>
+        <button class="main-tab-btn" onclick="switchTab('vks-import', this)">📥 загрузка ВКС из отчёта</button>
+        <button class="main-tab-btn" onclick="switchTab('quality', this)">🌟 качество (тренеры и дни)</button>
     </div>
 
     <!-- ВКЛАДКА 1: ОСНОВНАЯ -->
     <div class="tab-content active" id="tab-main">
         <div class="container">
             <div class="box">
-                <h3>1. Данные из Excel </h3>
+                <h3>1. Данные из Excel (5 столбцов)</h3>
                 <p style="font-size: 12px; color: #666;">вставь столбцы: <b>marker_id, start_date, end_date, quality, reviewer_comment</b>.</p>
                 <textarea id="mainData" placeholder="вставь данные сюда..."></textarea>
             </div>
             <div class="box">
-                <h3>2. Сотрудники</h3>
+                <h3>2. Тренеры</h3>
                 <p style="font-size: 12px; color: #666;">вставь столбцы: <b>Фамилия, UUID</b> (в любом порядке).</p>
                 <textarea id="namesData" placeholder="Иванов И.И.   81977398-70..."></textarea>
             </div>
@@ -459,9 +459,9 @@
 
         <div class="btn-group">
             <button class="btn-load" onclick="processData()">загрузить и обработать</button>
+            <button class="btn-cloud" onclick="manualSaveToCloud()">☁️ сохранить в облако</button>
             <button class="btn-export" id="exportBtn" onclick="exportToExcel()">скачать всё в Excel</button>
         </div>
-       <button class="btn-save" style="background:#8e44ad; color:white;" onclick="manualSaveToCloud()">☁️ сохранить в облако</button>
 
         <div class="filters-panel" id="filtersPanel">
             <h3>фильтры</h3>
@@ -731,16 +731,17 @@ async function saveToCloud() {
             });
         if (error) {
             console.error('Ошибка сохранения:', error);
+            alert('❌ Ошибка Supabase: ' + error.message);
         }
     } catch (e) {
         console.error('Сетевая ошибка:', e);
+        alert('❌ Сетевая ошибка: ' + e.message);
     }
 }
-// Новая функция для ручного сохранения
-async function manualSaveToCloud() {
+
+function manualSaveToCloud() {
     showToast('Отправляем в облако...');
-    await saveToCloud();
-    showToast('Данные отправлены в облако!');
+    saveToCloud().then(() => showToast('Данные сохранены!'));
 }
 
 // Заменяем старый persistAll на сохранение в облако
@@ -753,9 +754,14 @@ async function loginUser() {
     const email = document.getElementById('authEmail').value;
     const password = document.getElementById('authPassword').value;
     const errEl = document.getElementById('authError');
+    const loadEl = document.getElementById('authLoading');
+    
     errEl.style.display = 'none';
+    loadEl.style.display = 'block';
 
     const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
+
+    loadEl.style.display = 'none';
 
     if (error) {
         errEl.textContent = 'Ошибка: ' + error.message;
@@ -764,7 +770,7 @@ async function loginUser() {
         currentUser = data.user;
         document.getElementById('authScreen').style.display = 'none';
         document.getElementById('appScreen').style.display = 'block';
-        loadUserData();
+        await loadUserData();
     }
 }
 
@@ -777,14 +783,13 @@ async function logoutUser() {
 async function loadUserData() {
     if (!currentUser) return;
     
-    // Загружаем данные
     const { data, error } = await supabaseClient
         .from('user_data')
         .select('*')
         .eq('id', currentUser.id)
         .single();
 
-    if (error && error.code !== 'PGRST116') { // PGRST116 = нет строки (первый вход)
+    if (error && error.code !== 'PGRST116') {
         console.error('Ошибка загрузки:', error);
         showToast('Ошибка загрузки данных');
         return;
@@ -796,23 +801,15 @@ async function loadUserData() {
         userCards = data.user_cards || {};
         userVks = data.user_vks || {};
 
-        // Вставляем тексты обратно в поля, если они есть
-        if (data.main_data) {
-            document.getElementById('mainData').value = data.main_data;
-        }
-        if (data.names_data) {
-            document.getElementById('namesData').value = data.names_data;
-        }
+        if (data.main_data) document.getElementById('mainData').value = data.main_data;
+        if (data.names_data) document.getElementById('namesData').value = data.names_data;
         
-        // Если тексты есть, автоматически строим таблицу
         if (data.main_data && data.names_data) {
             processData();
         }
     } else {
-        // Если данных нет — создаем пустую запись
         userMarks = {}; userPaints = {}; userCards = {}; userVks = {};
         await saveToCloud();
-    }
     }
 
     showToast('Данные загружены');
@@ -832,7 +829,6 @@ async function checkSession() {
     }
 }
 
-// Запускаем проверку сессии
 checkSession();
 
 // ================== КИСТЬ ==================
@@ -980,6 +976,7 @@ function processData() {
     document.getElementById('tabsSection').style.display = 'block';
 
     applyFilters();
+    saveToCloud(); // Сохраняем тексты в облако при обработке
 }
 
 // ================== ФИЛЬТРЫ И ТАБЛИЦА ==================
