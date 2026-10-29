@@ -414,7 +414,7 @@
 <!-- ЭКРАН ВХОДА -->
 <div id="authScreen">
     <div class="auth-box">
-        <h2>Вход в дашборд</h2>
+        <h2>Вход</h2>
         <p style="font-size: 13px; color: #666; margin-bottom: 20px;">Введите email и пароль</p>
         <input type="email" id="authEmail" placeholder="Email">
         <input type="password" id="authPassword" placeholder="Пароль">
@@ -426,29 +426,29 @@
 <!-- ОСНОВНОЙ ИНТЕРФЕЙС -->
 <div id="appScreen">
     <button class="btn-logout" onclick="logoutUser()">Выйти</button>
-    <h1>дашборд: отчёты, ВКС и качество</h1>
+    <h1>Дашборд: отчёты, ВКС и качество</h1>
 
     <div class="main-tabs">
-        <button class="main-tab-btn active" onclick="switchTab('main', this)">📊 сводка по сотрудникам</button>
-        <button class="main-tab-btn" onclick="switchTab('vks-import', this)">📥 загрузка ВКС из отчёта</button>
-        <button class="main-tab-btn" onclick="switchTab('quality', this)">🌟 качество (тренеры и дни)</button>
+        <button class="main-tab-btn active" onclick="switchTab('main', this)">📊 Сводка по сотрудникам</button>
+        <button class="main-tab-btn" onclick="switchTab('vks-import', this)">📥 ВКС</button>
+        <button class="main-tab-btn" onclick="switchTab('quality', this)">🌟 Качество</button>
     </div>
 
     <!-- ВКЛАДКА 1: ОСНОВНАЯ -->
     <div class="tab-content active" id="tab-main">
         <div class="container">
             <div class="box">
-                <h3>1. данные из Excel (5 столбцов)</h3>
+                <h3>1. Данные из Excel </h3>
                 <p style="font-size: 12px; color: #666;">вставь столбцы: <b>marker_id, start_date, end_date, quality, reviewer_comment</b>.</p>
                 <textarea id="mainData" placeholder="вставь данные сюда..."></textarea>
             </div>
             <div class="box">
-                <h3>2. справочник ФИО</h3>
+                <h3>2. Сотрудники</h3>
                 <p style="font-size: 12px; color: #666;">вставь столбцы: <b>Фамилия, UUID</b> (в любом порядке).</p>
                 <textarea id="namesData" placeholder="Иванов И.И.   81977398-70..."></textarea>
             </div>
             <div class="box">
-                <h3>3. прошлый отчёт (необязательно)</h3>
+                <h3>3. Прошлый отчёт (необязательно)</h3>
                 <p style="font-size: 12px; color: #666;">загрузи прошлый .xlsx. подтянутся пометки, цвета, заметки, ВКС и т.д.</p>
                 <div class="import-info">сопоставление по <b>marker_id</b>.</div>
                 <button class="btn-import-xlsx" onclick="document.getElementById('xlsxFile').click()">📥 загрузить прошлый отчёт (.xlsx)</button>
@@ -712,12 +712,12 @@ const now = new Date(); calYear = now.getFullYear(); calMonth = now.getMonth();
 
 // Функция сохранения в облако
 async function saveToCloud() {
-    if (!currentUser) {
-        alert('Вы не авторизованы!');
-        return;
-    }
+    if (!currentUser) return;
     try {
-        const { data, error } = await supabaseClient
+        const mainText = document.getElementById('mainData') ? document.getElementById('mainData').value : '';
+        const namesText = document.getElementById('namesData') ? document.getElementById('namesData').value : '';
+
+        const { error } = await supabaseClient
             .from('user_data')
             .upsert({ 
                 id: currentUser.id, 
@@ -725,19 +725,17 @@ async function saveToCloud() {
                 user_paints: userPaints, 
                 user_cards: userCards, 
                 user_vks: userVks,
+                main_data: mainText,
+                names_data: namesText,
                 updated_at: new Date().toISOString()
             });
-        
         if (error) {
             console.error('Ошибка сохранения:', error);
-            alert('❌ Ошибка Supabase: ' + error.message);
         }
     } catch (e) {
         console.error('Сетевая ошибка:', e);
-        alert('❌ Сетевая ошибка: ' + e.message);
     }
 }
-
 // Новая функция для ручного сохранения
 async function manualSaveToCloud() {
     showToast('Отправляем в облако...');
@@ -797,10 +795,24 @@ async function loadUserData() {
         userPaints = data.user_paints || {};
         userCards = data.user_cards || {};
         userVks = data.user_vks || {};
+
+        // Вставляем тексты обратно в поля, если они есть
+        if (data.main_data) {
+            document.getElementById('mainData').value = data.main_data;
+        }
+        if (data.names_data) {
+            document.getElementById('namesData').value = data.names_data;
+        }
+        
+        // Если тексты есть, автоматически строим таблицу
+        if (data.main_data && data.names_data) {
+            processData();
+        }
     } else {
         // Если данных нет — создаем пустую запись
         userMarks = {}; userPaints = {}; userCards = {}; userVks = {};
         await saveToCloud();
+    }
     }
 
     showToast('Данные загружены');
