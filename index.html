@@ -4451,7 +4451,7 @@ document.addEventListener('keydown', e => {
     if (e.key === 'Escape') { closeModal(); closeVksModal(); }
 });
 </script>
-    <script>
+<script>
 (function() {
     // 1. Добавляем кнопку в главное меню
     const tabsContainer = document.querySelector('.main-tabs');
@@ -4521,6 +4521,15 @@ document.addEventListener('keydown', e => {
         appScreen.appendChild(tabDiv);
     }
 
+    // 3. Перехватываем переключение вкладок, чтобы отрисовывать отчёт
+    const originalSwitchTab = window.switchTab;
+    window.switchTab = function(tabId, btn) {
+        if (typeof originalSwitchTab === 'function') originalSwitchTab(tabId, btn);
+        if (tabId === 'manager-report') {
+            renderManagerReport();
+        }
+    };
+
     // 4. Инициализация дат при первом открытии
     window.applyReportPreset = function(val) {
         const fromEl = document.getElementById('repDateFrom');
@@ -4546,8 +4555,10 @@ document.addEventListener('keydown', e => {
     window.renderManagerReport = function() {
         const body = document.getElementById('repBody');
         if (!body) return;
+        
+        // Проверяем, загружены ли данные
         if (!window.globalReport || window.globalReport.length === 0) {
-            body.innerHTML = '<p style="color:var(--c-text-3); text-align:center; padding:20px;">Сначала загрузите данные в «Сводке».</p>';
+            body.innerHTML = '<p style="color:var(--c-red); text-align:center; padding:20px; font-weight:600;">Данные не найдены. Вернитесь на вкладку «Сводка» и нажмите «загрузить и обработать».</p>';
             return;
         }
 
@@ -4566,7 +4577,6 @@ document.addEventListener('keydown', e => {
 
         const cur = aggregateReportPeriod(users, from, to);
         
-        // Сравнение с предыдущим
         const doCompare = document.getElementById('repCompare').checked;
         let old = null; let prev = null;
         if (doCompare) {
@@ -4937,21 +4947,8 @@ document.addEventListener('keydown', e => {
         `;
         drillModal.classList.add('open');
     };
-      // Правильный перехват switchTab (только один раз!)
-    const originalSwitchTab = window.switchTab;
-    window.switchTab = function(tabId, btn) {
-        originalSwitchTab(tabId, btn);
-        if (tabId === 'manager-report') {
-            renderManagerReport();
-        }
-    };
 
-    // Кнопка ручного обновления на всякий случай
-    window.refreshManagerReport = function() {
-        renderManagerReport();
-    };
-
-    // Инициализация дат и первая отрисовка
+    // Задаем дефолтные даты при инициализации
     window.addEventListener('load', () => {
         setTimeout(() => {
             const fromEl = document.getElementById('repDateFrom');
@@ -4962,11 +4959,10 @@ document.addEventListener('keydown', e => {
             }
             if (toEl && !toEl.value) toEl.value = new Date().toISOString().slice(0,10);
             
-            // Отрисовываем только если данные уже есть в памяти
             if (window.globalReport && window.globalReport.length > 0) {
                 renderManagerReport();
             }
-        }, 800);
+        }, 1000);
     });
 })();
 </script>
