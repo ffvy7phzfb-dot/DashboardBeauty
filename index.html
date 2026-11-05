@@ -498,7 +498,6 @@ table.progress-table th { background: var(--c-surface-2); font-weight: 600; font
                                     <th>С ошибками</th>
                                     <th>% ошибок</th>
                                     <th>Ср. время (ч)</th>
-                                    <th>Доработки</th>
                                     <th>Тренд</th>
                                 </tr>
                             </thead>
@@ -729,29 +728,46 @@ function processData() {
     taskComments = {};
     rawParsedTasks = [];
 
-    lines.forEach(line => {
-        if (!line.trim() || line.toLowerCase().includes('marker_id')) return;
+    let currentRow = null;
+
+    for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        if (!line.trim() || line.toLowerCase().includes('marker_id')) continue;
+        
         const cols = line.split('\t');
-        if (cols.length < 4) return;
+        
+        // Если в строке есть ID и даты (от 4 колонок) — это начало новой задачи
+        if (cols.length >= 4 && cols[0].includes('-')) {
+            if (currentRow) parseRow(currentRow); // Сохраняем предыдущую
+            
+            currentRow = {
+                id: cols[0].trim(),
+                start: cols[1]?.trim() || '',
+                end: cols[2]?.trim() || '',
+                quality: parseFloat(cols[3]?.replace(',', '.')) || 0,
+                commentParts: cols.slice(4) // Берем всё, что идет после 4-й колонки
+            };
+        } else if (currentRow) {
+            // Если это продолжение комментария (многострочный текст) — приклеиваем
+            currentRow.commentParts.push(line);
+        }
+    }
+    if (currentRow) parseRow(currentRow); // Сохраняем последнюю
 
-        const id = cols[0].trim();
-        const start = cols[1]?.trim() || '';
-        const end = cols[2]?.trim() || '';
-        const quality = parseFloat(cols[3]?.replace(',', '.')) || 0;
-        const comment = cols[4]?.trim() || '';
+    function parseRow(row) {
+        const id = row.id;
+        // Склеиваем многострочный комментарий в одну строку через пробел
+        const comment = row.commentParts.join(' ').replace(/\s+/g, ' ').trim();
         const name = employees[id] || 'ФИО не указано';
-
+        
         if (!report[id]) { report[id] = { id, name, tasks: [] }; taskComments[id] = []; }
         
-        const isTimeExceeded = /превышено/i.test(comment);
-        const isRework = /доработка/i.test(comment);
-        const duration = parseDuration(start, end);
-
+        const duration = parseDuration(row.start, row.end);
         let taskHasErrors = false;
         const taskCats = {};
         categoriesList.forEach(c => taskCats[c] = false);
 
-        // ОРИГИНАЛЬНАЯ ЛОГИКА: ищем категории и проверяем, есть ли после них "без ошибк"
+        // Ищем категории и смотрим, что идет после них
         if (comment) {
             const catPattern = categoriesList.map(c => c.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|');
             const regexSplit = new RegExp(`(${catPattern})`, 'gi');
@@ -759,35 +775,40 @@ function processData() {
 
             for (let i = 1; i < parts.length; i += 2) {
                 const catName = parts[i];
-                const blockText = parts[i+1] || '';
+                const blockText = (parts[i+1] || '').trim();
                 const actualCat = categoriesList.find(c => c.toLowerCase() === catName.toLowerCase());
                 
                 if (actualCat) {
+                    // Если текст после категории НЕ содержит "без ошибк" (и вообще содержит что-то кроме знаков препинания)
                     const cleanBlock = blockText.replace(/^[:\-\s\.]+/, '').trim();
-                    if (cleanBlock.length > 0 && !cleanBlock.toLowerCase().includes('без ошибк')) {
+                    
+                    // Если это НЕ "без ошибки", значит там описание проблемы = ОШИБКА
+                    if (cleanBlock.length > 0 && !cleanBlock.toLowerCase().startsWith('без ошибк')) {
                         taskCats[actualCat] = true;
                         taskHasErrors = true;
                         taskComments[id].push({
-                            date: start.split('T')[0] || end.split('T')[0] || '',
+                            date: row.start.split('T')[0] || row.end.split('T')[0] || '',
                             category: actualCat,
-                            text: cleanBlock.slice(0, 500)
+                            text: cleanBlock.slice(0, 300)
                         });
                     }
                 }
             }
         }
-        if (isRework && !taskHasErrors) taskHasErrors = true;
 
+        // Игнорируем "Доработку", если она не привязана к категории
         const taskObj = {
-            id, startDate: start.split('T')[0], endDate: end.split('T')[0],
-            quality, comment, duration, isRework, isTimeExceeded,
-            hasErrors: taskHasErrors,
+            id, startDate: row.start.split('T')[0], endDate: row.end.split('T')[0],
+            quality: row.quality, comment, duration, 
+            isRework: /доработка/i.test(comment), // Просто сохраняем флаг для инфы, но не считаем ошибкой
+            isTimeExceeded: /превышено/i.test(comment),
+            hasErrors: taskHasErrors, // ТОЛЬКО ЕСЛИ НАШЛИ КАТЕГОРИЮ С ТЕКСТОМ
             cats: taskCats
         };
 
         report[id].tasks.push(taskObj);
         rawParsedTasks.push(taskObj);
-    });
+    }
 
     globalReport = Object.values(report);
     populateFilters();
@@ -845,29 +866,28 @@ function renderDynTeam() {
     const to = document.getElementById('dynTeamTo').value;
 
     let tbodyHtml = '';
-    let totalTasks = 0, totalErr = 0, totalTime = 0, validTimeCount = 0, totalRework = 0;
+    let totalTasks = 0, totalErr = 0, totalTime = 0, validTimeCount = 0;
 
     globalReport.forEach(u => {
         let userTasks = u.tasks.filter(t => (!from || t.startDate >= from) && (!to || t.startDate <= to));
         if (userTasks.length === 0) return;
 
-        let err = 0, timeSum = 0, timeCount = 0, rework = 0;
+        let err = 0, timeSum = 0, timeCount = 0;
         userTasks.forEach(t => {
             if (t.hasErrors) err++;
             if (t.duration > 0) { timeSum += t.duration; timeCount++; }
-            if (t.isRework) rework++;
         });
 
         const avgTime = timeCount ? (timeSum / timeCount).toFixed(1) : '—';
         const errPct = (err / userTasks.length * 100).toFixed(1);
         
-        totalTasks += userTasks.length; totalErr += err; totalTime += timeSum; validTimeCount += timeCount; totalRework += rework;
+        totalTasks += userTasks.length; totalErr += err; totalTime += timeSum; validTimeCount += timeCount;
 
         tbodyHtml += `<tr>
             <td style="text-align:left; font-weight:600;">${u.name}</td>
             <td>${userTasks.length}</td><td>${err}</td>
             <td><span class="badge-status ${errPct > 15 ? 'badge-bad' : errPct > 5 ? 'badge-warn' : 'badge-good'}">${errPct}%</span></td>
-            <td>${avgTime}</td><td>${rework}</td><td>—</td>
+            <td>${avgTime}</td><td>—</td>
         </tr>`;
     });
 
@@ -876,7 +896,6 @@ function renderDynTeam() {
         <div class="progress-kpi" style="border-left-color:var(--c-primary);"><div class="lbl">Всего задач</div><div class="val">${totalTasks}</div></div>
         <div class="progress-kpi" style="border-left-color:var(--c-red);"><div class="lbl">Ошибок</div><div class="val">${totalErr} <small>(${(totalErr/(totalTasks||1)*100).toFixed(1)}%)</small></div></div>
         <div class="progress-kpi" style="border-left-color:var(--c-orange);"><div class="lbl">Ср. время (команда)</div><div class="val">${avgTeamTime} <small>ч</small></div></div>
-        <div class="progress-kpi" style="border-left-color:var(--c-purple);"><div class="lbl">Доработки</div><div class="val">${totalRework}</div></div>
     `;
     document.getElementById('dynTeamTbody').innerHTML = tbodyHtml;
 }
@@ -945,7 +964,6 @@ function runAIAnalysis() {
 
     const total = filteredTasks.length;
     const errors = filteredTasks.filter(t => t.hasErrors).length;
-    const reworks = filteredTasks.filter(t => t.isRework).length;
     const timeTasks = filteredTasks.filter(t => t.duration > 0);
     const avgTime = timeTasks.length ? (timeTasks.reduce((s, t) => s + t.duration, 0) / timeTasks.length).toFixed(1) : 0;
     const exceeded = filteredTasks.filter(t => t.isTimeExceeded).length;
@@ -953,8 +971,6 @@ function runAIAnalysis() {
     let insightsHtml = '';
     if (target === 'team') {
         insightsHtml += `<div class="ai-insight">Команда выполнила <b>${total}</b> задач. Общий % ошибок: <b>${(errors/total*100).toFixed(1)}%</b>.</div>`;
-        if (reworks > 0) insightsHtml += `<div class="ai-insight bad">Обнаружено <b>${reworks}</b> задач с пометкой «Доработка».</div>`;
-        else insightsHtml += `<div class="ai-insight good">Отлично! Задач с пометкой «Доработка» нет.</div>`;
     } else {
         const user = globalReport.find(u => u.id === target);
         insightsHtml += `<div class="ai-insight">Анализ для <b>${user.name}</b>. Выполнено: <b>${total}</b>.</div>`;
@@ -972,10 +988,9 @@ function runAIAnalysis() {
     }
 
     let recsHtml = '';
-    if (target === 'team') recsHtml += `<div class="ai-insight">Обратите внимание на тренеров с высоким % доработок. Рекомендуется ВКС по частым ошибкам.</div>`;
+    if (target === 'team') recsHtml += `<div class="ai-insight">Обратите внимание на тренеров с высоким % ошибок. Рекомендуется ВКС по частым ошибкам.</div>`;
     else {
-        if (reworks > 2) recsHtml += `<div class="ai-insight bad">Тренеру нужна индивидуальная ВКС: много доработок.</div>`;
-        else if (errors / total > 0.15) recsHtml += `<div class="ai-insight warn">Рекомендуется разбор ошибок по категориям.</div>`;
+        if (errors / total > 0.15) recsHtml += `<div class="ai-insight warn">Рекомендуется разбор ошибок по категориям.</div>`;
         else recsHtml += `<div class="ai-insight good">Показатели в норме. Можно дать более сложные задачи.</div>`;
     }
 
