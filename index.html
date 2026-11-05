@@ -1,1214 +1,3 @@
-<!DOCTYPE html>
-<html lang="ru">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Дашборд: отчёты, ВКС и качество</title>
-<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📊</text></svg>">
-<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
-<style>
-:root {
-    --c-bg: #F5F5F7;
-    --c-bg-grad: linear-gradient(135deg, #E8EEF5 0%, #DCE6F0 40%, #E5E0F0 70%, #EBE4F0 100%);
-    --c-surface: #FFFFFF;
-    --c-surface-2: #FAFAFA;
-    --c-border: #E5E5EA;
-    --c-border-soft: #F0F0F3;
-    --c-text: #1C1C1E;
-    --c-text-2: #6E6E73;
-    --c-text-3: #8E8E93;
-    --c-primary: #5B9DF9;
-    --c-primary-grad: linear-gradient(135deg, #5B9DF9 0%, #7B6FE8 100%);
-    --c-primary-soft: rgba(91,157,249,0.12);
-    --c-green: #34C759;
-    --c-green-soft: #D4EDDA;
-    --c-green-text: #155724;
-    --c-red: #FF3B30;
-    --c-red-soft: #F8D7DA;
-    --c-red-text: #721C24;
-    --c-orange: #FF9500;
-    --c-orange-soft: #FFF3CD;
-    --c-orange-text: #856404;
-    --c-purple: #7B6FE8;
-    --r-sm: 8px;
-    --r-md: 12px;
-    --r-lg: 16px;
-    --r-xl: 24px;
-    --r-pill: 20px;
-    --sh-1: 0 1px 2px rgba(0,0,0,0.04), 0 1px 3px rgba(0,0,0,0.06);
-    --sh-2: 0 2px 4px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.08);
-    --sh-3: 0 8px 24px rgba(91,157,249,0.25), 0 2px 8px rgba(91,157,249,0.15);
-    --sh-focus: 0 0 0 4px rgba(91,157,249,0.15);
-    --f-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    --f-mono: 'JetBrains Mono', 'SF Mono', Monaco, monospace;
-}
-
-* { box-sizing: border-box; margin: 0; padding: 0; }
-
-body {
-    font-family: var(--f-sans);
-    background: var(--c-bg);
-    color: var(--c-text);
-    padding: 24px;
-    min-height: 100vh;
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
-}
-
-h1 { text-align: center; margin: 0 0 24px 0; font-size: 26px; font-weight: 700; letter-spacing: -0.5px; }
-
-#authScreen {
-    display: flex; justify-content: center; align-items: center; min-height: 100vh;
-    background: var(--c-bg-grad); position: fixed; inset: 0; z-index: 9999;
-    padding: 20px; overflow: hidden;
-}
-
-#authScreen::before, #authScreen::after {
-    content: ''; position: fixed; border-radius: 50%; filter: blur(100px);
-    opacity: 0.4; pointer-events: none; z-index: 0;
-}
-#authScreen::before { width: 500px; height: 500px; background: #A8C5E8; top: -150px; left: -150px; animation: float1 20s ease-in-out infinite; }
-#authScreen::after { width: 600px; height: 600px; background: #C9B8E8; bottom: -200px; right: -200px; animation: float2 25s ease-in-out infinite; }
-
-@keyframes float1 { 0%,100% { transform: translate(0,0) scale(1);} 50% { transform: translate(80px,60px) scale(1.1);} }
-@keyframes float2 { 0%,100% { transform: translate(0,0) scale(1);} 50% { transform: translate(-80px,-60px) scale(1.15);} }
-
-.auth-wrap { position: relative; z-index: 1; width: 100%; max-width: 420px; animation: cardIn 0.6s cubic-bezier(0.16,1,0.3,1) both; }
-@keyframes cardIn { from { opacity: 0; transform: translateY(24px);} to { opacity: 1; transform: translateY(0);} }
-
-.auth-card {
-    background: rgba(255,255,255,0.75); backdrop-filter: blur(24px) saturate(180%);
-    -webkit-backdrop-filter: blur(24px) saturate(180%);
-    border: 1px solid rgba(255,255,255,0.8); border-radius: var(--r-xl);
-    padding: 40px 36px 32px;
-    box-shadow: 0 20px 60px rgba(80,100,140,0.12), 0 4px 16px rgba(80,100,140,0.06), inset 0 1px 0 rgba(255,255,255,0.9);
-}
-
-.auth-logo {
-    width: 56px; height: 56px; border-radius: 16px; background: var(--c-primary-grad);
-    display: flex; align-items: center; justify-content: center; font-size: 28px;
-    margin: 0 auto 20px; box-shadow: var(--sh-3);
-    animation: logoIn 0.7s cubic-bezier(0.16,1,0.3,1) 0.1s both;
-}
-@keyframes logoIn { from { opacity: 0; transform: scale(0.8) translateY(-10px);} to { opacity: 1; transform: scale(1) translateY(0);} }
-
-.auth-title { text-align: center; font-size: 26px; font-weight: 700; color: var(--c-text); letter-spacing: -0.5px; margin-bottom: 6px; animation: fadeIn 0.6s ease 0.2s both; }
-.auth-subtitle { text-align: center; font-size: 14px; color: var(--c-text-2); margin-bottom: 32px; animation: fadeIn 0.6s ease 0.25s both; }
-@keyframes fadeIn { from { opacity: 0;} to { opacity: 1;} }
-
-.auth-field { position: relative; margin-bottom: 14px; animation: fadeIn 0.6s ease 0.3s both; }
-.auth-field:nth-child(3) { animation-delay: 0.35s; }
-.auth-field-icon { position: absolute; left: 16px; top: 50%; transform: translateY(-50%); font-size: 16px; color: var(--c-text-3); pointer-events: none; transition: color 0.15s; }
-
-.auth-field input {
-    width: 100%; padding: 15px 16px 15px 46px; font-size: 15px; font-family: inherit;
-    color: var(--c-text); background: rgba(255,255,255,0.7);
-    border: 1px solid rgba(200,205,215,0.6); border-radius: 14px; outline: none; transition: all 0.2s;
-}
-.auth-field input::placeholder { color: #A0A0A8; }
-.auth-field input:hover { background: rgba(255,255,255,0.9); border-color: rgba(180,190,205,0.8); }
-.auth-field input:focus { background: #FFF; border-color: var(--c-primary); box-shadow: var(--sh-focus); }
-.auth-field:focus-within .auth-field-icon { color: var(--c-primary); }
-
-.auth-eye {
-    position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
-    width: 32px; height: 32px; border: none; background: transparent;
-    cursor: pointer; font-size: 16px; color: var(--c-text-3); border-radius: 8px;
-    display: flex; align-items: center; justify-content: center; transition: background 0.15s, color 0.15s;
-}
-.auth-eye:hover { background: rgba(0,0,0,0.05); color: var(--c-text); }
-
-.auth-btn {
-    width: 100%; padding: 15px; font-size: 15px; font-weight: 600; font-family: inherit;
-    color: #FFF; background: var(--c-primary-grad); border: none; border-radius: 14px;
-    cursor: pointer; margin-top: 10px; box-shadow: var(--sh-3); transition: all 0.2s;
-    position: relative; overflow: hidden; animation: fadeIn 0.6s ease 0.4s both;
-}
-.auth-btn:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 12px 28px rgba(91,157,249,0.4), 0 4px 12px rgba(91,157,249,0.25); }
-.auth-btn:active:not(:disabled) { transform: translateY(0); }
-.auth-btn:disabled { cursor: not-allowed; opacity: 0.8; }
-
-.spinner {
-    display: inline-block; width: 16px; height: 16px;
-    border: 2px solid rgba(255,255,255,0.3); border-top-color: #FFF;
-    border-radius: 50%; animation: spin 0.7s linear infinite;
-    vertical-align: middle; margin-right: 8px; margin-top: -2px;
-}
-@keyframes spin { to { transform: rotate(360deg);} }
-
-.auth-error {
-    display: none; padding: 12px 16px; background: rgba(255,59,48,0.1);
-    border: 1px solid rgba(255,59,48,0.2); border-radius: 12px; color: #C0392B;
-    font-size: 13px; font-weight: 500; margin-top: 14px; line-height: 1.4;
-    animation: shake 0.4s ease;
-}
-.auth-error.show { display: block; }
-@keyframes shake { 0%,100% { transform: translateX(0);} 25% { transform: translateX(-6px);} 75% { transform: translateX(6px);} }
-
-.auth-footer { text-align: center; font-size: 12px; color: var(--c-text-3); margin-top: 28px; animation: fadeIn 0.6s ease 0.5s both; }
-
-#appScreen { display: none; }
-
-.app-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; flex-wrap: wrap; gap: 12px; }
-.app-header h1 { margin: 0; text-align: left; flex: 1; min-width: 200px; }
-.header-actions { display: flex; gap: 8px; flex-wrap: wrap; }
-
-.btn-header {
-    padding: 10px 18px; border: none; border-radius: var(--r-md); font-size: 14px; font-weight: 600;
-    font-family: inherit; cursor: pointer; text-decoration: none; display: inline-flex;
-    align-items: center; gap: 6px; transition: all 0.2s;
-}
-.btn-header.ghost { background: var(--c-surface); color: var(--c-text); border: 1px solid var(--c-border); box-shadow: var(--sh-1); }
-.btn-header.ghost:hover { background: var(--c-surface-2); box-shadow: var(--sh-2); }
-.btn-header.danger { background: var(--c-red-soft); color: var(--c-red-text); }
-.btn-header.danger:hover { background: #F5C6C9; }
-
-.main-tabs {
-    display: flex; gap: 4px; margin-bottom: 24px; padding: 6px;
-    background: var(--c-surface); border-radius: 16px; box-shadow: var(--sh-1);
-    width: fit-content; max-width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch;
-}
-.main-tabs::-webkit-scrollbar { display: none; }
-
-.main-tab-btn {
-    padding: 10px 18px; border: none; background: none; font-size: 14px;
-    font-weight: 500; font-family: inherit; color: var(--c-text-2); cursor: pointer;
-    border-radius: var(--r-md); transition: all 0.15s; white-space: nowrap;
-}
-.main-tab-btn:hover { background: var(--c-bg); color: var(--c-text); }
-.main-tab-btn.active { background: var(--c-primary); color: #FFF; box-shadow: 0 2px 8px rgba(91,157,249,0.3); font-weight: 600; }
-
-.tab-content { display: none; }
-.tab-content.active { display: block; animation: fadeIn 0.3s ease; }
-
-.container { display: flex; gap: 20px; margin-bottom: 20px; flex-wrap: wrap; }
-
-.box {
-    background: var(--c-surface); padding: 22px; border-radius: var(--r-lg);
-    box-shadow: var(--sh-1); flex: 1; min-width: 300px;
-}
-.box h3 { font-size: 16px; font-weight: 700; color: var(--c-text); margin-bottom: 8px; }
-.box p { font-size: 13px; color: var(--c-text-2); margin-bottom: 10px; line-height: 1.5; }
-
-textarea {
-    width: 100%; height: 120px; padding: 12px; border: 1px solid var(--c-border);
-    border-radius: var(--r-md); font-family: var(--f-mono); font-size: 12px;
-    resize: vertical; background: var(--c-surface-2); outline: none; transition: all 0.15s; color: var(--c-text);
-}
-textarea:focus { background: var(--c-surface); border-color: var(--c-primary); box-shadow: var(--sh-focus); }
-
-.btn-group { text-align: center; margin-bottom: 20px; display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
-
-button { padding: 11px 20px; border: none; border-radius: var(--r-md); cursor: pointer; font-size: 14px; font-weight: 600; font-family: inherit; transition: all 0.15s; }
-
-.btn-load { background: var(--c-primary-grad); color: #FFF; box-shadow: 0 4px 12px rgba(91,157,249,0.3); }
-.btn-load:hover { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(91,157,249,0.4); }
-
-.btn-export { background: var(--c-green); color: #FFF; display: none; }
-.btn-export:hover { background: #2AAE4C; }
-
-.btn-import-xlsx { background: var(--c-surface-2); color: var(--c-text); border: 1px solid var(--c-border); display: inline-block; }
-.btn-import-xlsx:hover { background: var(--c-bg); border-color: #D0D0D5; }
-
-.btn-cloud { background: var(--c-purple); color: #FFF; }
-.btn-cloud:hover { background: #6B5FD8; }
-
-.btn-calc { background: var(--c-primary-grad); color: #FFF; box-shadow: 0 4px 12px rgba(91,157,249,0.3); }
-.btn-calc:hover { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(91,157,249,0.4); }
-
-.btn-clear { background: var(--c-surface-2); color: var(--c-text); border: 1px solid var(--c-border); }
-.btn-clear:hover { background: var(--c-bg); }
-
-.btn-copy { background: var(--c-surface); color: var(--c-text); border: 1px solid var(--c-border); }
-.btn-copy:hover { background: var(--c-surface-2); }
-
-.filters-panel {
-    display: none; background: var(--c-surface); padding: 22px; border-radius: var(--r-lg);
-    box-shadow: var(--sh-1); margin-bottom: 20px;
-}
-.filters-panel h3 { font-size: 16px; font-weight: 700; margin-bottom: 16px; color: var(--c-text); }
-
-.filter-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin-bottom: 15px; }
-.filter-group { display: flex; flex-direction: column; }
-.filter-group label { font-size: 12px; font-weight: 600; margin-bottom: 6px; color: var(--c-text-2); text-transform: uppercase; letter-spacing: 0.4px; }
-.filter-group select, .filter-group input {
-    padding: 10px 12px; border: 1px solid var(--c-border); border-radius: var(--r-md);
-    font-size: 14px; font-family: inherit; background: var(--c-surface); color: var(--c-text); outline: none; transition: all 0.15s;
-}
-.filter-group select:focus, .filter-group input:focus { border-color: var(--c-primary); box-shadow: var(--sh-focus); }
-
-.reset-btn { background: var(--c-red-soft); color: var(--c-red-text); padding: 10px 16px; border-radius: var(--r-md); font-size: 14px; font-weight: 600; align-self: flex-end; }
-.reset-btn:hover { background: #F5C6C9; }
-
-.marks-panel {
-    display: none; background: var(--c-surface); padding: 16px 22px; border-radius: var(--r-lg);
-    box-shadow: var(--sh-1); margin-bottom: 20px; align-items: center; gap: 12px; flex-wrap: wrap;
-}
-.marks-panel h3 { font-size: 14px; font-weight: 700; color: var(--c-text); margin: 0; }
-
-.brush-btn { background: var(--c-surface-2); color: var(--c-text); padding: 8px 14px; font-size: 13px; border: 1px solid var(--c-border); border-radius: var(--r-pill); font-weight: 500; }
-.brush-btn.active { background: var(--c-primary); color: #FFF; border-color: var(--c-primary); box-shadow: 0 2px 8px rgba(91,157,249,0.3); }
-
-.color-swatch { width: 28px; height: 28px; border-radius: 50%; border: 2px solid transparent; cursor: pointer; display: inline-block; transition: transform 0.15s, border-color 0.15s; }
-.color-swatch:hover { transform: scale(1.15); }
-.color-swatch.active { border-color: var(--c-text); box-shadow: 0 0 0 2px #FFF, 0 0 0 4px var(--c-text); }
-
-.hint-text { font-size: 12px; color: var(--c-text-3); margin-left: auto; }
-
-.results {
-    background: var(--c-surface); padding: 22px; border-radius: var(--r-lg);
-    box-shadow: var(--sh-1); overflow-x: auto; margin-bottom: 20px;
-}
-
-table.summary-table { width: 100%; border-collapse: collapse; font-size: 13px; white-space: nowrap; }
-table.summary-table th, table.summary-table td {
-    border: none; border-bottom: 1px solid var(--c-border-soft); padding: 10px 12px; text-align: center;
-}
-table.summary-table th {
-    background: var(--c-surface-2); font-weight: 600; font-size: 11px;
-    text-transform: uppercase; letter-spacing: 0.4px; color: var(--c-text-2);
-    position: sticky; top: 0;
-}
-table.summary-table td.name-col { text-align: left; font-weight: 600; min-width: 150px; cursor: pointer; color: var(--c-primary); }
-table.summary-table td.name-col:hover { text-decoration: underline; }
-table.summary-table td.id-col { text-align: left; font-size: 11px; color: var(--c-text-3); max-width: 150px; overflow: hidden; text-overflow: ellipsis; font-family: var(--f-mono); }
-.zero-cell { color: #C0C0C5; }
-table.summary-table tr.total-row td { background: var(--c-primary-soft); font-weight: 700; font-size: 13px; border-bottom: 2px solid var(--c-primary); }
-table.summary-table tbody tr:hover { background: var(--c-surface-2); }
-
-body.brush-mode table.summary-table tbody tr:not(.total-row) { cursor: crosshair; }
-body.brush-mode table.summary-table tbody tr:not(.total-row) td:hover { outline: 2px dashed var(--c-purple); outline-offset: -2px; }
-
-tr.paint-red { background-color: #FFD9D6 !important; }
-tr.paint-orange { background-color: #FFE8CC !important; }
-tr.paint-yellow { background-color: #FFF9C4 !important; }
-tr.paint-green { background-color: #D4EDDA !important; }
-tr.paint-blue { background-color: #D6E8FF !important; }
-tr.paint-purple { background-color: #E5DEF8 !important; }
-tr.paint-gray { background-color: #E8E8EA !important; }
-td.paint-red { background-color: #FFD9D6 !important; }
-td.paint-orange { background-color: #FFE8CC !important; }
-td.paint-yellow { background-color: #FFF9C4 !important; }
-td.paint-green { background-color: #D4EDDA !important; }
-td.paint-blue { background-color: #D6E8FF !important; }
-td.paint-purple { background-color: #E5DEF8 !important; }
-td.paint-gray { background-color: #E8E8EA !important; }
-
-.status-select { padding: 5px 8px; border: 1px solid var(--c-border); border-radius: 8px; font-size: 12px; background: var(--c-surface); color: var(--c-text); cursor: pointer; font-family: inherit; outline: none; }
-.status-select:focus { border-color: var(--c-primary); }
-
-.tabs-section { display: none; background: var(--c-surface); padding: 22px; border-radius: var(--r-lg); box-shadow: var(--sh-1); margin-bottom: 20px; }
-.tabs-section h3 { font-size: 16px; font-weight: 700; margin-bottom: 14px; color: var(--c-text); }
-.tabs-search {
-    width: 100%; padding: 11px 14px; margin-bottom: 14px; border: 1px solid var(--c-border);
-    border-radius: var(--r-md); font-size: 14px; font-family: inherit;
-    background: var(--c-surface-2); color: var(--c-text); outline: none; transition: all 0.15s;
-}
-.tabs-search:focus { background: var(--c-surface); border-color: var(--c-primary); box-shadow: var(--sh-focus); }
-.tabs-list { display: flex; flex-wrap: wrap; gap: 8px; max-height: 220px; overflow-y: auto; }
-.tab-btn { background: var(--c-surface-2); color: var(--c-text); padding: 8px 16px; border-radius: var(--r-pill); font-size: 13px; font-weight: 500; border: 1px solid var(--c-border); transition: all 0.15s; }
-.tab-btn:hover { background: var(--c-bg); border-color: #D0D0D5; }
-.tab-btn.archived { opacity: 0.55; }
-
-.modal-overlay {
-    display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4);
-    backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
-    z-index: 1000; justify-content: center; align-items: flex-start;
-    padding: 30px 15px; overflow-y: auto;
-}
-.modal-overlay.open { display: flex; }
-
-.modal {
-    background: var(--c-surface); border-radius: var(--r-xl); max-width: 1100px; width: 100%;
-    padding: 28px; box-shadow: 0 20px 60px rgba(0,0,0,0.2);
-    position: relative; animation: modalIn 0.3s cubic-bezier(0.16,1,0.3,1);
-}
-@keyframes modalIn { from { opacity: 0; transform: scale(0.96) translateY(10px);} to { opacity: 1; transform: scale(1) translateY(0);} }
-
-.modal-close {
-    position: absolute; top: 16px; right: 16px; background: var(--c-surface-2); color: var(--c-text);
-    width: 36px; height: 36px; border-radius: 50%; font-size: 18px; padding: 0;
-    display: flex; align-items: center; justify-content: center; font-weight: 600;
-    border: none; cursor: pointer; transition: all 0.15s;
-}
-.modal-close:hover { background: var(--c-red-soft); color: var(--c-red-text); }
-.modal h2 { margin: 0 0 6px 0; color: var(--c-text); padding-right: 50px; font-size: 22px; font-weight: 700; letter-spacing: -0.3px; }
-.modal .subline { color: var(--c-text-2); font-size: 13px; margin-bottom: 20px; word-break: break-all; font-family: var(--f-mono); }
-
-.card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; margin-bottom: 18px; }
-.card-block { background: var(--c-surface-2); padding: 16px 18px; border-radius: var(--r-md); border-left: 3px solid var(--c-primary); }
-.card-block h4 { margin: 0 0 8px 0; font-size: 11px; font-weight: 600; color: var(--c-text-2); text-transform: uppercase; letter-spacing: 0.6px; }
-.stat-big { font-size: 24px; font-weight: 700; color: var(--c-text); letter-spacing: -0.5px; }
-
-.cat-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 8px; }
-.cat-table td { padding: 6px 8px; border-bottom: 1px solid var(--c-border-soft); }
-.cat-table td:last-child { text-align: right; font-weight: 700; color: var(--c-red); font-family: var(--f-mono); }
-.cat-table td:first-child { color: var(--c-text-2); }
-
-.comments-list { max-height: 320px; overflow-y: auto; padding-right: 6px; }
-.comment-item { background: var(--c-surface); border: 1px solid var(--c-border-soft); border-radius: var(--r-md); padding: 10px 12px; margin-bottom: 8px; font-size: 12px; }
-.comment-date { color: var(--c-primary); font-weight: 600; margin-right: 6px; font-family: var(--f-mono); }
-.comment-cat { color: var(--c-red); font-weight: 600; }
-
-.field-group { display: flex; flex-direction: column; margin-bottom: 14px; }
-.field-group label { font-size: 12px; font-weight: 600; color: var(--c-text-2); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.4px; }
-.field-group input, .field-group textarea, .field-group select {
-    padding: 10px 12px; border: 1px solid var(--c-border); border-radius: var(--r-md);
-    font-size: 14px; font-family: inherit; width: 100%; background: var(--c-surface);
-    color: var(--c-text); outline: none; transition: all 0.15s;
-}
-.field-group input:focus, .field-group textarea:focus, .field-group select:focus { border-color: var(--c-primary); box-shadow: var(--sh-focus); }
-.field-group textarea { min-height: 90px; resize: vertical; font-family: inherit; font-size: 14px; }
-
-.links-list { margin-bottom: 8px; }
-.link-row { display: flex; gap: 8px; align-items: center; margin-bottom: 6px; font-size: 13px; }
-.link-row a { flex: 1; color: var(--c-primary); word-break: break-all; text-decoration: none; }
-.link-row a:hover { text-decoration: underline; }
-.link-row button { padding: 5px 10px; font-size: 12px; background: var(--c-red-soft); color: var(--c-red-text); border-radius: 6px; font-weight: 600; }
-.link-add-row { display: flex; gap: 6px; margin-top: 6px; }
-.link-add-row input { flex: 1; padding: 8px 10px; border: 1px solid var(--c-border); border-radius: 8px; font-size: 13px; font-family: inherit; background: var(--c-surface); color: var(--c-text); outline: none; }
-.link-add-row input:focus { border-color: var(--c-primary); }
-.link-add-row button { padding: 8px 14px; font-size: 13px; background: var(--c-green); color: #FFF; }
-
-.modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; flex-wrap: wrap; }
-.btn-save { background: var(--c-primary-grad); color: #FFF; box-shadow: 0 4px 12px rgba(91,157,249,0.3); }
-.btn-save:hover { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(91,157,249,0.4); }
-.btn-archive { background: var(--c-surface-2); color: var(--c-text-2); border: 1px solid var(--c-border); }
-.btn-archive:hover { background: var(--c-bg); }
-.btn-unarchive { background: var(--c-orange-soft); color: var(--c-orange-text); }
-.btn-unarchive:hover { background: #FFE5B4; }
-.btn-cancel { background: var(--c-surface-2); color: var(--c-text); border: 1px solid var(--c-border); }
-.btn-cancel:hover { background: var(--c-bg); }
-
-.save-toast {
-    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(100px);
-    background: var(--c-text); color: #FFF; padding: 12px 24px; border-radius: var(--r-md);
-    font-size: 14px; font-weight: 500; z-index: 2000; opacity: 0;
-    transition: all 0.3s cubic-bezier(0.16,1,0.3,1); box-shadow: 0 8px 24px rgba(0,0,0,0.2); pointer-events: none;
-}
-.save-toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
-
-.import-info {
-    background: var(--c-primary-soft); border-left: 3px solid var(--c-primary);
-    padding: 12px 16px; border-radius: var(--r-md); font-size: 13px; color: var(--c-text);
-    margin-bottom: 14px; line-height: 1.5;
-}
-
-.vks-block { border-left-color: var(--c-purple) !important; }
-.vks-header { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
-.vks-header h4 { margin: 0; flex: 1; color: var(--c-text-2); text-transform: uppercase; font-size: 11px; letter-spacing: 0.6px; font-weight: 600; }
-.vks-nav { background: var(--c-surface-2); color: var(--c-text); padding: 6px 12px; font-size: 14px; border-radius: 8px; font-weight: 600; border: 1px solid var(--c-border); }
-.vks-nav:hover { background: var(--c-bg); }
-.vks-month-title { font-weight: 700; color: var(--c-text); font-size: 14px; min-width: 140px; text-align: center; }
-.vks-calendar { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
-.vks-dow { text-align: center; font-size: 10px; font-weight: 700; color: var(--c-text-3); padding: 6px 0; text-transform: uppercase; }
-.vks-day {
-    min-height: 68px; border: 1px solid var(--c-border-soft); border-radius: 10px;
-    padding: 4px; background: var(--c-surface); position: relative; cursor: pointer;
-    transition: all 0.15s; overflow: hidden; display: flex; flex-direction: column;
-}
-.vks-day:hover { background: var(--c-surface-2); border-color: var(--c-purple); transform: translateY(-1px); }
-.vks-day.empty { background: var(--c-surface-2); cursor: default; border: 1px dashed var(--c-border); }
-.vks-day.empty:hover { background: var(--c-surface-2); border-color: var(--c-border); transform: none; }
-.vks-day.has-vks { background: #F3E8FC; border-color: var(--c-purple); border-width: 2px; }
-.vks-day-num { font-size: 11px; font-weight: 700; color: var(--c-text-2); margin-bottom: 3px; }
-.vks-day-cat { font-size: 9px; padding: 2px 4px; border-radius: 4px; color: #FFF; font-weight: 600; margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.vks-cat-individual { background: var(--c-primary); }
-.vks-cat-general { background: var(--c-orange); }
-.vks-cat-master { background: var(--c-red); }
-.vks-day-comment {
-    font-size: 9px; color: var(--c-text-2); line-height: 1.2; overflow: hidden; text-overflow: ellipsis;
-    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; flex: 1;
-}
-.vks-day-plus { position: absolute; top: 4px; right: 6px; font-size: 14px; color: var(--c-purple); font-weight: bold; opacity: 0; transition: opacity 0.15s; }
-.vks-day:hover .vks-day-plus { opacity: 1; }
-.vks-day.has-vks .vks-day-plus { opacity: 0.5; }
-
-.vks-modal-overlay {
-    display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5);
-    backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
-    z-index: 1500; justify-content: center; align-items: center; padding: 20px;
-}
-.vks-modal-overlay.open { display: flex; }
-.vks-modal {
-    background: var(--c-surface); border-radius: var(--r-xl); max-width: 500px; width: 100%;
-    padding: 24px; position: relative; box-shadow: 0 20px 60px rgba(0,0,0,0.2);
-    animation: modalIn 0.3s cubic-bezier(0.16,1,0.3,1);
-}
-.vks-modal h3 { margin: 0 0 8px 0; color: var(--c-text); font-size: 18px; font-weight: 700; }
-.vks-modal .vks-date-label { color: var(--c-text-2); font-size: 13px; margin-bottom: 16px; }
-
-.quality-controls {
-    display: flex; gap: 15px; flex-wrap: wrap; align-items: flex-end;
-    background: var(--c-surface); padding: 20px; border-radius: var(--r-lg);
-    box-shadow: var(--sh-1); margin-bottom: 20px;
-}
-.quality-controls .field-group { margin-bottom: 0; min-width: 150px; flex: 1; }
-
-.thresholds-box {
-    display: flex; gap: 15px; flex-wrap: wrap; align-items: center;
-    background: var(--c-surface-2); padding: 14px 18px; border-radius: var(--r-md);
-    border: 1px solid var(--c-border-soft); margin-bottom: 15px;
-}
-.threshold-item { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--c-text-2); }
-.threshold-item input { width: 70px; padding: 6px 8px; border: 1px solid var(--c-border); border-radius: 8px; font-size: 13px; font-family: inherit; background: var(--c-surface); color: var(--c-text); outline: none; }
-.color-dot { width: 14px; height: 14px; border-radius: 50%; display: inline-block; }
-
-.q-green { background-color: var(--c-green-soft) !important; color: var(--c-green-text) !important; font-weight: 700; }
-.q-orange { background-color: var(--c-orange-soft) !important; color: var(--c-orange-text) !important; font-weight: 700; }
-.q-red { background-color: var(--c-red-soft) !important; color: var(--c-red-text) !important; font-weight: 700; }
-
-.mode-box {
-    display: flex; gap: 18px; align-items: center; background: var(--c-surface-2);
-    padding: 12px 16px; border-radius: var(--r-md); flex-wrap: wrap; border: 1px solid var(--c-border-soft);
-}
-.mode-box label { margin: 0; font-weight: 500; display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 14px; color: var(--c-text); }
-
-table.q-table { border-collapse: collapse; width: 100%; margin-top: 12px; font-size: 14px; }
-table.q-table th, table.q-table td { border: none; border-bottom: 1px solid var(--c-border-soft); padding: 10px 14px; text-align: left; }
-table.q-table th { background: var(--c-surface-2); cursor: pointer; user-select: none; font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.4px; color: var(--c-text-2); }
-table.q-table th:hover { background: var(--c-bg); }
-table.q-table th .arrow { color: var(--c-primary); margin-left: 6px; font-size: 11px; }
-table.q-table tbody tr:hover { background: var(--c-surface-2); }
-.no-name { color: var(--c-orange-text); font-style: italic; }
-
-.stats { background: var(--c-surface-2); border: 1px solid var(--c-border-soft); border-radius: var(--r-md); padding: 12px 16px; margin-top: 12px; font-size: 13px; color: var(--c-text-2); }
-
-.q-emp-chip { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: var(--r-pill); cursor: pointer; font-size: 12px; font-weight: 500; border: 1px solid var(--c-border); background: var(--c-surface-2); color: var(--c-text-2); transition: all 0.15s; }
-.q-emp-chip.checked { background: var(--c-primary); color: #FFF; border-color: var(--c-primary); }
-.q-emp-chip input { margin: 0; display: none; }
-
-.progress-controls {
-    display: flex; gap: 14px; flex-wrap: wrap; align-items: flex-end;
-    background: var(--c-surface); padding: 22px; border-radius: var(--r-lg);
-    box-shadow: var(--sh-1); margin-bottom: 20px;
-}
-.progress-controls .field-group { margin-bottom: 0; min-width: 140px; flex: 1; }
-
-.progress-kpi-grid {
-    display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-    gap: 14px; margin-bottom: 20px;
-}
-.progress-kpi {
-    background: var(--c-surface); padding: 20px 22px; border-radius: var(--r-lg);
-    box-shadow: var(--sh-1); border-left: 4px solid var(--c-primary);
-    transition: transform 0.15s, box-shadow 0.15s;
-}
-.progress-kpi:hover { transform: translateY(-2px); box-shadow: var(--sh-2); }
-.progress-kpi .lbl { font-size: 11px; color: var(--c-text-2); text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px; margin-bottom: 8px; }
-.progress-kpi .val { font-size: 28px; font-weight: 700; color: var(--c-text); letter-spacing: -0.6px; }
-.progress-kpi .val small { font-size: 14px; color: var(--c-text-3); font-weight: 500; margin-left: 4px; }
-.progress-kpi .sub { font-size: 12px; color: var(--c-text-3); margin-top: 4px; }
-
-.progress-chart-block {
-    background: var(--c-surface); padding: 24px; border-radius: var(--r-lg);
-    box-shadow: var(--sh-1); margin-bottom: 20px;
-}
-.progress-chart-block h3 { font-size: 16px; font-weight: 700; color: var(--c-text); margin-bottom: 8px; }
-.progress-chart-block .chart-hint { font-size: 12px; color: var(--c-text-3); margin-bottom: 16px; }
-
-.progress-table-wrap {
-    background: var(--c-surface); padding: 22px; border-radius: var(--r-lg);
-    box-shadow: var(--sh-1); margin-bottom: 20px; overflow-x: auto;
-}
-.progress-table-wrap h3 { font-size: 16px; font-weight: 700; color: var(--c-text); margin-bottom: 14px; }
-
-table.progress-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-table.progress-table th, table.progress-table td {
-    border: none; border-bottom: 1px solid var(--c-border-soft); padding: 10px 14px; text-align: center;
-}
-table.progress-table th {
-    background: var(--c-surface-2); font-weight: 600; font-size: 11px;
-    text-transform: uppercase; letter-spacing: 0.4px; color: var(--c-text-2);
-}
-table.progress-table tbody tr:hover { background: var(--c-surface-2); }
-table.progress-table td.period-col { text-align: left; font-weight: 600; color: var(--c-text); }
-
-.badge-status {
-    display: inline-block; padding: 3px 10px; border-radius: 12px;
-    font-size: 11px; font-weight: 700; letter-spacing: 0.3px;
-}
-.badge-good { background: var(--c-green-soft); color: var(--c-green-text); }
-.badge-warn { background: var(--c-orange-soft); color: var(--c-orange-text); }
-.badge-bad { background: var(--c-red-soft); color: var(--c-red-text); }
-
-/* ===== НОВЫЕ СТИЛИ ДЛЯ СРАВНЕНИЯ И AI ===== */
-.cmp-tabs { display: flex; gap: 8px; margin-bottom: 16px; }
-.cmp-tab-btn { padding: 8px 16px; border: 1px solid var(--c-border); background: var(--c-surface-2); border-radius: var(--r-pill); font-size: 13px; font-weight: 600; cursor: pointer; color: var(--c-text-2); transition: all 0.15s; }
-.cmp-tab-btn.active { background: var(--c-primary); color: #fff; border-color: var(--c-primary); }
-
-.cmp-view { display: none; }
-.cmp-view.active { display: block; }
-
-.cmp-wrapper { background: var(--c-surface); border-radius: var(--r-lg); padding: 24px; box-shadow: var(--sh-1); margin-bottom: 20px; border: 1px solid var(--c-border-soft); }
-.cmp-main-title { text-align: center; font-size: 22px; font-weight: 800; color: var(--c-text); margin-bottom: 8px; letter-spacing: -0.5px; }
-.cmp-big-pct { text-align: center; font-size: 64px; font-weight: 800; line-height: 1; letter-spacing: -2px; margin-bottom: 8px; }
-.cmp-big-pct.good { color: var(--c-green); }
-.cmp-big-pct.bad { color: var(--c-red); }
-.cmp-sub-title { text-align: center; font-size: 14px; color: var(--c-text-2); font-weight: 500; margin-bottom: 24px; }
-.cmp-cards { display: flex; justify-content: center; align-items: center; gap: 20px; margin-bottom: 24px; flex-wrap: wrap; }
-.cmp-card { background: var(--c-surface-2); border: 1px solid var(--c-border-soft); border-radius: var(--r-lg); padding: 20px 30px; text-align: center; min-width: 160px; }
-.cmp-card .val { font-size: 36px; font-weight: 800; color: var(--c-text); line-height: 1; margin-bottom: 8px; letter-spacing: -1px; }
-.cmp-card.after .val { color: var(--c-green); }
-.cmp-card .date { font-size: 13px; color: var(--c-text-3); font-weight: 500; }
-.cmp-arrow { font-size: 24px; color: var(--c-text-3); font-weight: 300; }
-.cmp-cats { display: flex; justify-content: center; flex-wrap: wrap; gap: 16px; background: var(--c-surface-2); border-radius: var(--r-pill); padding: 12px 24px; margin-bottom: 24px; }
-.cmp-cat-item { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--c-text-2); text-transform: capitalize; }
-.cmp-cat-item b { font-size: 14px; font-weight: 700; }
-.cmp-cat-item b.good { color: var(--c-green); }
-.cmp-cat-item b.bad { color: var(--c-red); }
-.cmp-footer { text-align: center; }
-.cmp-footer-badge { display: inline-flex; align-items: center; gap: 8px; background: var(--c-green-soft); color: var(--c-green-text); padding: 8px 20px; border-radius: var(--r-pill); font-size: 14px; font-weight: 600; }
-.cmp-footer-badge.bad { background: var(--c-red-soft); color: var(--c-red-text); }
-
-.ai-controls { display: flex; gap: 16px; flex-wrap: wrap; align-items: flex-end; margin-bottom: 20px; background: var(--c-surface); padding: 20px; border-radius: var(--r-lg); box-shadow: var(--sh-1); }
-.ai-controls .field-group { margin-bottom: 0; min-width: 150px; }
-
-.ai-output { background: var(--c-surface); padding: 24px; border-radius: var(--r-lg); box-shadow: var(--sh-1); }
-.ai-section { margin-bottom: 24px; }
-.ai-section h4 { font-size: 14px; font-weight: 700; color: var(--c-text); margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
-.ai-insight { display: flex; gap: 10px; background: var(--c-surface-2); padding: 10px 14px; border-radius: var(--r-md); margin-bottom: 8px; border-left: 3px solid var(--c-text-3); font-size: 13px; align-items: flex-start; }
-.ai-insight.good { border-left-color: var(--c-green); }
-.ai-insight.bad { border-left-color: var(--c-red); }
-.ai-insight.warn { border-left-color: var(--c-orange); }
-
-.trend-up { color: var(--c-red); font-weight: 700; }
-.trend-down { color: var(--c-green); font-weight: 700; }
-.trend-flat { color: var(--c-text-3); font-weight: 600; }
-
-@media (max-width: 768px) {
-    body { padding: 12px; }
-    h1 { font-size: 22px; }
-    .auth-card { padding: 32px 24px 24px; }
-    .auth-title { font-size: 23px; }
-    .auth-logo { width: 50px; height: 50px; font-size: 24px; }
-    .box { padding: 16px; }
-    .results { padding: 16px; }
-    .modal { padding: 20px; }
-    .app-header h1 { font-size: 20px; }
-    .progress-kpi .val { font-size: 24px; }
-}
-</style>
-</head>
-<body>
-
-<div id="authScreen">
-    <div class="auth-wrap">
-        <div class="auth-card">
-            <div class="auth-logo">📊</div>
-            <div class="auth-title">Дашборд</div>
-            <div class="auth-subtitle">Войдите, чтобы продолжить</div>
-
-            <div class="auth-field">
-                <input type="email" id="authEmail" placeholder="Email" autocomplete="email">
-                <span class="auth-field-icon">✉️</span>
-            </div>
-
-            <div class="auth-field">
-                <input type="password" id="authPassword" placeholder="Пароль" autocomplete="current-password">
-                <span class="auth-field-icon">🔒</span>
-                <button type="button" class="auth-eye" id="authEye" onclick="togglePassword()" tabindex="-1" title="Показать пароль">👁</button>
-            </div>
-
-            <button class="auth-btn" id="authSubmit" onclick="doLogin()">Войти</button>
-
-            <div class="auth-error" id="authError"></div>
-
-            <div class="auth-footer">Отчёты, ВКС и качество</div>
-        </div>
-    </div>
-</div>
-
-<div id="appScreen">
-    <div class="app-header">
-        <h1>Дашборд</h1>
-        <div class="header-actions">
-            <a href="https://ffvy7phzfb-dot.github.io/Analytic-/" target="_blank" class="btn-header ghost">AI Аналитик</a>
-            <button class="btn-header danger" onclick="logoutUser()">Выйти</button>
-        </div>
-    </div>
-
-    <div class="main-tabs">
-        <button class="main-tab-btn active" onclick="switchTab('main', this)">📊 Сводка</button>
-        <button class="main-tab-btn" onclick="switchTab('progress', this)">📈 Общий прогресс</button>
-        <button class="main-tab-btn" onclick="switchTab('vks-import', this)">📥 ВКС из отчёта</button>
-        <button class="main-tab-btn" onclick="switchTab('quality', this)">🌟 Качество</button>
-        <button class="main-tab-btn" onclick="switchTab('dynamics', this)">📈 Динамика</button>
-        <button class="main-tab-btn" onclick="switchTab('compare', this)">⚖️ Сравнение</button>
-        <button class="main-tab-btn" onclick="switchTab('ai-analysis', this)">🤖 AI Анализ</button>
-    </div>
-
-    <div class="tab-content active" id="tab-main">
-        <div class="container">
-            <div class="box">
-                <h3>1. Данные из Excel (5 столбцов)</h3>
-                <p>вставь столбцы: <b>marker_id, start_date, end_date, quality, reviewer_comment</b>.</p>
-                <textarea id="mainData" placeholder="вставь данные сюда..."></textarea>
-            </div>
-            <div class="box">
-                <h3>2. Тренеры</h3>
-                <p>вставь ФИО и UUID. форматы: <b>Фамилия</b>, <b>Фамилия Имя</b>, <b>Фамилия Имя Отчество</b> — через Tab с ID.</p>
-                <textarea id="namesData" placeholder="Иванов Иван Петрович    81977398-70..."></textarea>
-            </div>
-            <div class="box">
-                <h3>3. Прошлый отчёт</h3>
-                <p>загрузи прошлый .xlsx. подтянутся пометки, цвета, заметки, ВКС и т.д.</p>
-                <div class="import-info">сопоставление по <b>marker_id</b>.</div>
-                <button class="btn-import-xlsx" onclick="document.getElementById('xlsxFile').click()">📥 загрузить (.xlsx)</button>
-                <input type="file" id="xlsxFile" accept=".xlsx,.xls" style="display:none" onchange="importPreviousXlsx(event)">
-                <div id="importStatus" style="margin-top:10px; font-size:13px; color:var(--c-text-2);"></div>
-            </div>
-        </div>
-
-        <div class="btn-group">
-            <button class="btn-load" onclick="processData()">загрузить и обработать</button>
-            <button class="btn-cloud" onclick="manualSaveToCloud()">☁️ сохранить в облако</button>
-            <button class="btn-export" id="exportBtn" onclick="exportToExcel()">скачать всё в Excel</button>
-        </div>
-
-        <div class="filters-panel" id="filtersPanel">
-            <h3>Фильтры</h3>
-            <div class="filter-grid">
-                <div class="filter-group">
-                    <label>сотрудник</label>
-                    <select id="filterUser" onchange="applyFilters()"><option value="all">все сотрудники</option></select>
-                </div>
-                <div class="filter-group">
-                    <label>start date (от)</label>
-                    <input type="date" id="filterDateFrom" onchange="applyFilters()">
-                </div>
-                <div class="filter-group">
-                    <label>start date (до)</label>
-                    <input type="date" id="filterDateTo" onchange="applyFilters()">
-                </div>
-                <div class="filter-group">
-                    <label>пометка</label>
-                    <select id="filterMark" onchange="applyFilters()">
-                        <option value="all">все</option>
-                        <option value="none">без пометки</option>
-                        <option value="newbie">новичок</option>
-                        <option value="experienced">опытный</option>
-                    </select>
-                </div>
-                <div class="filter-group">
-                    <label>цвет кисти</label>
-                    <select id="filterPaint" onchange="applyFilters()">
-                        <option value="all">все</option>
-                        <option value="none">без цвета</option>
-                        <option value="red">красный</option>
-                        <option value="orange">оранжевый</option>
-                        <option value="yellow">жёлтый</option>
-                        <option value="green">зелёный</option>
-                        <option value="blue">синий</option>
-                        <option value="purple">фиолетовый</option>
-                        <option value="gray">серый</option>
-                    </select>
-                </div>
-                <div class="filter-group">
-                    <button class="reset-btn" onclick="resetFilters()">сбросить</button>
-                </div>
-            </div>
-        </div>
-
-        <div class="marks-panel" id="marksPanel">
-            <h3>Кисть:</h3>
-            <button class="brush-btn" id="brushToggle" onclick="toggleBrush()">включить</button>
-            <span style="font-size:13px; color:var(--c-text-2);">цвет:</span>
-            <span class="color-swatch" data-paint="red" style="background:#FF6B6B;" onclick="pickPaint('red')"></span>
-            <span class="color-swatch" data-paint="orange" style="background:#FFA94D;" onclick="pickPaint('orange')"></span>
-            <span class="color-swatch" data-paint="yellow" style="background:#FFD43B;" onclick="pickPaint('yellow')"></span>
-            <span class="color-swatch" data-paint="green" style="background:#69DB7C;" onclick="pickPaint('green')"></span>
-            <span class="color-swatch" data-paint="blue" style="background:#74C0FC;" onclick="pickPaint('blue')"></span>
-            <span class="color-swatch" data-paint="purple" style="background:#B197FC;" onclick="pickPaint('purple')"></span>
-            <span class="color-swatch" data-paint="gray" style="background:#CED4DA;" onclick="pickPaint('gray')"></span>
-            <span class="color-swatch" data-paint="none" style="background:#FFF; border:2px solid #ADB5BD;" onclick="pickPaint('none')"></span>
-            <span class="hint-text">клик по фамилии (без кисти) — карточка.</span>
-        </div>
-
-        <div class="results" id="output">
-            <h3 style="text-align:center; color:var(--c-text-3); font-size:14px;">здесь будет результат</h3>
-        </div>
-
-        <div class="tabs-section" id="tabsSection">
-            <h3>Карточки сотрудников</h3>
-            <input type="text" class="tabs-search" id="tabsSearch" placeholder="поиск по ФИО или marker_id..." oninput="renderTabs()">
-            <div class="tabs-list" id="tabsList"></div>
-        </div>
-
-        <div class="progress-table-wrap" id="weekProgressBlock" style="display:none; margin-top:20px;">
-            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:14px;">
-                <h3 style="margin:0;">📊 Прогресс по периодам</h3>
-                <div style="display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap;">
-                    <div class="field-group" style="margin:0; min-width:170px;">
-                        <label style="font-size:11px;">режим</label>
-                        <select id="wpMode" onchange="renderWeekProgress()">
-                            <option value="all" selected>Все сотрудники</option>
-                            <option value="selected">Только выбранные (по фильтрам)</option>
-                        </select>
-                    </div>
-                    <div class="field-group" style="margin:0; min-width:130px;">
-                        <label style="font-size:11px;">шаг</label>
-                        <select id="wpStep" onchange="renderWeekProgress()">
-                            <option value="week" selected>по неделям</option>
-                            <option value="day">по дням</option>
-                            <option value="month">по месяцам</option>
-                        </select>
-                    </div>
-                    <div class="field-group" style="margin:0; min-width:150px;">
-                        <label style="font-size:11px;">метрика</label>
-                        <select id="wpMetric" onchange="renderWeekProgress()">
-                            <option value="pct" selected>% ошибок</option>
-                            <option value="quality">среднее качество</option>
-                        </select>
-                    </div>
-                    <button class="btn-copy" onclick="exportWeekProgress()" style="padding:9px 14px;">📤 экспорт</button>
-                </div>
-            </div>
-
-            <div style="position:relative; height:340px; margin-bottom:20px;">
-                <canvas id="wpChart"></canvas>
-            </div>
-
-            <div style="overflow-x:auto; max-height:500px; overflow-y:auto;">
-                <div id="wpTable"></div>
-            </div>
-            <div id="wpSummary" style="margin-top:14px; font-size:13px; color:var(--c-text-2);"></div>
-        </div>
-    </div>
-
-    <div class="tab-content" id="tab-progress">
-        <div class="container">
-            <div class="box" style="min-width:100%;">
-                <h3>Общий прогресс команды</h3>
-                <p>сравнение фактического качества с нормой. норма задаётся вручную. среднее считается только по неархивным тренерам.</p>
-
-                <div class="progress-controls">
-                    <div class="field-group" style="flex:0 0 160px;">
-                        <label>норма качества, %</label>
-                        <input type="number" id="progNorm" value="100" step="1" min="0" max="100" onchange="renderProgress()">
-                    </div>
-                    <div class="field-group" style="flex:0 0 150px;">
-                        <label>шаг</label>
-                        <select id="progStep" onchange="renderProgress()">
-                            <option value="day">по дням</option>
-                            <option value="week" selected>по неделям</option>
-                            <option value="month">по месяцам</option>
-                        </select>
-                    </div>
-                    <div class="field-group" style="flex:0 0 150px;">
-                        <label>группа</label>
-                        <select id="progGroup" onchange="renderProgress()">
-                            <option value="all">все</option>
-                            <option value="newbie">только новички</option>
-                            <option value="experienced">только опытные</option>
-                        </select>
-                    </div>
-                    <div class="field-group" style="flex:0 0 160px;">
-                        <label>период от</label>
-                        <input type="date" id="progFrom" onchange="renderProgress()">
-                    </div>
-                    <div class="field-group" style="flex:0 0 160px;">
-                        <label>период до</label>
-                        <input type="date" id="progTo" onchange="renderProgress()">
-                    </div>
-                    <div class="field-group" style="flex:0 0 160px;">
-                        <label>быстрый выбор</label>
-                        <select id="progQuick" onchange="applyProgQuick(this.value)">
-                            <option value="">—</option>
-                            <option value="4w">4 недели</option>
-                            <option value="8w">8 недель</option>
-                            <option value="12w">12 недель</option>
-                            <option value="all">всё время</option>
-                        </select>
-                    </div>
-                    <div class="field-group" style="flex:0 0 160px;">
-                        <label>&nbsp;</label>
-                        <button class="btn-copy" onclick="exportProgress()" style="padding:10px 14px;">📤 экспорт</button>
-                    </div>
-                </div>
-
-                <div class="progress-kpi-grid" id="progKpi"></div>
-
-                <div class="progress-chart-block">
-                    <h3>📈 среднее качество vs норма</h3>
-                    <div class="chart-hint">зелёная зона — выше нормы, красная — ниже. пунктир — норма качества.</div>
-                    <div style="position:relative; height:360px;"><canvas id="progChart"></canvas></div>
-                </div>
-
-                <div class="progress-table-wrap">
-                    <h3>Детализация по периодам</h3>
-                    <div id="progTable"></div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <div class="tab-content" id="tab-vks-import">
-        <div class="container">
-            <div class="box" style="min-width:100%;">
-                <h3>Загрузка ВКС из отчёта</h3>
-                <p>вставь колонку «Отчёт по ВКС и НФ» из Excel. скрипт найдёт в тексте фамилии из справочника.</p>
-                <div class="import-info">⚠️ фамилии ищутся по первому слову из справочника ФИО.</div>
-                <div style="display:flex; gap:15px; flex-wrap:wrap; margin-bottom:15px;">
-                    <div style="flex:1; min-width:250px;">
-                        <label style="font-size:13px; font-weight:600; display:block; margin-bottom:6px; color:var(--c-text-2);">дата ВКС:</label>
-                        <input type="date" id="vksImportDate" style="padding:10px 12px; border:1px solid var(--c-border); border-radius:var(--r-md); width:100%; font-family:inherit; font-size:14px; background:var(--c-surface); color:var(--c-text); outline:none;">
-                    </div>
-                    <div style="flex:1; min-width:250px;">
-                        <label style="font-size:13px; font-weight:600; display:block; margin-bottom:6px; color:var(--c-text-2);">категория:</label>
-                        <select id="vksImportCategory" style="padding:10px 12px; border:1px solid var(--c-border); border-radius:var(--r-md); width:100%; font-family:inherit; font-size:14px; background:var(--c-surface); color:var(--c-text); outline:none;">
-                            <option value="individual">индивидуальная</option>
-                            <option value="general">общая</option>
-                            <option value="master">мастер-класс</option>
-                        </select>
-                    </div>
-                </div>
-                <textarea id="vksReportData" placeholder="вставь сюда колонку 'Отчёт по ВКС и НФ'..." style="height:180px;"></textarea>
-                <div class="btn-group" style="margin-top:15px; margin-bottom:0;">
-                    <button class="btn-load" onclick="parseVksReport()">🔍 найти фамилии в тексте</button>
-                    <button class="btn-import-xlsx" onclick="document.getElementById('vksXlsxFile').click()">📥 загрузить .xlsx</button>
-                    <input type="file" id="vksXlsxFile" accept=".xlsx,.xls" style="display:none" onchange="importVksXlsx(event)">
-                </div>
-                <div id="vksImportStatus" style="margin-top:15px; font-size:13px;"></div>
-                <div id="vksImportResults" style="margin-top:15px;"></div>
-            </div>
-        </div>
-    </div>
-
-    <div class="tab-content" id="tab-quality">
-        <div class="container">
-            <div class="box" style="min-width:100%;">
-                <h3>Расчёт качества</h3>
-                <p>данные автоматически подтягиваются из вкладки «Сводка». можно отредактировать вручную.</p>
-
-                <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:15px;">
-                    <button class="btn-copy" onclick="syncQualityFromMain()" style="padding:10px 16px;">🔄 обновить из сводки</button>
-                    <span id="qSyncInfo" style="font-size:12px; color:var(--c-text-3); align-self:center;"></span>
-                </div>
-
-                <div style="display:flex; gap:16px; flex-wrap:wrap; margin-bottom:15px;">
-                    <div style="flex:1; min-width:300px;">
-                        <label style="font-size:13px; font-weight:600; display:block; margin-bottom:6px; color:var(--c-text-2);">1. данные: ID, начало, конец, качество</label>
-                        <textarea id="qDataInput" placeholder="скопируй из Excel столбцы marker_id, start_date, end_date, quality..."></textarea>
-                    </div>
-                    <div style="flex:1; min-width:300px;">
-                        <label style="font-size:13px; font-weight:600; display:block; margin-bottom:6px; color:var(--c-text-2);">2. справочник ФИО</label>
-                        <textarea id="qNameInput" placeholder="Фамилия Имя&#9;ID"></textarea>
-                    </div>
-                </div>
-                <div class="quality-controls">
-                    <div class="field-group" style="flex:0 0 150px;">
-                        <label>коэффициент:</label>
-                        <input type="number" id="qCoefInput" value="1.03" step="0.0001" min="0">
-                    </div>
-                    <div class="field-group">
-                        <label>период (от):</label>
-                        <input type="date" id="qDateFrom">
-                    </div>
-                    <div class="field-group">
-                        <label>период (до):</label>
-                        <input type="date" id="qDateTo">
-                    </div>
-                    <div class="field-group" style="flex:1; min-width:250px;">
-                        <label>режим:</label>
-                        <div class="mode-box">
-                            <label><input type="radio" name="qMode" value="trainer" checked> по тренерам</label>
-                            <label><input type="radio" name="qMode" value="day"> по дням</label>
-                            <label><input type="radio" name="qMode" value="dayTrainer"> день+тренер</label>
-                            <label><input type="radio" name="qMode" value="week">динамика</label>
-                        </div>
-                    </div>
-                </div>
-                <div class="thresholds-box">
-                    <span style="font-weight:600; font-size:13px;">пороги:</span>
-                    <div class="threshold-item">
-                        <span class="color-dot" style="background:#EF4444;"></span>
-                        <span>красный:</span>
-                        <input type="number" id="thrRed" value="0.85" step="0.01" disabled>
-                        <span>и меньше</span>
-                    </div>
-                    <div class="threshold-item">
-                        <span class="color-dot" style="background:#F97316;"></span>
-                        <span>оранжевый:</span>
-                        <input type="number" id="thrOrange" value="0.86" step="0.01">
-                        <span>до</span>
-                        <input type="number" id="thrOrangeEnd" value="0.96" step="0.01">
-                    </div>
-                    <div class="threshold-item">
-                        <span class="color-dot" style="background:#22C55E;"></span>
-                        <span>зелёный:</span>
-                        <input type="number" id="thrGreen" value="0.97" step="0.01">
-                        <span>и выше</span>
-                    </div>
-                </div>
-
-                <div style="background:var(--c-primary-soft); border-left:3px solid var(--c-primary); padding:14px 18px; border-radius:var(--r-md); margin-bottom:15px;">
-                    <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:10px;">
-                        <b style="font-size:13px;">👥 фильтр по сотрудникам:</b>
-                        <input type="text" id="qEmpSearch" placeholder="поиск по фамилии..." style="padding:8px 12px; border:1px solid var(--c-border); border-radius:8px; font-size:13px; flex:1; min-width:200px; font-family:inherit; background:var(--c-surface); color:var(--c-text); outline:none;" oninput="renderEmployeeChips()">
-                        <button onclick="selectAllEmployees(true)" style="padding:8px 14px; font-size:12px; background:var(--c-primary); color:#fff; border-radius:8px; border:none; cursor:pointer; font-family:inherit; font-weight:600;">выбрать всех</button>
-                        <button onclick="selectAllEmployees(false)" style="padding:8px 14px; font-size:12px; background:var(--c-surface-2); color:var(--c-text); border-radius:8px; border:1px solid var(--c-border); cursor:pointer; font-family:inherit; font-weight:600;">снять всех</button>
-                    </div>
-                    <div id="qEmpChips" style="display:flex; flex-wrap:wrap; gap:6px; max-height:120px; overflow-y:auto;">
-                        <span style="font-size:12px; color:var(--c-text-3);">сначала нажми «посчитать», чтобы появился список сотрудников.</span>
-                    </div>
-                </div>
-
-                <div class="btn-group" style="margin-bottom:0;">
-                    <button class="btn-calc" onclick="calcQuality()">посчитать</button>
-                    <button class="btn-copy" id="qCopyBtn" onclick="copyQualityResult()" disabled>скопировать</button>
-                    <button class="btn-clear" onclick="clearQuality()">очистить</button>
-                </div>
-                <div id="qStats" class="stats" style="display:none;"></div>
-            </div>
-        </div>
-        <div class="results" id="qResultBox" style="display:none;">
-            <h3 id="qResultTitle" style="margin-top:0; font-size:16px;">результат</h3>
-            <div style="overflow-x:auto;">
-                <table class="q-table" id="qResultTable">
-                    <thead id="qResultHead"></thead>
-                    <tbody></tbody>
-                </table>
-            </div>
-            <div id="qThresholdHint" style="margin-top:12px; font-size:12px; color:var(--c-text-2);"></div>
-        </div>
-    </div>
-
-    <div class="tab-content" id="tab-dynamics">
-        <div class="container">
-            <div class="box" style="min-width:100%;">
-                <h3>Профиль тренера во времени</h3>
-                <p>данные берутся из основной сводки (вкладка 1). если там пусто — вернись и загрузи отчёт.</p>
-
-                <div style="display:flex; gap:12px; flex-wrap:wrap; margin-bottom:20px; align-items:flex-end;">
-                    <div class="field-group" style="flex:1; min-width:220px;">
-                        <label>тренер</label>
-                        <input type="text" id="dynSearch" placeholder="поиск по фамилии..." oninput="renderDynTrainerList()" style="margin-bottom:6px;">
-                        <select id="dynTrainerSelect" onchange="renderDynProfile()" size="1"></select>
-                    </div>
-                    <div class="field-group" style="flex:0 0 150px;">
-                        <label>шаг</label>
-                        <select id="dynStep" onchange="renderDynProfile()">
-                            <option value="day">по дням</option>
-                            <option value="week" selected>по неделям</option>
-                            <option value="month">по месяцам</option>
-                        </select>
-                    </div>
-                    <div class="field-group" style="flex:0 0 160px;">
-                        <label>период от</label>
-                        <input type="date" id="dynFrom" onchange="renderDynProfile()">
-                    </div>
-                    <div class="field-group" style="flex:0 0 160px;">
-                        <label>период до</label>
-                        <input type="date" id="dynTo" onchange="renderDynProfile()">
-                    </div>
-                    <div class="field-group" style="flex:0 0 160px;">
-                        <label>быстрый выбор</label>
-                        <select id="dynQuick" onchange="applyDynQuick(this.value)">
-                            <option value="">—</option>
-                            <option value="4w">4 недели</option>
-                            <option value="8w">8 недель</option>
-                            <option value="12w">12 недель</option>
-                            <option value="all">всё время</option>
-                        </select>
-                    </div>
-                    <div class="field-group" style="flex:0 0 160px;">
-                        <label>&nbsp;</label>
-                        <button class="btn-copy" onclick="exportDynProfile()" style="padding:10px 14px;">📤 экспорт</button>
-                    </div>
-                </div>
-
-                <div id="dynEmpty" style="text-align:center; color:var(--c-text-3); padding:40px 0;">выбери тренера выше 👆</div>
-
-                <div id="dynProfile" style="display:none;">
-                    <div id="dynHeader" style="background:linear-gradient(135deg,#EEF4FF 0%,#F5F0FF 100%); border-left:4px solid var(--c-primary); border-radius:var(--r-md); padding:16px 20px; margin-bottom:18px;"></div>
-                    <div id="dynKpi" style="display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:12px; margin-bottom:20px;"></div>
-
-                    <div style="background:var(--c-surface); border:1px solid var(--c-border-soft); border-radius:var(--r-md); padding:16px; margin-bottom:16px;">
-                        <h4 style="margin:0 0 12px 0; color:var(--c-text); font-size:14px; font-weight:700;">📉 динамика % ошибок (тренер vs среднее)</h4>
-                        <div style="position:relative; height:320px;"><canvas id="dynChartQuality"></canvas></div>
-                    </div>
-
-                    <div style="background:var(--c-surface); border:1px solid var(--c-border-soft); border-radius:var(--r-md); padding:16px; margin-bottom:16px;">
-                        <h4 style="margin:0 0 12px 0; color:var(--c-text); font-size:14px; font-weight:700;">🧩 ошибки по категориям</h4>
-                        <div style="position:relative; height:340px;"><canvas id="dynChartCats"></canvas></div>
-                    </div>
-
-                    <div style="background:var(--c-surface); border:1px solid var(--c-border-soft); border-radius:var(--r-md); padding:16px; margin-bottom:16px;">
-                        <h4 style="margin:0 0 12px 0; color:var(--c-text); font-size:14px; font-weight:700;">⚖️ ошибки по категориям по периодам</h4>
-                        <div id="dynProgressTable" style="overflow-x:auto; max-height:480px; overflow-y:auto; border-radius:var(--r-md);"></div>
-                    </div>
-
-                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
-                        <div style="background:var(--c-surface); border:1px solid var(--c-border-soft); border-radius:var(--r-md); padding:16px;">
-                            <h4 style="margin:0 0 12px 0; color:var(--c-text); font-size:14px; font-weight:700;">🎥 лента ВКС</h4>
-                            <div id="dynVksList" class="comments-list"></div>
-                        </div>
-                        <div style="background:var(--c-surface); border:1px solid var(--c-border-soft); border-radius:var(--r-md); padding:16px;">
-                            <h4 style="margin:0 0 12px 0; color:var(--c-text); font-size:14px; font-weight:700;">💬 комментарии ревьюера</h4>
-                            <div id="dynCommentsList" class="comments-list"></div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- ВКЛАДКА СРАВНЕНИЯ (ОБА ВАРИАНТА) -->
-    <div class="tab-content" id="tab-compare">
-        <div class="container">
-            <div class="box" style="min-width:100%;">
-                <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:16px;">
-                    <h3 style="margin:0;">Сравнение периодов</h3>
-                    <div class="cmp-tabs">
-                        <button class="cmp-tab-btn active" onclick="switchCmpView('general', this)">Общий вид</button>
-                        <button class="cmp-tab-btn" onclick="switchCmpView('by-emp', this)">Таблица по сотрудникам</button>
-                    </div>
-                </div>
-
-                <!-- ВАРИАНТ 1: ОБЩИЙ ВИД (ДО/ПОСЛЕ) -->
-                <div id="cmp-view-general" class="cmp-view active">
-                    <div style="display:flex; gap:12px; flex-wrap:wrap; margin-bottom:20px; align-items:flex-end;">
-                        <div class="field-group" style="margin:0; min-width:250px; flex-direction:row; align-items:center; gap:10px;">
-                            <label style="margin:0; white-space:nowrap;">кто:</label>
-                            <select id="cmpTarget" onchange="renderCompareGeneral()" style="flex:1;">
-                                <option value="all">🌟 Все сотрудники (суммарно)</option>
-                            </select>
-                        </div>
-                    </div>
-
-                    <div class="cmp-dates" style="margin-bottom: 24px; display:flex; gap:12px; align-items:flex-end; flex-wrap:wrap;">
-                        <div class="field-group" style="margin:0;">
-                            <label>Период А (было)</label>
-                            <div style="display:flex; gap:6px;">
-                                <input type="date" id="cmpAFrom" onchange="renderCompareGeneral()">
-                                <input type="date" id="cmpATo" onchange="renderCompareGeneral()">
-                            </div>
-                        </div>
-                        <div class="cmp-arrow" style="margin-bottom:10px;">→</div>
-                        <div class="field-group" style="margin:0;">
-                            <label>Период Б (стало)</label>
-                            <div style="display:flex; gap:6px;">
-                                <input type="date" id="cmpBFrom" onchange="renderCompareGeneral()">
-                                <input type="date" id="cmpBTo" onchange="renderCompareGeneral()">
-                            </div>
-                        </div>
-                    </div>
-
-                    <div id="cmpGeneralResult" class="cmp-wrapper" style="display:none; box-shadow:none; padding:0; border:none;">
-                        <div class="cmp-main-title" id="cmpTitle"></div>
-                        <div class="cmp-big-pct" id="cmpBigPct"></div>
-                        <div class="cmp-sub-title">заданий с ошибками</div>
-                        
-                        <div class="cmp-cards">
-                            <div class="cmp-card">
-                                <div class="val" id="cmpValA">0</div>
-                                <div class="date" id="cmpDateA">—</div>
-                            </div>
-                            <div class="cmp-arrow">→</div>
-                            <div class="cmp-card after">
-                                <div class="val" id="cmpValB">0</div>
-                                <div class="date" id="cmpDateB">—</div>
-                            </div>
-                        </div>
-
-                        <div class="cmp-cats" id="cmpCats"></div>
-
-                        <div class="cmp-footer">
-                            <div class="cmp-footer-badge" id="cmpFooterBadge">качество растёт · вы молодцы</div>
-                        </div>
-                    </div>
-                    
-                    <div id="cmpEmpty" style="text-align:center; color:var(--c-text-3); padding:40px 0;">
-                        заполните периоды выше 👆
-                    </div>
-                </div>
-
-                <!-- ВАРИАНТ 2: ТАБЛИЦА ПО СОТРУДНИКАМ -->
-                <div id="cmp-view-by-emp" class="cmp-view">
-                    <div class="cmp-controls" style="display:flex; gap:16px; flex-wrap:wrap; align-items:flex-end; margin-bottom:20px; background:var(--c-surface-2); padding:16px; border-radius:var(--r-md); border:1px solid var(--c-border-soft);">
-                        <div class="field-group">
-                            <label>Период</label>
-                            <select id="cmpPeriodType" onchange="renderCompareTable()">
-                                <option value="week">Неделя</option>
-                                <option value="month" selected>Месяц</option>
-                                <option value="quarter">Квартал</option>
-                            </select>
-                        </div>
-                        <div class="field-group">
-                            <label>От</label>
-                            <input type="date" id="cmpDateFrom" onchange="renderCompareTable()">
-                        </div>
-                        <div class="field-group">
-                            <label>До</label>
-                            <input type="date" id="cmpDateTo" onchange="renderCompareTable()">
-                        </div>
-                        <div class="field-group" style="justify-content: flex-end;">
-                            <button class="btn-copy" onclick="renderCompareTable()" style="padding:10px 20px;">Обновить</button>
-                        </div>
-                    </div>
-
-                    <div class="progress-kpi-grid" id="cmpKpi"></div>
-
-                    <div style="overflow-x:auto; max-height:600px; border-radius:var(--r-md);">
-                        <div id="cmpTableContainer"></div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- ВКЛАДКА AI АНАЛИЗ -->
-    <div class="tab-content" id="tab-ai-analysis">
-        <div class="container">
-            <div class="box" style="min-width:100%;">
-                <h3>🤖 AI Анализ</h3>
-                <p>Выберите сотрудника (или всех) и период — сгенерируем подробный отчет.</p>
-                
-                <div class="ai-controls">
-                    <div class="field-group" style="flex:1; min-width:200px;">
-                        <label>Сотрудник</label>
-                        <select id="aiTarget" onchange="renderAiAnalysis()">
-                            <option value="all">🌟 Все сотрудники</option>
-                        </select>
-                    </div>
-                    <div class="field-group" style="flex:0 0 160px;">
-                        <label>Период от</label>
-                        <input type="date" id="aiDateFrom" onchange="renderAiAnalysis()">
-                    </div>
-                    <div class="field-group" style="flex:0 0 160px;">
-                        <label>Период до</label>
-                        <input type="date" id="aiDateTo" onchange="renderAiAnalysis()">
-                    </div>
-                    <div class="field-group" style="justify-content: flex-end;">
-                        <button class="btn-calc" onclick="renderAiAnalysis()" style="padding:10px 20px;">Сгенерировать</button>
-                    </div>
-                </div>
-
-                <div id="aiOutputBox" class="ai-output" style="display:none;">
-                    <div id="aiResultContent"></div>
-                </div>
-                <div id="aiEmpty" style="text-align:center; color:var(--c-text-3); padding:40px 0;">
-                    выберите параметры и нажмите «Сгенерировать» 👆
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <div class="modal-overlay" id="modalOverlay" onclick="if(event.target===this)closeModal()">
-        <div class="modal" id="modalContent"></div>
-    </div>
-    <div class="vks-modal-overlay" id="vksModalOverlay" onclick="if(event.target===this)closeVksModal()">
-        <div class="vks-modal" id="vksModalContent"></div>
-    </div>
-    <div class="save-toast" id="saveToast">сохранено</div>
-</div>
-
 <script>
 const SUPABASE_URL = 'https://lzjyacoflsggrfrqlbsx.supabase.co';
 const SUPABASE_KEY = 'sb_publishable__BwRBB5_ZTH-L84Gi7zGNg_c-YHoyUA';
@@ -1949,7 +738,6 @@ function renderTabs() {
     list.innerHTML = html;
 }
 
-/* ===== АНАЛИЗ И РЕКОМЕНДАЦИИ ===== */
 const CATEGORY_TIPS = {
     'маркдаун': { topic: 'Разметка и форматирование', checklist: ['Проверить заголовки (H1/H2) в последних задачах','Пройти чек-лист по маркдауну перед сдачей','Разобрать 2–3 примера с ошибками из комментариев'] },
     'ошибки РП': { topic: 'Работа с речевыми ошибками', checklist: ['Перечитать критерии качества по РП','Разобрать примеры неудачных формулировок','Проверять текст на речевые ошибки перед отправкой'] },
@@ -2128,7 +916,7 @@ function buildMessageTemplate(name, errPct, teamErrPct, problemCats, improvingCa
         if (problemCats.length > 1) msg += ` и ${problemCats.slice(1).map(c => CAT_SHORT_LABELS[c] || c).join(', ')}`;
         msg += `.\n\n`;
     }
-    msg += `Если хочешь, могу скинуть примеры и чек-лист. Хорошей недели! 🙌`;
+    msg += `Если хочешь, могу скинуть примеры и чек-лист. Хорошей недели!`;
     return msg;
 }
 
@@ -2623,7 +1411,6 @@ function importVksXlsx(ev) {
     alert('функция импорта .xlsx для ВКС будет доступна в следующей версии');
 }
 
-/* ===== КАЧЕСТВО ===== */
 let qResultRows = []; let qAllRows = []; 
 let qCurrentMode = 'trainer';
 let qSortKey = 'avg'; let qSortDir = 'desc';
@@ -2928,9 +1715,7 @@ function clearQuality() {
     if (infoEl) infoEl.textContent = '';
 }
 
-/* ===== ОБЩИЙ ПРОГРЕСС ===== */
 let progChart = null;
-
 function pad2p(n) { return n < 10 ? '0' + n : '' + n; }
 function isoDateP(d) { return d.getFullYear() + '-' + pad2p(d.getMonth()+1) + '-' + pad2p(d.getDate()); }
 
@@ -3135,10 +1920,8 @@ function exportProgress() {
     showToast('экспортировано');
 }
 
-/* ===== ДИНАМИКА ТРЕНЕРА ===== */
 let dynChartQuality = null;
 let dynChartCats = null;
-
 function pad2dyn(n) { return n < 10 ? '0' + n : '' + n; }
 function isoDate(d) { return d.getFullYear() + '-' + pad2dyn(d.getMonth()+1) + '-' + pad2dyn(d.getDate()); }
 
@@ -3549,7 +2332,6 @@ function exportDynProfile() {
     showToast('профиль экспортирован');
 }
 
-/* ===== ОБЩИЙ ЭКСПОРТ ===== */
 function exportToExcel() {
     if (globalReport.length === 0) { alert('нет данных'); return; }
     const wb = XLSX.utils.book_new();
@@ -3729,7 +2511,6 @@ function importPreviousXlsx(ev) {
     ev.target.value = '';
 }
 
-/* ===== ПРОГРЕСС ПО ПЕРИОДАМ (Сводка) ===== */
 let wpChart = null;
 
 function wpBucketKey(dateStr, step) {
@@ -3952,7 +2733,6 @@ function exportWeekProgress() {
     showToast('экспортировано');
 }
 
-/* ===== ВКЛАДКА СРАВНЕНИЯ (ОБЩИЙ ВИД) ===== */
 function populateCompareTargets() {
     const sel = document.getElementById('cmpTarget');
     if (!sel) return;
@@ -3973,6 +2753,7 @@ function formatDateShort(dateStr) {
     return `${d}.${m}`;
 }
 
+// ИСПРАВЛЕННАЯ ЛОГИКА СРАВНЕНИЯ (Общий вид)
 function renderCompareGeneral() {
     const targetId = document.getElementById('cmpTarget').value;
     const aFrom = document.getElementById('cmpAFrom').value;
@@ -4004,6 +2785,7 @@ function renderCompareGeneral() {
             (u.tasks || []).forEach(t => {
                 const d = t.startDate || t.endDate;
                 if (!d) return;
+                // КЛЮЧЕВОЕ ИСПРАВЛЕНИЕ: сравниваем только строки дат (YYYY-MM-DD)
                 if (d < from || d > to) return;
                 total++;
                 if (t.hasErrors) errors++;
@@ -4065,17 +2847,17 @@ function renderCompareGeneral() {
     });
     catsEl.innerHTML = catsHtml || '<div class="cmp-cat-item">нет ошибок в категориях</div>';
 
+    // Заменённые фразы и смайлики
     const badge = document.getElementById('cmpFooterBadge');
     if (isGood) {
         badge.className = 'cmp-footer-badge';
-        badge.innerHTML = '🌿 качество растёт · вы молодцы';
+        badge.innerHTML = '📊 динамика положительная';
     } else {
         badge.className = 'cmp-footer-badge bad';
-        badge.innerHTML = '⚠️ качество падает · нужно внимание';
+        badge.innerHTML = '📊 динамика отрицательная';
     }
 }
 
-/* ===== ВКЛАДКА СРАВНЕНИЯ (ТАБЛИЦА) ===== */
 function getWeekRange(dateStr) {
     const d = new Date(dateStr + 'T00:00:00');
     const day = d.getDay() || 7;
@@ -4244,7 +3026,6 @@ function renderCompareTable() {
     document.getElementById('cmpTableContainer').innerHTML = html;
 }
 
-/* ===== ВКЛАДКА AI АНАЛИЗ ===== */
 function populateAiTargets() {
     const sel = document.getElementById('aiTarget');
     if (!sel) return;
@@ -4282,7 +3063,6 @@ function renderAiAnalysis() {
         return;
     }
 
-    // Сбор задач за период
     const tasks = [];
     if (targetId === 'all') {
         globalReport.forEach(u => {
@@ -4330,13 +3110,10 @@ function renderAiAnalysis() {
     let subtitle = `Период: ${formatDateShort(from)} – ${formatDateShort(to)} · Задач: ${total}`;
 
     let insightsHtml = '';
-    
-    // Базовые показатели
     insightsHtml += `<div class="ai-insight"><span style="font-size:16px;">📊</span><span><b>Всего задач:</b> ${total} (с ошибками: ${errCount})</span></div>`;
     insightsHtml += `<div class="ai-insight"><span style="font-size:16px;">🎯</span><span><b>% ошибок:</b> ${errPct.toFixed(1)}%</span></div>`;
     insightsHtml += `<div class="ai-insight"><span style="font-size:16px;">⭐</span><span><b>Среднее качество:</b> ${avgQ.toFixed(1)}%</span></div>`;
 
-    // Тренд
     if (trendDelta < -3) {
         insightsHtml += `<div class="ai-insight good"><span style="font-size:16px;">📈</span><span><b>Тренд:</b> Качество растёт. Во второй половине периода ошибок стало меньше на ${Math.abs(trendDelta).toFixed(1)} п.п.</span></div>`;
     } else if (trendDelta > 3) {
@@ -4345,7 +3122,6 @@ function renderAiAnalysis() {
         insightsHtml += `<div class="ai-insight warn"><span style="font-size:16px;">➡️</span><span><b>Тренд:</b> Стабильно. Уровень ошибок держится примерно на одном уровне.</span></div>`;
     }
 
-    // Проблемные категории
     const problemCats = categoriesList.filter(c => catCounts[c] > 0).sort((a,b) => catPct[b] - catPct[a]).slice(0, 3);
     if (problemCats.length > 0) {
         insightsHtml += `<div class="ai-insight bad"><span style="font-size:16px;">⚠️</span><span><b>Топ ошибок:</b> ${problemCats.map(c => `${CAT_SHORT_LABELS[c] || c} (${catCounts[c]})`).join(', ')}</span></div>`;
@@ -4367,7 +3143,6 @@ function renderAiAnalysis() {
     });
     categoriesHtml += `</tbody></table></div>`;
 
-    // Если все сотрудники, добавим разбивку по людям
     let perUserHtml = '';
     if (targetId === 'all') {
         perUserHtml = `<div class="ai-section">
@@ -4419,9 +3194,7 @@ function renderAiAnalysis() {
     `;
 }
 
-// Инициализация при загрузке
 window.onload = () => {
-    // Даты по умолчанию
     const today = new Date();
     const past = new Date(today); past.setDate(past.getDate() - 90);
     const pFrom = past.toISOString().slice(0,10);
