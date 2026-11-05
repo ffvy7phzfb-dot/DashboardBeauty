@@ -743,22 +743,50 @@ function processData() {
 
         if (!report[id]) { report[id] = { id, name, tasks: [] }; taskComments[id] = []; }
         
-        const isRework = /доработка/i.test(comment);
         const isTimeExceeded = /превышено/i.test(comment);
+        const isRework = /доработка/i.test(comment);
         const duration = parseDuration(start, end);
+
+        let taskHasErrors = false;
+        const taskCats = {};
+        categoriesList.forEach(c => taskCats[c] = false);
+
+        // ОРИГИНАЛЬНАЯ ЛОГИКА: ищем категории и проверяем, есть ли после них "без ошибк"
+        if (comment) {
+            const catPattern = categoriesList.map(c => c.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|');
+            const regexSplit = new RegExp(`(${catPattern})`, 'gi');
+            const parts = comment.split(regexSplit);
+
+            for (let i = 1; i < parts.length; i += 2) {
+                const catName = parts[i];
+                const blockText = parts[i+1] || '';
+                const actualCat = categoriesList.find(c => c.toLowerCase() === catName.toLowerCase());
+                
+                if (actualCat) {
+                    const cleanBlock = blockText.replace(/^[:\-\s\.]+/, '').trim();
+                    if (cleanBlock.length > 0 && !cleanBlock.toLowerCase().includes('без ошибк')) {
+                        taskCats[actualCat] = true;
+                        taskHasErrors = true;
+                        taskComments[id].push({
+                            date: start.split('T')[0] || end.split('T')[0] || '',
+                            category: actualCat,
+                            text: cleanBlock.slice(0, 500)
+                        });
+                    }
+                }
+            }
+        }
+        if (isRework && !taskHasErrors) taskHasErrors = true;
 
         const taskObj = {
             id, startDate: start.split('T')[0], endDate: end.split('T')[0],
             quality, comment, duration, isRework, isTimeExceeded,
-            hasErrors: comment.length > 0 && !/нет ошибок/i.test(comment) && !/верный ответ/i.test(comment),
-            cats: {}
+            hasErrors: taskHasErrors,
+            cats: taskCats
         };
-        
-        categoriesList.forEach(c => { if (comment.toLowerCase().includes(c.toLowerCase())) taskObj.cats[c] = true; });
 
         report[id].tasks.push(taskObj);
         rawParsedTasks.push(taskObj);
-        if (comment) taskComments[id].push({ date: taskObj.startDate, category: isRework ? 'Доработка' : 'Комментарий', text: comment });
     });
 
     globalReport = Object.values(report);
