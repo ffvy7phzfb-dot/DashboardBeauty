@@ -4939,8 +4939,22 @@ document.addEventListener('keydown', e => {
         `;
         drillModal.classList.add('open');
     };
+    // Функция для принудительного обновления (если поменяли период)
+    window.refreshManagerReport = function() {
+        renderManagerReport();
+    };
 
-    // Задаем дефолтные даты при инициализации
+    // Автоматическое обновление при переключении вкладки
+    const origSwitchTab = window.switchTab;
+    window.switchTab = function(tabId, btn) {
+        origSwitchTab(tabId, btn);
+        if (tabId === 'manager-report') {
+            // Небольшая задержка, чтобы данные успели подгрузиться
+            setTimeout(() => renderManagerReport(), 50); 
+        }
+    };
+
+    // Задаем дефолтные даты и перерисовываем при загрузке
     window.addEventListener('load', () => {
         setTimeout(() => {
             const fromEl = document.getElementById('repDateFrom');
@@ -4950,7 +4964,12 @@ document.addEventListener('keydown', e => {
                 fromEl.value = t.toISOString().slice(0,10);
             }
             if (toEl && !toEl.value) toEl.value = new Date().toISOString().slice(0,10);
-        }, 500);
+            
+            // Если данные уже загружены к моменту открытия — рисуем
+            if (window.globalReport && window.globalReport.length > 0) {
+                renderManagerReport();
+            }
+        }, 1500); // Ждем 1.5 секунды, пока Supabase отдаст данные
     });
 })();
 </script>
