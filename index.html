@@ -1324,16 +1324,20 @@ async function saveToCloud() {
         const namesText = document.getElementById('namesData') ? document.getElementById('namesData').value : '';
         const settings = collectAllSettings();
 
-        const { error } = await supabaseClient.rpc('upsert_user_data', {
-            p_id: currentUser.id,
-            p_main_data: mainText,
-            p_names_data: namesText,
-            p_user_marks: userMarks,
-            p_user_paints: userPaints,
-            p_user_cards: userCards,
-            p_user_vks: userVks,
-            p_settings: settings
-        });
+        // Пробуем сохранить данные напрямую в таблицу
+        const { error } = await supabaseClient
+            .from('user_data')
+            .upsert({
+                id: currentUser.id,
+                main_data: mainText,
+                names_data: namesText,
+                user_marks: userMarks,
+                user_paints: userPaints,
+                user_cards: userCards,
+                user_vks: userVks,
+                settings: settings,
+                updated_at: new Date().toISOString()
+            });
 
         if (error) console.error('Ошибка сохранения:', error);
     } catch (e) {
