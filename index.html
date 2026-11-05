@@ -1,741 +1,3 @@
-<!DOCTYPE html>
-<html lang="ru">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Дашборд: отчёты, ВКС и качество</title>
-<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📊</text></svg>">
-<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
-<style>
-:root {
-    --c-bg: #F5F5F7;
-    --c-bg-grad: linear-gradient(135deg, #E8EEF5 0%, #DCE6F0 40%, #E5E0F0 70%, #EBE4F0 100%);
-    --c-surface: #FFFFFF;
-    --c-surface-2: #FAFAFA;
-    --c-border: #E5E5EA;
-    --c-border-soft: #F0F0F3;
-    --c-text: #1C1C1E;
-    --c-text-2: #6E6E73;
-    --c-text-3: #8E8E93;
-    --c-primary: #5B9DF9;
-    --c-primary-grad: linear-gradient(135deg, #5B9DF9 0%, #7B6FE8 100%);
-    --c-primary-soft: rgba(91,157,249,0.12);
-    --c-green: #34C759;
-    --c-green-soft: #D4EDDA;
-    --c-green-text: #155724;
-    --c-red: #FF3B30;
-    --c-red-soft: #F8D7DA;
-    --c-red-text: #721C24;
-    --c-orange: #FF9500;
-    --c-orange-soft: #FFF3CD;
-    --c-orange-text: #856404;
-    --c-purple: #7B6FE8;
-    --r-sm: 8px;
-    --r-md: 12px;
-    --r-lg: 16px;
-    --r-xl: 24px;
-    --r-pill: 20px;
-    --sh-1: 0 1px 2px rgba(0,0,0,0.04), 0 1px 3px rgba(0,0,0,0.06);
-    --sh-2: 0 2px 4px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.08);
-    --sh-3: 0 8px 24px rgba(91,157,249,0.25), 0 2px 8px rgba(91,157,249,0.15);
-    --sh-focus: 0 0 0 4px rgba(91,157,249,0.15);
-    --f-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    --f-mono: 'JetBrains Mono', 'SF Mono', Monaco, monospace;
-}
-
-* { box-sizing: border-box; margin: 0; padding: 0; }
-
-body {
-    font-family: var(--f-sans);
-    background: var(--c-bg);
-    color: var(--c-text);
-    padding: 24px;
-    min-height: 100vh;
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
-}
-
-h1 { text-align: center; margin: 0 0 24px 0; font-size: 26px; font-weight: 700; letter-spacing: -0.5px; }
-
-#authScreen {
-    display: flex; justify-content: center; align-items: center; min-height: 100vh;
-    background: var(--c-bg-grad); position: fixed; inset: 0; z-index: 9999;
-    padding: 20px; overflow: hidden;
-}
-
-#authScreen::before, #authScreen::after {
-    content: ''; position: fixed; border-radius: 50%; filter: blur(100px);
-    opacity: 0.4; pointer-events: none; z-index: 0;
-}
-#authScreen::before { width: 500px; height: 500px; background: #A8C5E8; top: -150px; left: -150px; animation: float1 20s ease-in-out infinite; }
-#authScreen::after { width: 600px; height: 600px; background: #C9B8E8; bottom: -200px; right: -200px; animation: float2 25s ease-in-out infinite; }
-
-@keyframes float1 { 0%,100% { transform: translate(0,0) scale(1);} 50% { transform: translate(80px,60px) scale(1.1);} }
-@keyframes float2 { 0%,100% { transform: translate(0,0) scale(1);} 50% { transform: translate(-80px,-60px) scale(1.15);} }
-
-.auth-wrap { position: relative; z-index: 1; width: 100%; max-width: 420px; animation: cardIn 0.6s cubic-bezier(0.16,1,0.3,1) both; }
-@keyframes cardIn { from { opacity: 0; transform: translateY(24px);} to { opacity: 1; transform: translateY(0);} }
-
-.auth-card {
-    background: rgba(255,255,255,0.75); backdrop-filter: blur(24px) saturate(180%);
-    -webkit-backdrop-filter: blur(24px) saturate(180%);
-    border: 1px solid rgba(255,255,255,0.8); border-radius: var(--r-xl);
-    padding: 40px 36px 32px;
-    box-shadow: 0 20px 60px rgba(80,100,140,0.12), 0 4px 16px rgba(80,100,140,0.06), inset 0 1px 0 rgba(255,255,255,0.9);
-}
-
-.auth-logo {
-    width: 56px; height: 56px; border-radius: 16px; background: var(--c-primary-grad);
-    display: flex; align-items: center; justify-content: center; font-size: 28px;
-    margin: 0 auto 20px; box-shadow: var(--sh-3);
-    animation: logoIn 0.7s cubic-bezier(0.16,1,0.3,1) 0.1s both;
-}
-@keyframes logoIn { from { opacity: 0; transform: scale(0.8) translateY(-10px);} to { opacity: 1; transform: scale(1) translateY(0);} }
-
-.auth-title { text-align: center; font-size: 26px; font-weight: 700; color: var(--c-text); letter-spacing: -0.5px; margin-bottom: 6px; animation: fadeIn 0.6s ease 0.2s both; }
-.auth-subtitle { text-align: center; font-size: 14px; color: var(--c-text-2); margin-bottom: 32px; animation: fadeIn 0.6s ease 0.25s both; }
-@keyframes fadeIn { from { opacity: 0;} to { opacity: 1;} }
-
-.auth-field { position: relative; margin-bottom: 14px; animation: fadeIn 0.6s ease 0.3s both; }
-.auth-field:nth-child(3) { animation-delay: 0.35s; }
-.auth-field-icon { position: absolute; left: 16px; top: 50%; transform: translateY(-50%); font-size: 16px; color: var(--c-text-3); pointer-events: none; transition: color 0.15s; }
-
-.auth-field input {
-    width: 100%; padding: 15px 16px 15px 46px; font-size: 15px; font-family: inherit;
-    color: var(--c-text); background: rgba(255,255,255,0.7);
-    border: 1px solid rgba(200,205,215,0.6); border-radius: 14px; outline: none; transition: all 0.2s;
-}
-.auth-field input::placeholder { color: #A0A0A8; }
-.auth-field input:hover { background: rgba(255,255,255,0.9); border-color: rgba(180,190,205,0.8); }
-.auth-field input:focus { background: #FFF; border-color: var(--c-primary); box-shadow: var(--sh-focus); }
-.auth-field:focus-within .auth-field-icon { color: var(--c-primary); }
-
-.auth-eye {
-    position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
-    width: 32px; height: 32px; border: none; background: transparent;
-    cursor: pointer; font-size: 16px; color: var(--c-text-3); border-radius: 8px;
-    display: flex; align-items: center; justify-content: center; transition: background 0.15s, color 0.15s;
-}
-.auth-eye:hover { background: rgba(0,0,0,0.05); color: var(--c-text); }
-
-.auth-btn {
-    width: 100%; padding: 15px; font-size: 15px; font-weight: 600; font-family: inherit;
-    color: #FFF; background: var(--c-primary-grad); border: none; border-radius: 14px;
-    cursor: pointer; margin-top: 10px; box-shadow: var(--sh-3); transition: all 0.2s;
-    position: relative; overflow: hidden; animation: fadeIn 0.6s ease 0.4s both;
-}
-.auth-btn:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 12px 28px rgba(91,157,249,0.4), 0 4px 12px rgba(91,157,249,0.25); }
-.auth-btn:active:not(:disabled) { transform: translateY(0); }
-.auth-btn:disabled { cursor: not-allowed; opacity: 0.8; }
-
-.spinner {
-    display: inline-block; width: 16px; height: 16px;
-    border: 2px solid rgba(255,255,255,0.3); border-top-color: #FFF;
-    border-radius: 50%; animation: spin 0.7s linear infinite;
-    vertical-align: middle; margin-right: 8px; margin-top: -2px;
-}
-@keyframes spin { to { transform: rotate(360deg);} }
-
-.auth-error {
-    display: none; padding: 12px 16px; background: rgba(255,59,48,0.1);
-    border: 1px solid rgba(255,59,48,0.2); border-radius: 12px; color: #C0392B;
-    font-size: 13px; font-weight: 500; margin-top: 14px; line-height: 1.4;
-    animation: shake 0.4s ease;
-}
-.auth-error.show { display: block; }
-@keyframes shake { 0%,100% { transform: translateX(0);} 25% { transform: translateX(-6px);} 75% { transform: translateX(6px);} }
-
-.auth-footer { text-align: center; font-size: 12px; color: var(--c-text-3); margin-top: 28px; animation: fadeIn 0.6s ease 0.5s both; }
-
-#appScreen { display: none; }
-
-.app-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; flex-wrap: wrap; gap: 12px; }
-.app-header h1 { margin: 0; text-align: left; flex: 1; min-width: 200px; }
-.header-actions { display: flex; gap: 8px; flex-wrap: wrap; }
-
-.btn-header {
-    padding: 10px 18px; border: none; border-radius: var(--r-md); font-size: 14px; font-weight: 600;
-    font-family: inherit; cursor: pointer; text-decoration: none; display: inline-flex;
-    align-items: center; gap: 6px; transition: all 0.2s;
-}
-.btn-header.ghost { background: var(--c-surface); color: var(--c-text); border: 1px solid var(--c-border); box-shadow: var(--sh-1); }
-.btn-header.ghost:hover { background: var(--c-surface-2); box-shadow: var(--sh-2); }
-.btn-header.danger { background: var(--c-red-soft); color: var(--c-red-text); }
-.btn-header.danger:hover { background: #F5C6C9; }
-
-.main-tabs {
-    display: flex; gap: 4px; margin-bottom: 24px; padding: 6px;
-    background: var(--c-surface); border-radius: 16px; box-shadow: var(--sh-1);
-    width: fit-content; max-width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch;
-}
-.main-tabs::-webkit-scrollbar { display: none; }
-
-.main-tab-btn {
-    padding: 10px 18px; border: none; background: none; font-size: 14px;
-    font-weight: 500; font-family: inherit; color: var(--c-text-2); cursor: pointer;
-    border-radius: var(--r-md); transition: all 0.15s; white-space: nowrap;
-}
-.main-tab-btn:hover { background: var(--c-bg); color: var(--c-text); }
-.main-tab-btn.active { background: var(--c-primary); color: #FFF; box-shadow: 0 2px 8px rgba(91,157,249,0.3); font-weight: 600; }
-
-.tab-content { display: none; }
-.tab-content.active { display: block; animation: fadeIn 0.3s ease; }
-
-.container { display: flex; gap: 20px; margin-bottom: 20px; flex-wrap: wrap; }
-
-.box {
-    background: var(--c-surface); padding: 22px; border-radius: var(--r-lg);
-    box-shadow: var(--sh-1); flex: 1; min-width: 300px;
-}
-.box h3 { font-size: 16px; font-weight: 700; color: var(--c-text); margin-bottom: 8px; }
-.box p { font-size: 13px; color: var(--c-text-2); margin-bottom: 10px; line-height: 1.5; }
-
-textarea {
-    width: 100%; height: 120px; padding: 12px; border: 1px solid var(--c-border);
-    border-radius: var(--r-md); font-family: var(--f-mono); font-size: 12px;
-    resize: vertical; background: var(--c-surface-2); outline: none; transition: all 0.15s; color: var(--c-text);
-}
-textarea:focus { background: var(--c-surface); border-color: var(--c-primary); box-shadow: var(--sh-focus); }
-
-.btn-group { text-align: center; margin-bottom: 20px; display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
-
-button { padding: 11px 20px; border: none; border-radius: var(--r-md); cursor: pointer; font-size: 14px; font-weight: 600; font-family: inherit; transition: all 0.15s; }
-
-.btn-load { background: var(--c-primary-grad); color: #FFF; box-shadow: 0 4px 12px rgba(91,157,249,0.3); }
-.btn-load:hover { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(91,157,249,0.4); }
-
-.btn-export { background: var(--c-green); color: #FFF; display: none; }
-.btn-export:hover { background: #2AAE4C; }
-
-.btn-import-xlsx { background: var(--c-surface-2); color: var(--c-text); border: 1px solid var(--c-border); display: inline-block; }
-.btn-import-xlsx:hover { background: var(--c-bg); border-color: #D0D0D5; }
-
-.btn-cloud { background: var(--c-purple); color: #FFF; }
-.btn-cloud:hover { background: #6B5FD8; }
-
-.btn-calc { background: var(--c-primary-grad); color: #FFF; box-shadow: 0 4px 12px rgba(91,157,249,0.3); }
-.btn-calc:hover { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(91,157,249,0.4); }
-
-.btn-clear { background: var(--c-surface-2); color: var(--c-text); border: 1px solid var(--c-border); }
-.btn-clear:hover { background: var(--c-bg); }
-
-.btn-copy { background: var(--c-surface); color: var(--c-text); border: 1px solid var(--c-border); }
-.btn-copy:hover { background: var(--c-surface-2); }
-
-.filters-panel {
-    display: none; background: var(--c-surface); padding: 22px; border-radius: var(--r-lg);
-    box-shadow: var(--sh-1); margin-bottom: 20px;
-}
-.filters-panel h3 { font-size: 16px; font-weight: 700; margin-bottom: 16px; color: var(--c-text); }
-
-.filter-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin-bottom: 15px; }
-.filter-group { display: flex; flex-direction: column; }
-.filter-group label { font-size: 12px; font-weight: 600; margin-bottom: 6px; color: var(--c-text-2); text-transform: uppercase; letter-spacing: 0.4px; }
-.filter-group select, .filter-group input {
-    padding: 10px 12px; border: 1px solid var(--c-border); border-radius: var(--r-md);
-    font-size: 14px; font-family: inherit; background: var(--c-surface); color: var(--c-text); outline: none; transition: all 0.15s;
-}
-.filter-group select:focus, .filter-group input:focus { border-color: var(--c-primary); box-shadow: var(--sh-focus); }
-
-.reset-btn { background: var(--c-red-soft); color: var(--c-red-text); padding: 10px 16px; border-radius: var(--r-md); font-size: 14px; font-weight: 600; align-self: flex-end; }
-.reset-btn:hover { background: #F5C6C9; }
-
-.marks-panel {
-    display: none; background: var(--c-surface); padding: 16px 22px; border-radius: var(--r-lg);
-    box-shadow: var(--sh-1); margin-bottom: 20px; align-items: center; gap: 12px; flex-wrap: wrap;
-}
-.marks-panel h3 { font-size: 14px; font-weight: 700; color: var(--c-text); margin: 0; }
-
-.brush-btn { background: var(--c-surface-2); color: var(--c-text); padding: 8px 14px; font-size: 13px; border: 1px solid var(--c-border); border-radius: var(--r-pill); font-weight: 500; }
-.brush-btn.active { background: var(--c-primary); color: #FFF; border-color: var(--c-primary); box-shadow: 0 2px 8px rgba(91,157,249,0.3); }
-
-.color-swatch { width: 28px; height: 28px; border-radius: 50%; border: 2px solid transparent; cursor: pointer; display: inline-block; transition: transform 0.15s, border-color 0.15s; }
-.color-swatch:hover { transform: scale(1.15); }
-.color-swatch.active { border-color: var(--c-text); box-shadow: 0 0 0 2px #FFF, 0 0 0 4px var(--c-text); }
-
-.hint-text { font-size: 12px; color: var(--c-text-3); margin-left: auto; }
-
-.results {
-    background: var(--c-surface); padding: 22px; border-radius: var(--r-lg);
-    box-shadow: var(--sh-1); overflow-x: auto; margin-bottom: 20px;
-}
-
-table.summary-table { width: 100%; border-collapse: collapse; font-size: 13px; white-space: nowrap; }
-table.summary-table th, table.summary-table td {
-    border: none; border-bottom: 1px solid var(--c-border-soft); padding: 10px 12px; text-align: center;
-}
-table.summary-table th {
-    background: var(--c-surface-2); font-weight: 600; font-size: 11px;
-    text-transform: uppercase; letter-spacing: 0.4px; color: var(--c-text-2);
-    position: sticky; top: 0;
-}
-table.summary-table td.name-col { text-align: left; font-weight: 600; min-width: 150px; cursor: pointer; color: var(--c-primary); }
-table.summary-table td.name-col:hover { text-decoration: underline; }
-table.summary-table td.id-col { text-align: left; font-size: 11px; color: var(--c-text-3); max-width: 150px; overflow: hidden; text-overflow: ellipsis; font-family: var(--f-mono); }
-.zero-cell { color: #C0C0C5; }
-table.summary-table tr.total-row td { background: var(--c-primary-soft); font-weight: 700; font-size: 13px; border-bottom: 2px solid var(--c-primary); }
-table.summary-table tbody tr:hover { background: var(--c-surface-2); }
-
-body.brush-mode table.summary-table tbody tr:not(.total-row) { cursor: crosshair; }
-body.brush-mode table.summary-table tbody tr:not(.total-row) td:hover { outline: 2px dashed var(--c-purple); outline-offset: -2px; }
-
-tr.paint-red { background-color: #FFD9D6 !important; }
-tr.paint-orange { background-color: #FFE8CC !important; }
-tr.paint-yellow { background-color: #FFF9C4 !important; }
-tr.paint-green { background-color: #D4EDDA !important; }
-tr.paint-blue { background-color: #D6E8FF !important; }
-tr.paint-purple { background-color: #E5DEF8 !important; }
-tr.paint-gray { background-color: #E8E8EA !important; }
-td.paint-red { background-color: #FFD9D6 !important; }
-td.paint-orange { background-color: #FFE8CC !important; }
-td.paint-yellow { background-color: #FFF9C4 !important; }
-td.paint-green { background-color: #D4EDDA !important; }
-td.paint-blue { background-color: #D6E8FF !important; }
-td.paint-purple { background-color: #E5DEF8 !important; }
-td.paint-gray { background-color: #E8E8EA !important; }
-
-.status-select { padding: 5px 8px; border: 1px solid var(--c-border); border-radius: 8px; font-size: 12px; background: var(--c-surface); color: var(--c-text); cursor: pointer; font-family: inherit; outline: none; }
-.status-select:focus { border-color: var(--c-primary); }
-
-.tabs-section { display: none; background: var(--c-surface); padding: 22px; border-radius: var(--r-lg); box-shadow: var(--sh-1); margin-bottom: 20px; }
-.tabs-section h3 { font-size: 16px; font-weight: 700; margin-bottom: 14px; color: var(--c-text); }
-.tabs-search {
-    width: 100%; padding: 11px 14px; margin-bottom: 14px; border: 1px solid var(--c-border);
-    border-radius: var(--r-md); font-size: 14px; font-family: inherit;
-    background: var(--c-surface-2); color: var(--c-text); outline: none; transition: all 0.15s;
-}
-.tabs-search:focus { background: var(--c-surface); border-color: var(--c-primary); box-shadow: var(--sh-focus); }
-.tabs-list { display: flex; flex-wrap: wrap; gap: 8px; max-height: 220px; overflow-y: auto; }
-.tab-btn { background: var(--c-surface-2); color: var(--c-text); padding: 8px 16px; border-radius: var(--r-pill); font-size: 13px; font-weight: 500; border: 1px solid var(--c-border); transition: all 0.15s; }
-.tab-btn:hover { background: var(--c-bg); border-color: #D0D0D5; }
-.tab-btn.archived { opacity: 0.55; }
-
-.modal-overlay {
-    display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4);
-    backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
-    z-index: 1000; justify-content: center; align-items: flex-start;
-    padding: 30px 15px; overflow-y: auto;
-}
-.modal-overlay.open { display: flex; }
-
-.modal {
-    background: var(--c-surface); border-radius: var(--r-xl); max-width: 1100px; width: 100%;
-    padding: 28px; box-shadow: 0 20px 60px rgba(0,0,0,0.2);
-    position: relative; animation: modalIn 0.3s cubic-bezier(0.16,1,0.3,1);
-}
-@keyframes modalIn { from { opacity: 0; transform: scale(0.96) translateY(10px);} to { opacity: 1; transform: scale(1) translateY(0);} }
-
-.modal-close {
-    position: absolute; top: 16px; right: 16px; background: var(--c-surface-2); color: var(--c-text);
-    width: 36px; height: 36px; border-radius: 50%; font-size: 18px; padding: 0;
-    display: flex; align-items: center; justify-content: center; font-weight: 600;
-    border: none; cursor: pointer; transition: all 0.15s;
-}
-.modal-close:hover { background: var(--c-red-soft); color: var(--c-red-text); }
-.modal h2 { margin: 0 0 6px 0; color: var(--c-text); padding-right: 50px; font-size: 22px; font-weight: 700; letter-spacing: -0.3px; }
-.modal .subline { color: var(--c-text-2); font-size: 13px; margin-bottom: 20px; word-break: break-all; font-family: var(--f-mono); }
-
-.card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; margin-bottom: 18px; }
-.card-block { background: var(--c-surface-2); padding: 16px 18px; border-radius: var(--r-md); border-left: 3px solid var(--c-primary); }
-.card-block h4 { margin: 0 0 8px 0; font-size: 11px; font-weight: 600; color: var(--c-text-2); text-transform: uppercase; letter-spacing: 0.6px; }
-.stat-big { font-size: 24px; font-weight: 700; color: var(--c-text); letter-spacing: -0.5px; }
-
-.cat-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 8px; }
-.cat-table td { padding: 6px 8px; border-bottom: 1px solid var(--c-border-soft); }
-.cat-table td:last-child { text-align: right; font-weight: 700; color: var(--c-red); font-family: var(--f-mono); }
-.cat-table td:first-child { color: var(--c-text-2); }
-
-.comments-list { max-height: 320px; overflow-y: auto; padding-right: 6px; }
-.comment-item { background: var(--c-surface); border: 1px solid var(--c-border-soft); border-radius: var(--r-md); padding: 10px 12px; margin-bottom: 8px; font-size: 12px; }
-.comment-date { color: var(--c-primary); font-weight: 600; margin-right: 6px; font-family: var(--f-mono); }
-.comment-cat { color: var(--c-red); font-weight: 600; }
-
-.field-group { display: flex; flex-direction: column; margin-bottom: 14px; }
-.field-group label { font-size: 12px; font-weight: 600; color: var(--c-text-2); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.4px; }
-.field-group input, .field-group textarea, .field-group select {
-    padding: 10px 12px; border: 1px solid var(--c-border); border-radius: var(--r-md);
-    font-size: 14px; font-family: inherit; width: 100%; background: var(--c-surface);
-    color: var(--c-text); outline: none; transition: all 0.15s;
-}
-.field-group input:focus, .field-group textarea:focus, .field-group select:focus { border-color: var(--c-primary); box-shadow: var(--sh-focus); }
-.field-group textarea { min-height: 90px; resize: vertical; font-family: inherit; font-size: 14px; }
-
-.links-list { margin-bottom: 8px; }
-.link-row { display: flex; gap: 8px; align-items: center; margin-bottom: 6px; font-size: 13px; }
-.link-row a { flex: 1; color: var(--c-primary); word-break: break-all; text-decoration: none; }
-.link-row a:hover { text-decoration: underline; }
-.link-row button { padding: 5px 10px; font-size: 12px; background: var(--c-red-soft); color: var(--c-red-text); border-radius: 6px; font-weight: 600; }
-.link-add-row { display: flex; gap: 6px; margin-top: 6px; }
-.link-add-row input { flex: 1; padding: 8px 10px; border: 1px solid var(--c-border); border-radius: 8px; font-size: 13px; font-family: inherit; background: var(--c-surface); color: var(--c-text); outline: none; }
-.link-add-row input:focus { border-color: var(--c-primary); }
-.link-add-row button { padding: 8px 14px; font-size: 13px; background: var(--c-green); color: #FFF; }
-
-.modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; flex-wrap: wrap; }
-.btn-save { background: var(--c-primary-grad); color: #FFF; box-shadow: 0 4px 12px rgba(91,157,249,0.3); }
-.btn-save:hover { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(91,157,249,0.4); }
-.btn-archive { background: var(--c-surface-2); color: var(--c-text-2); border: 1px solid var(--c-border); }
-.btn-archive:hover { background: var(--c-bg); }
-.btn-unarchive { background: var(--c-orange-soft); color: var(--c-orange-text); }
-.btn-unarchive:hover { background: #FFE5B4; }
-.btn-cancel { background: var(--c-surface-2); color: var(--c-text); border: 1px solid var(--c-border); }
-.btn-cancel:hover { background: var(--c-bg); }
-
-.save-toast {
-    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(100px);
-    background: var(--c-text); color: #FFF; padding: 12px 24px; border-radius: var(--r-md);
-    font-size: 14px; font-weight: 500; z-index: 2000; opacity: 0;
-    transition: all 0.3s cubic-bezier(0.16,1,0.3,1); box-shadow: 0 8px 24px rgba(0,0,0,0.2); pointer-events: none;
-}
-.save-toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
-
-.import-info {
-    background: var(--c-primary-soft); border-left: 3px solid var(--c-primary);
-    padding: 12px 16px; border-radius: var(--r-md); font-size: 13px; color: var(--c-text);
-    margin-bottom: 14px; line-height: 1.5;
-}
-
-.vks-block { border-left-color: var(--c-purple) !important; }
-.vks-header { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
-.vks-header h4 { margin: 0; flex: 1; color: var(--c-text-2); text-transform: uppercase; font-size: 11px; letter-spacing: 0.6px; font-weight: 600; }
-.vks-nav { background: var(--c-surface-2); color: var(--c-text); padding: 6px 12px; font-size: 14px; border-radius: 8px; font-weight: 600; border: 1px solid var(--c-border); }
-.vks-nav:hover { background: var(--c-bg); }
-.vks-month-title { font-weight: 700; color: var(--c-text); font-size: 14px; min-width: 140px; text-align: center; }
-.vks-calendar { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
-.vks-dow { text-align: center; font-size: 10px; font-weight: 700; color: var(--c-text-3); padding: 6px 0; text-transform: uppercase; }
-.vks-day {
-    min-height: 68px; border: 1px solid var(--c-border-soft); border-radius: 10px;
-    padding: 4px; background: var(--c-surface); position: relative; cursor: pointer;
-    transition: all 0.15s; overflow: hidden; display: flex; flex-direction: column;
-}
-.vks-day:hover { background: var(--c-surface-2); border-color: var(--c-purple); transform: translateY(-1px); }
-.vks-day.empty { background: var(--c-surface-2); cursor: default; border: 1px dashed var(--c-border); }
-.vks-day.empty:hover { background: var(--c-surface-2); border-color: var(--c-border); transform: none; }
-.vks-day.has-vks { background: #F3E8FC; border-color: var(--c-purple); border-width: 2px; }
-.vks-day-num { font-size: 11px; font-weight: 700; color: var(--c-text-2); margin-bottom: 3px; }
-.vks-day-cat { font-size: 9px; padding: 2px 4px; border-radius: 4px; color: #FFF; font-weight: 600; margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.vks-cat-individual { background: var(--c-primary); }
-.vks-cat-general { background: var(--c-orange); }
-.vks-cat-master { background: var(--c-red); }
-.vks-day-comment {
-    font-size: 9px; color: var(--c-text-2); line-height: 1.2; overflow: hidden; text-overflow: ellipsis;
-    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; flex: 1;
-}
-.vks-day-plus { position: absolute; top: 4px; right: 6px; font-size: 14px; color: var(--c-purple); font-weight: bold; opacity: 0; transition: opacity 0.15s; }
-.vks-day:hover .vks-day-plus { opacity: 1; }
-.vks-day.has-vks .vks-day-plus { opacity: 0.5; }
-
-.vks-modal-overlay {
-    display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5);
-    backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
-    z-index: 1500; justify-content: center; align-items: center; padding: 20px;
-}
-.vks-modal-overlay.open { display: flex; }
-.vks-modal {
-    background: var(--c-surface); border-radius: var(--r-xl); max-width: 500px; width: 100%;
-    padding: 24px; position: relative; box-shadow: 0 20px 60px rgba(0,0,0,0.2);
-    animation: modalIn 0.3s cubic-bezier(0.16,1,0.3,1);
-}
-.vks-modal h3 { margin: 0 0 8px 0; color: var(--c-text); font-size: 18px; font-weight: 700; }
-.vks-modal .vks-date-label { color: var(--c-text-2); font-size: 13px; margin-bottom: 16px; }
-
-.quality-controls {
-    display: flex; gap: 15px; flex-wrap: wrap; align-items: flex-end;
-    background: var(--c-surface); padding: 20px; border-radius: var(--r-lg);
-    box-shadow: var(--sh-1); margin-bottom: 20px;
-}
-.quality-controls .field-group { margin-bottom: 0; min-width: 150px; flex: 1; }
-
-.thresholds-box {
-    display: flex; gap: 15px; flex-wrap: wrap; align-items: center;
-    background: var(--c-surface-2); padding: 14px 18px; border-radius: var(--r-md);
-    border: 1px solid var(--c-border-soft); margin-bottom: 15px;
-}
-.threshold-item { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--c-text-2); }
-.threshold-item input { width: 70px; padding: 6px 8px; border: 1px solid var(--c-border); border-radius: 8px; font-size: 13px; font-family: inherit; background: var(--c-surface); color: var(--c-text); outline: none; }
-.color-dot { width: 14px; height: 14px; border-radius: 50%; display: inline-block; }
-
-.q-green { background-color: var(--c-green-soft) !important; color: var(--c-green-text) !important; font-weight: 700; }
-.q-orange { background-color: var(--c-orange-soft) !important; color: var(--c-orange-text) !important; font-weight: 700; }
-.q-red { background-color: var(--c-red-soft) !important; color: var(--c-red-text) !important; font-weight: 700; }
-
-.mode-box {
-    display: flex; gap: 18px; align-items: center; background: var(--c-surface-2);
-    padding: 12px 16px; border-radius: var(--r-md); flex-wrap: wrap; border: 1px solid var(--c-border-soft);
-}
-.mode-box label { margin: 0; font-weight: 500; display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 14px; color: var(--c-text); }
-
-table.q-table { border-collapse: collapse; width: 100%; margin-top: 12px; font-size: 14px; }
-table.q-table th, table.q-table td { border: none; border-bottom: 1px solid var(--c-border-soft); padding: 10px 14px; text-align: left; }
-table.q-table th { background: var(--c-surface-2); cursor: pointer; user-select: none; font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.4px; color: var(--c-text-2); }
-table.q-table th:hover { background: var(--c-bg); }
-table.q-table th .arrow { color: var(--c-primary); margin-left: 6px; font-size: 11px; }
-table.q-table tbody tr:hover { background: var(--c-surface-2); }
-.no-name { color: var(--c-orange-text); font-style: italic; }
-
-.stats { background: var(--c-surface-2); border: 1px solid var(--c-border-soft); border-radius: var(--r-md); padding: 12px 16px; margin-top: 12px; font-size: 13px; color: var(--c-text-2); }
-
-.q-emp-chip { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: var(--r-pill); cursor: pointer; font-size: 12px; font-weight: 500; border: 1px solid var(--c-border); background: var(--c-surface-2); color: var(--c-text-2); transition: all 0.15s; }
-.q-emp-chip.checked { background: var(--c-primary); color: #FFF; border-color: var(--c-primary); }
-.q-emp-chip input { margin: 0; display: none; }
-
-.progress-controls {
-    display: flex; gap: 14px; flex-wrap: wrap; align-items: flex-end;
-    background: var(--c-surface); padding: 22px; border-radius: var(--r-lg);
-    box-shadow: var(--sh-1); margin-bottom: 20px;
-}
-.progress-controls .field-group { margin-bottom: 0; min-width: 140px; flex: 1; }
-
-.progress-kpi-grid {
-    display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-    gap: 14px; margin-bottom: 20px;
-}
-.progress-kpi {
-    background: var(--c-surface); padding: 20px 22px; border-radius: var(--r-lg);
-    box-shadow: var(--sh-1); border-left: 4px solid var(--c-primary);
-    transition: transform 0.15s, box-shadow 0.15s;
-}
-.progress-kpi:hover { transform: translateY(-2px); box-shadow: var(--sh-2); }
-.progress-kpi .lbl { font-size: 11px; color: var(--c-text-2); text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px; margin-bottom: 8px; }
-.progress-kpi .val { font-size: 28px; font-weight: 700; color: var(--c-text); letter-spacing: -0.6px; }
-.progress-kpi .val small { font-size: 14px; color: var(--c-text-3); font-weight: 500; margin-left: 4px; }
-.progress-kpi .sub { font-size: 12px; color: var(--c-text-3); margin-top: 4px; }
-
-.progress-chart-block {
-    background: var(--c-surface); padding: 24px; border-radius: var(--r-lg);
-    box-shadow: var(--sh-1); margin-bottom: 20px;
-}
-.progress-chart-block h3 { font-size: 16px; font-weight: 700; color: var(--c-text); margin-bottom: 8px; }
-.progress-chart-block .chart-hint { font-size: 12px; color: var(--c-text-3); margin-bottom: 16px; }
-
-.progress-table-wrap {
-    background: var(--c-surface); padding: 22px; border-radius: var(--r-lg);
-    box-shadow: var(--sh-1); margin-bottom: 20px; overflow-x: auto;
-}
-.progress-table-wrap h3 { font-size: 16px; font-weight: 700; color: var(--c-text); margin-bottom: 14px; }
-
-table.progress-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-table.progress-table th, table.progress-table td {
-    border: none; border-bottom: 1px solid var(--c-border-soft); padding: 10px 14px; text-align: center;
-}
-table.progress-table th {
-    background: var(--c-surface-2); font-weight: 600; font-size: 11px;
-    text-transform: uppercase; letter-spacing: 0.4px; color: var(--c-text-2);
-}
-table.progress-table tbody tr:hover { background: var(--c-surface-2); }
-table.progress-table td.period-col { text-align: left; font-weight: 600; color: var(--c-text); }
-
-.badge-status {
-    display: inline-block; padding: 3px 10px; border-radius: 12px;
-    font-size: 11px; font-weight: 700; letter-spacing: 0.3px;
-}
-.badge-good { background: var(--c-green-soft); color: var(--c-green-text); }
-.badge-warn { background: var(--c-orange-soft); color: var(--c-orange-text); }
-.badge-bad { background: var(--c-red-soft); color: var(--c-red-text); }
-
-@media (max-width: 768px) {
-    body { padding: 12px; }
-    h1 { font-size: 22px; }
-    .auth-card { padding: 32px 24px 24px; }
-    .auth-title { font-size: 23px; }
-    .auth-logo { width: 50px; height: 50px; font-size: 24px; }
-    .box { padding: 16px; }
-    .results { padding: 16px; }
-    .modal { padding: 20px; }
-    .app-header h1 { font-size: 20px; }
-    .progress-kpi .val { font-size: 24px; }
-}
-</style>
-</head>
-<body>
-
-<div id="authScreen">
-    <div class="auth-wrap">
-        <div class="auth-card">
-            <div class="auth-logo">📊</div>
-            <div class="auth-title">Дашборд</div>
-            <div class="auth-subtitle">Войдите, чтобы продолжить</div>
-
-            <div class="auth-field">
-                <input type="email" id="authEmail" placeholder="Email" autocomplete="email">
-                <span class="auth-field-icon">✉️</span>
-            </div>
-
-            <div class="auth-field">
-                <input type="password" id="authPassword" placeholder="Пароль" autocomplete="current-password">
-                <span class="auth-field-icon">🔒</span>
-                <button type="button" class="auth-eye" id="authEye" onclick="togglePassword()" tabindex="-1" title="Показать пароль">👁</button>
-            </div>
-
-            <button class="auth-btn" id="authSubmit" onclick="doLogin()">Войти</button>
-
-            <div class="auth-error" id="authError"></div>
-
-            <div class="auth-footer">Отчёты, ВКС и качество</div>
-        </div>
-    </div>
-</div>
-
-<div id="appScreen">
-    <div class="app-header">
-        <h1>Дашборд</h1>
-        <div class="header-actions">
-            <a href="https://ffvy7phzfb-dot.github.io/Analytic-/" target="_blank" class="btn-header ghost">AI Аналитик</a>
-            <button class="btn-header danger" onclick="logoutUser()">Выйти</button>
-        </div>
-    </div>
-
-    <div class="main-tabs">
-        <button class="main-tab-btn active" onclick="switchTab('main', this)">📊 Сводка</button>
-        <button class="main-tab-btn" onclick="switchTab('progress', this)">📈 Общий прогресс</button>
-        <button class="main-tab-btn" onclick="switchTab('vks-import', this)">📥 ВКС из отчёта</button>
-        <button class="main-tab-btn" onclick="switchTab('quality', this)">🌟 Качество</button>
-        <button class="main-tab-btn" onclick="switchTab('dynamics', this)">📈 Динамика</button>
-    </div>
-
-    <div class="tab-content active" id="tab-main">
-        <div class="container">
-            <div class="box">
-                <h3>1. Данные из Excel (5 столбцов)</h3>
-                <p>вставь столбцы: <b>marker_id, start_date, end_date, quality, reviewer_comment</b>.</p>
-                <textarea id="mainData" placeholder="вставь данные сюда..."></textarea>
-            </div>
-            <div class="box">
-                <h3>2. Тренеры</h3>
-                <p>вставь ФИО и UUID. форматы: <b>Фамилия</b>, <b>Фамилия Имя</b>, <b>Фамилия Имя Отчество</b> — через Tab с ID.</p>
-                <textarea id="namesData" placeholder="Иванов Иван Петрович    81977398-70..."></textarea>
-            </div>
-            <div class="box">
-                <h3>3. Прошлый отчёт</h3>
-                <p>загрузи прошлый .xlsx. подтянутся пометки, цвета, заметки, ВКС и т.д.</p>
-                <div class="import-info">сопоставление по <b>marker_id</b>.</div>
-                <button class="btn-import-xlsx" onclick="document.getElementById('xlsxFile').click()">📥 загрузить (.xlsx)</button>
-                <input type="file" id="xlsxFile" accept=".xlsx,.xls" style="display:none" onchange="importPreviousXlsx(event)">
-                <div id="importStatus" style="margin-top:10px; font-size:13px; color:var(--c-text-2);"></div>
-            </div>
-        </div>
-
-        <div class="btn-group">
-            <button class="btn-load" onclick="processData()">загрузить и обработать</button>
-            <button class="btn-cloud" onclick="manualSaveToCloud()">☁️ сохранить в облако</button>
-            <button class="btn-export" id="exportBtn" onclick="exportToExcel()">скачать всё в Excel</button>
-        </div>
-
-        <div class="filters-panel" id="filtersPanel">
-            <h3>Фильтры</h3>
-            <div class="filter-grid">
-                <div class="filter-group">
-                    <label>сотрудник</label>
-                    <select id="filterUser" onchange="applyFilters()"><option value="all">все сотрудники</option></select>
-                </div>
-                <div class="filter-group">
-                    <label>start date (от)</label>
-                    <input type="date" id="filterDateFrom" onchange="applyFilters()">
-                </div>
-                <div class="filter-group">
-                    <label>start date (до)</label>
-                    <input type="date" id="filterDateTo" onchange="applyFilters()">
-                </div>
-                <div class="filter-group">
-                    <label>пометка</label>
-                    <select id="filterMark" onchange="applyFilters()">
-                        <option value="all">все</option>
-                        <option value="none">без пометки</option>
-                        <option value="newbie">новичок</option>
-                        <option value="experienced">опытный</option>
-                    </select>
-                </div>
-                <div class="filter-group">
-                    <label>цвет кисти</label>
-                    <select id="filterPaint" onchange="applyFilters()">
-                        <option value="all">все</option>
-                        <option value="none">без цвета</option>
-                        <option value="red">красный</option>
-                        <option value="orange">оранжевый</option>
-                        <option value="yellow">жёлтый</option>
-                        <option value="green">зелёный</option>
-                        <option value="blue">синий</option>
-                        <option value="purple">фиолетовый</option>
-                        <option value="gray">серый</option>
-                    </select>
-                </div>
-                <div class="filter-group">
-                    <button class="reset-btn" onclick="resetFilters()">сбросить</button>
-                </div>
-            </div>
-        </div>
-
-        <div class="marks-panel" id="marksPanel">
-            <h3>Кисть:</h3>
-            <button class="brush-btn" id="brushToggle" onclick="toggleBrush()">включить</button>
-            <span style="font-size:13px; color:var(--c-text-2);">цвет:</span>
-            <span class="color-swatch" data-paint="red" style="background:#FF6B6B;" onclick="pickPaint('red')"></span>
-            <span class="color-swatch" data-paint="orange" style="background:#FFA94D;" onclick="pickPaint('orange')"></span>
-            <span class="color-swatch" data-paint="yellow" style="background:#FFD43B;" onclick="pickPaint('yellow')"></span>
-            <span class="color-swatch" data-paint="green" style="background:#69DB7C;" onclick="pickPaint('green')"></span>
-            <span class="color-swatch" data-paint="blue" style="background:#74C0FC;" onclick="pickPaint('blue')"></span>
-            <span class="color-swatch" data-paint="purple" style="background:#B197FC;" onclick="pickPaint('purple')"></span>
-            <span class="color-swatch" data-paint="gray" style="background:#CED4DA;" onclick="pickPaint('gray')"></span>
-            <span class="color-swatch" data-paint="none" style="background:#FFF; border:2px solid #ADB5BD;" onclick="pickPaint('none')"></span>
-            <span class="hint-text">клик по фамилии (без кисти) — карточка.</span>
-        </div>
-
-        <div class="results" id="output">
-            <h3 style="text-align:center; color:var(--c-text-3); font-size:14px;">здесь будет результат</h3>
-        </div>
-
-        <div class="tabs-section" id="tabsSection">
-            <h3>Карточки сотрудников</h3>
-            <input type="text" class="tabs-search" id="tabsSearch" placeholder="поиск по ФИО или marker_id..." oninput="renderTabs()">
-            <div class="tabs-list" id="tabsList"></div>
-        </div>
-
-        <!-- НОВЫЙ БЛОК: прогресс по периодам (все / выбранные) -->
-        <div class="progress-table-wrap" id="weekProgressBlock" style="display:none; margin-top:20px;">
-            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:14px;">
-                <h3 style="margin:0;">📊 Прогресс по периодам</h3>
-                <div style="display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap;">
-                    <div class="field-group" style="margin:0; min-width:170px;">
-                        <label style="font-size:11px;">режим</label>
-                        <select id="wpMode" onchange="renderWeekProgress()">
-                            <option value="all" selected>Все сотрудники</option>
-                            <option value="selected">Только выбранные (по фильтрам)</option>
-                        </select>
-                    </div>
-                    <div class="field-group" style="margin:0; min-width:130px;">
-                        <label style="font-size:11px;">шаг</label>
-                        <select id="wpStep" onchange="renderWeekProgress()">
-                            <option value="week" selected>по неделям</option>
-                            <option value="day">по дням</option>
-                            <option value="month">по месяцам</option>
-                        </select>
-                    </div>
-                    <div class="field-group" style="margin:0; min-width:150px;">
-                        <label style="font-size:11px;">метрика</label>
-                        <select id="wpMetric" onchange="renderWeekProgress()">
-                            <option value="pct" selected>% ошибок</option>
-                            <option value="quality">среднее качество</option>
-                        </select>
-                    </div>
-                    <button class="btn-copy" onclick="exportWeekProgress()" style="padding:9px 14px;">📤 экспорт</button>
-                </div>
-            </div>
-
-            <div style="position:relative; height:340px; margin-bottom:20px;">
-                <canvas id="wpChart"></canvas>
-            </div>
-
-            <div style="overflow-x:auto; max-height:500px; overflow-y:auto;">
-                <div id="wpTable"></div>
-            </div>
-            <div id="wpSummary" style="margin-top:14px; font-size:13px; color:var(--c-text-2);"></div>
-        </div>
-    </div>
-
     <div class="tab-content" id="tab-progress">
         <div class="container">
             <div class="box" style="min-width:100%;">
@@ -1014,6 +276,70 @@ table.progress-table td.period-col { text-align: left; font-weight: 600; color: 
         </div>
     </div>
 
+    <div class="tab-content" id="tab-compare">
+        <div class="container">
+            <div class="box" style="min-width:100%;">
+                <h3>Сравнение двух периодов</h3>
+                <p>Выберите период А и период Б. Можно смотреть как по всей команде, так и по конкретному сотруднику.</p>
+                
+                <div class="cmp-dates" style="margin-bottom: 20px;">
+                    <div class="field-group" style="margin:0; min-width: 250px; flex-direction:row; align-items:center; gap:10px;">
+                        <label style="margin:0; white-space:nowrap;">кто:</label>
+                        <select id="cmpTarget" onchange="renderCompare()" style="flex:1;">
+                            <option value="all">🌟 Все сотрудники (суммарно)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="cmp-dates" style="margin-bottom: 24px;">
+                    <div class="field-group" style="margin:0;">
+                        <label>Период А (было)</label>
+                        <div style="display:flex; gap:6px;">
+                            <input type="date" id="cmpAFrom" onchange="renderCompare()">
+                            <input type="date" id="cmpATo" onchange="renderCompare()">
+                        </div>
+                    </div>
+                    <div class="cmp-arrow">→</div>
+                    <div class="field-group" style="margin:0;">
+                        <label>Период Б (стало)</label>
+                        <div style="display:flex; gap:6px;">
+                            <input type="date" id="cmpBFrom" onchange="renderCompare()">
+                            <input type="date" id="cmpBTo" onchange="renderCompare()">
+                        </div>
+                    </div>
+                </div>
+
+                <div id="cmpResultBox" class="cmp-wrapper" style="display:none; box-shadow:none; padding:0; border:none;">
+                    <div class="cmp-main-title" id="cmpTitle"></div>
+                    <div class="cmp-big-pct" id="cmpBigPct"></div>
+                    <div class="cmp-sub-title">заданий с ошибками</div>
+                    
+                    <div class="cmp-cards">
+                        <div class="cmp-card">
+                            <div class="val" id="cmpValA">0</div>
+                            <div class="date" id="cmpDateA">—</div>
+                        </div>
+                        <div class="cmp-arrow">→</div>
+                        <div class="cmp-card after">
+                            <div class="val" id="cmpValB">0</div>
+                            <div class="date" id="cmpDateB">—</div>
+                        </div>
+                    </div>
+
+                    <div class="cmp-cats" id="cmpCats"></div>
+
+                    <div class="cmp-footer">
+                        <div class="cmp-footer-badge" id="cmpFooterBadge">качество растёт · вы молодцы</div>
+                    </div>
+                </div>
+                
+                <div id="cmpEmpty" style="text-align:center; color:var(--c-text-3); padding:40px 0;">
+                    заполните периоды выше 👆
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div class="modal-overlay" id="modalOverlay" onclick="if(event.target===this)closeModal()">
         <div class="modal" id="modalContent"></div>
     </div>
@@ -1030,6 +356,7 @@ const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 let currentUser = null;
 let loginInProgress = false;
+let saveSettingsTimer = null;
 
 const categoriesList = [
     'маркдаун', 'ошибки РП', 'грамматика, орфография, пунктуация, не те слова',
@@ -1059,11 +386,69 @@ let userMarks = {}; let userPaints = {}; let userCards = {}; let userVks = {}; l
 let calYear, calMonth;
 const now = new Date(); calYear = now.getFullYear(); calMonth = now.getMonth();
 
+function collectAllSettings() {
+    const settings = {};
+    const activeTab = document.querySelector('.main-tab-btn.active');
+    if (activeTab) {
+        const onclickAttr = activeTab.getAttribute('onclick') || '';
+        const match = onclickAttr.match(/switchTab\('([^']+)'/);
+        if (match) settings.activeTab = match[1];
+    }
+
+    settings.filters = {
+        user: document.getElementById('filterUser')?.value,
+        dateFrom: document.getElementById('filterDateFrom')?.value,
+        dateTo: document.getElementById('filterDateTo')?.value,
+        mark: document.getElementById('filterMark')?.value,
+        paint: document.getElementById('filterPaint')?.value
+    };
+
+    settings.progress = {
+        norm: document.getElementById('progNorm')?.value,
+        step: document.getElementById('progStep')?.value,
+        group: document.getElementById('progGroup')?.value,
+        from: document.getElementById('progFrom')?.value,
+        to: document.getElementById('progTo')?.value
+    };
+
+    settings.quality = {
+        coef: document.getElementById('qCoefInput')?.value,
+        dateFrom: document.getElementById('qDateFrom')?.value,
+        dateTo: document.getElementById('qDateTo')?.value,
+        mode: document.querySelector('input[name="qMode"]:checked')?.value,
+        thrOrange: document.getElementById('thrOrange')?.value,
+        thrGreen: document.getElementById('thrGreen')?.value
+    };
+
+    settings.dynamics = {
+        step: document.getElementById('dynStep')?.value,
+        from: document.getElementById('dynFrom')?.value,
+        to: document.getElementById('dynTo')?.value
+    };
+
+    settings.compare = {
+        target: document.getElementById('cmpTarget')?.value,
+        aFrom: document.getElementById('cmpAFrom')?.value,
+        aTo: document.getElementById('cmpATo')?.value,
+        bFrom: document.getElementById('cmpBFrom')?.value,
+        bTo: document.getElementById('cmpBTo')?.value
+    };
+
+    settings.weekProgress = {
+        mode: document.getElementById('wpMode')?.value,
+        step: document.getElementById('wpStep')?.value,
+        metric: document.getElementById('wpMetric')?.value
+    };
+
+    return settings;
+}
+
 async function saveToCloud() {
     if (!currentUser) return;
     try {
         const mainText = document.getElementById('mainData') ? document.getElementById('mainData').value : '';
         const namesText = document.getElementById('namesData') ? document.getElementById('namesData').value : '';
+        const settings = collectAllSettings();
 
         const { error } = await supabaseClient
             .from('user_data')
@@ -1075,11 +460,10 @@ async function saveToCloud() {
                 user_vks: userVks,
                 main_data: mainText,
                 names_data: namesText,
+                settings: settings,
                 updated_at: new Date().toISOString()
             });
-        if (error) {
-            console.error('Ошибка сохранения:', error);
-        }
+        if (error) console.error('Ошибка сохранения:', error);
     } catch (e) {
         console.error('Сетевая ошибка:', e);
     }
@@ -1092,17 +476,18 @@ function manualSaveToCloud() {
 
 function persistAll() { saveToCloud(); }
 
+function debouncedSaveSettings() {
+    if (saveSettingsTimer) clearTimeout(saveSettingsTimer);
+    saveSettingsTimer = setTimeout(() => saveToCloud(), 800);
+}
+
 function togglePassword() {
     const inp = document.getElementById('authPassword');
     const eye = document.getElementById('authEye');
     if (inp.type === 'password') {
-        inp.type = 'text';
-        eye.textContent = '🙈';
-        eye.title = 'Скрыть пароль';
+        inp.type = 'text'; eye.textContent = '🙈'; eye.title = 'Скрыть пароль';
     } else {
-        inp.type = 'password';
-        eye.textContent = '👁';
-        eye.title = 'Показать пароль';
+        inp.type = 'password'; eye.textContent = '👁'; eye.title = 'Показать пароль';
     }
 }
 
@@ -1112,9 +497,7 @@ function showAuthError(msg) {
     el.classList.add('show');
 }
 
-function hideAuthError() {
-    document.getElementById('authError').classList.remove('show');
-}
+function hideAuthError() { document.getElementById('authError').classList.remove('show'); }
 
 function setAuthLoading(isLoading) {
     const btn = document.getElementById('authSubmit');
@@ -1126,24 +509,19 @@ function setAuthLoading(isLoading) {
 async function doLogin() {
     if (loginInProgress) return;
     hideAuthError();
-
     const email = document.getElementById('authEmail').value.trim();
     const password = document.getElementById('authPassword').value;
-
     if (!email) { showAuthError('Введите email'); return; }
     if (!password) { showAuthError('Введите пароль'); return; }
-
     setAuthLoading(true);
 
     try {
         const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
-
         if (error) {
             setAuthLoading(false);
             showAuthError(error.message || 'Не удалось войти');
             return;
         }
-
         currentUser = data.user;
         document.getElementById('authScreen').style.display = 'none';
         document.getElementById('appScreen').style.display = 'block';
@@ -1159,39 +537,101 @@ async function logoutUser() {
     location.reload();
 }
 
+function applyAllSettings(settings) {
+    if (!settings) return;
+    if (settings.filters) {
+        const f = settings.filters;
+        if (f.user) document.getElementById('filterUser').value = f.user;
+        if (f.dateFrom) document.getElementById('filterDateFrom').value = f.dateFrom;
+        if (f.dateTo) document.getElementById('filterDateTo').value = f.dateTo;
+        if (f.mark) document.getElementById('filterMark').value = f.mark;
+        if (f.paint) document.getElementById('filterPaint').value = f.paint;
+    }
+    if (settings.progress) {
+        const p = settings.progress;
+        if (p.norm) document.getElementById('progNorm').value = p.norm;
+        if (p.step) document.getElementById('progStep').value = p.step;
+        if (p.group) document.getElementById('progGroup').value = p.group;
+        if (p.from) document.getElementById('progFrom').value = p.from;
+        if (p.to) document.getElementById('progTo').value = p.to;
+    }
+    if (settings.quality) {
+        const q = settings.quality;
+        if (q.coef) document.getElementById('qCoefInput').value = q.coef;
+        if (q.dateFrom) document.getElementById('qDateFrom').value = q.dateFrom;
+        if (q.dateTo) document.getElementById('qDateTo').value = q.dateTo;
+        if (q.mode) {
+            const radio = document.querySelector(`input[name="qMode"][value="${q.mode}"]`);
+            if (radio) radio.checked = true;
+        }
+        if (q.thrOrange) document.getElementById('thrOrange').value = q.thrOrange;
+        if (q.thrGreen) document.getElementById('thrGreen').value = q.thrGreen;
+    }
+    if (settings.dynamics) {
+        const d = settings.dynamics;
+        if (d.step) document.getElementById('dynStep').value = d.step;
+        if (d.from) document.getElementById('dynFrom').value = d.from;
+        if (d.to) document.getElementById('dynTo').value = d.to;
+    }
+    if (settings.compare) {
+        const c = settings.compare;
+        if (c.target) {
+            const sel = document.getElementById('cmpTarget');
+            setTimeout(() => { if (sel.querySelector(`option[value="${c.target}"]`)) sel.value = c.target; }, 100);
+        }
+        if (c.aFrom) document.getElementById('cmpAFrom').value = c.aFrom;
+        if (c.aTo) document.getElementById('cmpATo').value = c.aTo;
+        if (c.bFrom) document.getElementById('cmpBFrom').value = c.bFrom;
+        if (c.bTo) document.getElementById('cmpBTo').value = c.bTo;
+    }
+    if (settings.weekProgress) {
+        const wp = settings.weekProgress;
+        if (wp.mode) document.getElementById('wpMode').value = wp.mode;
+        if (wp.step) document.getElementById('wpStep').value = wp.step;
+        if (wp.metric) document.getElementById('wpMetric').value = wp.metric;
+    }
+    if (settings.activeTab) {
+        const tabs = document.querySelectorAll('.main-tab-btn');
+        tabs.forEach(tab => {
+            const onclickAttr = tab.getAttribute('onclick') || '';
+            if (onclickAttr.includes(`'${settings.activeTab}'`)) switchTab(settings.activeTab, tab);
+        });
+    }
+}
+
 async function loadUserData() {
     if (!currentUser) return;
-    
-    const { data, error } = await supabaseClient
-        .from('user_data')
-        .select('*')
-        .eq('id', currentUser.id)
-        .single();
-
+    const { data, error } = await supabaseClient.from('user_data').select('*').eq('id', currentUser.id).single();
     if (error && error.code !== 'PGRST116') {
         console.error('Ошибка загрузки:', error);
         showToast('Ошибка загрузки данных');
         return;
     }
-
     if (data) {
         userMarks = data.user_marks || {};
         userPaints = data.user_paints || {};
         userCards = data.user_cards || {};
         userVks = data.user_vks || {};
-
         if (data.main_data) document.getElementById('mainData').value = data.main_data;
         if (data.names_data) document.getElementById('namesData').value = data.names_data;
         
         if (data.main_data && data.names_data) {
             processData();
+            if (data.settings) {
+                applyAllSettings(data.settings);
+                setTimeout(() => {
+                    if (data.settings.progress) renderProgress();
+                    if (data.settings.dynamics) renderDynTrainerList();
+                    if (data.settings.compare) { populateCompareTargets(); renderCompare(); }
+                    if (data.settings.filters) applyFilters();
+                }, 150);
+            }
         }
         syncQualityFromMain();
     } else {
         userMarks = {}; userPaints = {}; userCards = {}; userVks = {};
         await saveToCloud();
     }
-
     showToast('Данные загружены');
 }
 
@@ -1218,6 +658,22 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
     checkSession();
+
+    const settingsIds = [
+        'filterUser', 'filterDateFrom', 'filterDateTo', 'filterMark', 'filterPaint',
+        'progNorm', 'progStep', 'progGroup', 'progFrom', 'progTo',
+        'qCoefInput', 'qDateFrom', 'qDateTo', 'thrOrange', 'thrGreen',
+        'dynStep', 'dynFrom', 'dynTo',
+        'cmpTarget', 'cmpAFrom', 'cmpATo', 'cmpBFrom', 'cmpBTo',
+        'wpMode', 'wpStep', 'wpMetric'
+    ];
+    settingsIds.forEach(id => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.addEventListener('change', debouncedSaveSettings);
+        if (el.tagName === 'INPUT' && el.type === 'number') el.addEventListener('input', debouncedSaveSettings);
+    });
+    document.querySelectorAll('input[name="qMode"]').forEach(r => r.addEventListener('change', debouncedSaveSettings));
 });
 
 function switchTab(tabId, btn) {
@@ -1228,6 +684,12 @@ function switchTab(tabId, btn) {
     if (tabId === 'dynamics') renderDynTrainerList();
     if (tabId === 'progress') renderProgress();
     if (tabId === 'quality') syncQualityFromMain();
+    if (tabId === 'compare') switchToCompare();
+    
+    if (currentUser) {
+        clearTimeout(saveSettingsTimer);
+        saveSettingsTimer = setTimeout(() => saveToCloud(), 500);
+    }
 }
 
 function syncQualityFromMain() {
@@ -1237,15 +699,9 @@ function syncQualityFromMain() {
     const qNameEl = document.getElementById('qNameInput');
     const infoEl = document.getElementById('qSyncInfo');
     if (!mainEl || !qDataEl) return;
-
     const mainText = mainEl.value || '';
     const namesText = (namesEl && namesEl.value) || '';
-
-    if (!mainText.trim()) {
-        if (infoEl) infoEl.textContent = 'в сводке пока нет данных';
-        return;
-    }
-
+    if (!mainText.trim()) { if (infoEl) infoEl.textContent = 'в сводке пока нет данных'; return; }
     qDataEl.value = mainText;
     qNameEl.value = namesText;
     if (infoEl) infoEl.textContent = '✓ данные подставлены из сводки';
@@ -1278,11 +734,7 @@ function pickPaint(p) {
 
 function handleCellClick(userId, colKey) {
     if (!brushMode) return; 
-    
-    if (!userPaints[userId] || typeof userPaints[userId] !== 'object') {
-        userPaints[userId] = {}; 
-    }
-    
+    if (!userPaints[userId] || typeof userPaints[userId] !== 'object') userPaints[userId] = {}; 
     if (brushPaint === 'none') {
         delete userPaints[userId][colKey];
         if (Object.keys(userPaints[userId]).length === 0) delete userPaints[userId];
@@ -1301,30 +753,22 @@ function parseNames(raw) {
         if (!lineTrim) return;
         const parts = lineTrim.split('\t').map(s => s.trim()).filter(Boolean);
         if (parts.length === 0) return;
-
-        let id = null;
-        let name = null;
+        let id = null; let name = null;
         const looksLikeId = (x) => /^[0-9a-fA-F]{8}-/.test(x) || /^\d{6,}$/.test(x);
-
         if (parts.length === 1) return;
-
         if (parts.length === 2) {
             if (looksLikeId(parts[1])) { id = parts[1]; name = parts[0]; }
             else if (looksLikeId(parts[0])) { id = parts[0]; name = parts[1]; }
             else { id = parts[1]; name = parts[0]; }
         } else {
             if (looksLikeId(parts[parts.length - 1])) {
-                id = parts[parts.length - 1];
-                name = parts.slice(0, parts.length - 1).join(' ');
+                id = parts[parts.length - 1]; name = parts.slice(0, parts.length - 1).join(' ');
             } else if (looksLikeId(parts[0])) {
-                id = parts[0];
-                name = parts.slice(1).join(' ');
+                id = parts[0]; name = parts.slice(1).join(' ');
             } else {
-                id = parts[parts.length - 1];
-                name = parts.slice(0, parts.length - 1).join(' ');
+                id = parts[parts.length - 1]; name = parts.slice(0, parts.length - 1).join(' ');
             }
         }
-
         if (id && name) map[id] = name;
     });
     return map;
@@ -1334,12 +778,7 @@ function processData() {
     const mainRaw = document.getElementById('mainData').value;
     const namesRaw = document.getElementById('namesData').value;
     const output = document.getElementById('output');
-
-    if (!mainRaw.trim()) {
-        output.innerHTML = '<p style="color:var(--c-red); text-align:center;">вставь данные в первое окно.</p>';
-        return;
-    }
-
+    if (!mainRaw.trim()) { output.innerHTML = '<p style="color:var(--c-red); text-align:center;">вставь данные в первое окно.</p>'; return; }
     const employees = parseNames(namesRaw);
 
     const lines = mainRaw.split(/\r?\n/);
@@ -1365,12 +804,10 @@ function processData() {
     parsedRows.forEach(cols => {
         const markerId = (cols[0] || '').trim();
         if (!markerId) return;
-
         const startDate = (cols[1] || '').trim();
         const endDate   = (cols[2] || '').trim();
         const quality   = (cols[3] || '').trim();
         const comment   = (cols[4] || '').trim();
-
         const qNum = parseFloat(quality.replace(',', '.'));
         if (isNaN(qNum)) return;
 
@@ -1380,7 +817,6 @@ function processData() {
             taskComments[markerId] = [];
         }
         const user = report[markerId];
-
         const startDateOnly = startDate.split('T')[0];
         const endDateOnly   = endDate.split('T')[0];
 
@@ -1392,7 +828,6 @@ function processData() {
             const catPattern = categoriesList.map(c => c.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|');
             const regexSplit = new RegExp(`(${catPattern})`, 'gi');
             const parts = comment.split(regexSplit);
-
             for (let i = 1; i < parts.length; i += 2) {
                 const catName = parts[i];
                 const blockText = parts[i+1] || '';
@@ -1413,11 +848,8 @@ function processData() {
         }
 
         user.tasks.push({
-            startDate: startDateOnly,
-            endDate: endDateOnly,
-            hasErrors: taskHasErrors,
-            cats: taskCats,
-            quality: qNum
+            startDate: startDateOnly, endDate: endDateOnly,
+            hasErrors: taskHasErrors, cats: taskCats, quality: qNum
         });
     });
 
@@ -1430,6 +862,7 @@ function processData() {
     document.getElementById('tabsSection').style.display = 'block';
 
     applyFilters();
+    populateCompareTargets();
     saveToCloud();
     syncQualityFromMain();
 }
@@ -1471,7 +904,6 @@ function applyFilters() {
                 return true;
             });
             if (tasksInPeriod.length === 0) return null;
-
             const newCatErrors = {};
             categoriesList.forEach(c => newCatErrors[c] = 0);
             let doneTotal = 0, doneWithErrors = 0;
@@ -1480,10 +912,7 @@ function applyFilters() {
                 if (t.hasErrors) doneWithErrors++;
                 categoriesList.forEach(c => { if (t.cats[c]) newCatErrors[c]++; });
             });
-            return {
-                id: user.id, name: user.name,
-                doneTotal, doneWithErrors, catErrors: newCatErrors
-            };
+            return { id: user.id, name: user.name, doneTotal, doneWithErrors, catErrors: newCatErrors };
         })
         .filter(Boolean);
 
@@ -1499,6 +928,7 @@ function resetFilters() {
     document.getElementById('filterMark').value = 'all';
     document.getElementById('filterPaint').value = 'all';
     applyFilters();
+    debouncedSaveSettings();
 }
 
 function renderReport(users) {
@@ -1543,12 +973,10 @@ function renderReport(users) {
         const mark = userMarks[user.id] || null;
         const paintObj = userPaints[user.id] || {};
         const isOldFormat = typeof paintObj === 'string'; 
-
         const getCellPaint = (key) => {
             if (isOldFormat) return ''; 
             return paintObj[key] ? `paint-${paintObj[key]}` : '';
         };
-
         const rowClass = isOldFormat ? `paint-${paintObj}` : ''; 
 
         html += `<tr class="${rowClass}" data-user-id="${user.id}">
@@ -1567,13 +995,11 @@ function renderReport(users) {
             const v = user.catErrors[cat];
             html += `<td class="${v===0?'zero-cell':''} ${getCellPaint(cat)}" onclick="handleCellClick('${user.id}', '${cat}')">${v}</td>`;
         });
-        
         html += `<td class="id-col ${getCellPaint('id')}" onclick="handleCellClick('${user.id}', 'id')" title="${user.id}">${user.id}</td></tr>`;
     });
 
     html += `</tbody></table>`;
     container.innerHTML = html;
-
     document.querySelectorAll('.color-swatch').forEach(el => {
         el.classList.toggle('active', el.dataset.paint === brushPaint);
     });
@@ -1590,7 +1016,6 @@ function renderTabs() {
     const list = document.getElementById('tabsList');
     const query = document.getElementById('tabsSearch').value.toLowerCase().trim();
     if (globalReport.length === 0) { list.innerHTML = ''; return; }
-
     const sorted = globalReport.slice().sort((a,b)=>a.name.localeCompare(b.name));
     let html = '';
     sorted.forEach(u => {
@@ -1606,38 +1031,14 @@ function renderTabs() {
 
 /* ===== АНАЛИЗ И РЕКОМЕНДАЦИИ ===== */
 const CATEGORY_TIPS = {
-    'маркдаун': {
-        topic: 'Разметка и форматирование',
-        checklist: ['Проверить заголовки (H1/H2) в последних задачах','Пройти чек-лист по маркдауну перед сдачей','Разобрать 2–3 примера с ошибками из комментариев']
-    },
-    'ошибки РП': {
-        topic: 'Работа с речевыми ошибками',
-        checklist: ['Перечитать критерии качества по РП','Разобрать примеры неудачных формулировок','Проверять текст на речевые ошибки перед отправкой']
-    },
-    'грамматика, орфография, пунктуация, не те слова': {
-        topic: 'Грамматика и орфография',
-        checklist: ['Пройди мини-тест по грамматике','Проверять текст через валидатор перед сдачей','Обращать внимание на падежи и согласование']
-    },
-    'пропущенная ё, опечатка, потерянная точка': {
-        topic: 'Точность и внимательность',
-        checklist: ['Перечитать финальный текст перед отправкой','Использовать автопроверку на опечатки','Проверить все точки в конце предложений']
-    },
-    'систем': {
-        topic: 'Системные ошибки',
-        checklist: ['Уточнить критерии системных ошибок','Разобрать 3 последних случая','Согласовать правила с ревьюером']
-    },
-    'контекст, ты/вы': {
-        topic: 'Контекст и обращение',
-        checklist: ['Проверить обращение к клиенту (ты/вы)','Уточнить стиль общения для каждого типа клиента','Разобрать примеры из комментариев']
-    },
-    'комментарий': {
-        topic: 'Качество комментариев',
-        checklist: ['Перечитать требования к комментариям','Проверить полноту описания','Сравнить с эталонными примерами']
-    },
-    'единообразие': {
-        topic: 'Единообразие терминов',
-        checklist: ['Свериться с глоссарием терминов','Проверить единообразие в рамках одной задачи','Разобрать примеры расхождений']
-    }
+    'маркдаун': { topic: 'Разметка и форматирование', checklist: ['Проверить заголовки (H1/H2) в последних задачах','Пройти чек-лист по маркдауну перед сдачей','Разобрать 2–3 примера с ошибками из комментариев'] },
+    'ошибки РП': { topic: 'Работа с речевыми ошибками', checklist: ['Перечитать критерии качества по РП','Разобрать примеры неудачных формулировок','Проверять текст на речевые ошибки перед отправкой'] },
+    'грамматика, орфография, пунктуация, не те слова': { topic: 'Грамматика и орфография', checklist: ['Пройди мини-тест по грамматике','Проверять текст через валидатор перед сдачей','Обращать внимание на падежи и согласование'] },
+    'пропущенная ё, опечатка, потерянная точка': { topic: 'Точность и внимательность', checklist: ['Перечитать финальный текст перед отправкой','Использовать автопроверку на опечатки','Проверить все точки в конце предложений'] },
+    'систем': { topic: 'Системные ошибки', checklist: ['Уточнить критерии системных ошибок','Разобрать 3 последних случая','Согласовать правила с ревьюером'] },
+    'контекст, ты/вы': { topic: 'Контекст и обращение', checklist: ['Проверить обращение к клиенту (ты/вы)','Уточнить стиль общения для каждого типа клиента','Разобрать примеры из комментариев'] },
+    'комментарий': { topic: 'Качество комментариев', checklist: ['Перечитать требования к комментариям','Проверить полноту описания','Сравнить с эталонными примерами'] },
+    'единообразие': { topic: 'Единообразие терминов', checklist: ['Свериться с глоссарием терминов','Проверить единообразие в рамках одной задачи','Разобрать примеры расхождений'] }
 };
 
 function getTeamAverage(excludeUserId, fromStr, toStr) {
@@ -1660,10 +1061,7 @@ function getTeamAverage(excludeUserId, fromStr, toStr) {
     return {
         total, errors,
         errPct: total ? (errors / total * 100) : 0,
-        catPct: categoriesList.reduce((acc, c) => {
-            acc[c] = total ? (catTotals[c] / total * 100) : 0;
-            return acc;
-        }, {})
+        catPct: categoriesList.reduce((acc, c) => { acc[c] = total ? (catTotals[c] / total * 100) : 0; return acc; }, {})
     };
 }
 
@@ -1699,30 +1097,18 @@ function buildRecommendations(userId, tasks, fromStr, toStr) {
         catDelta[c] = b - a;
     });
 
-    const problemCats = categoriesList.filter(c => catCounts[c] > 0 && catPct[c] > teamAvg.catPct[c])
-        .sort((a,b) => catPct[b] - catPct[a]).slice(0, 3);
-    const improvingCats = categoriesList.filter(c => catDelta[c] < -2)
-        .sort((a,b) => catDelta[a] - catDelta[b]).slice(0, 3);
-    const worseningCats = categoriesList.filter(c => catDelta[c] > 2)
-        .sort((a,b) => catDelta[b] - catDelta[a]).slice(0, 3);
+    const problemCats = categoriesList.filter(c => catCounts[c] > 0 && catPct[c] > teamAvg.catPct[c]).sort((a,b) => catPct[b] - catPct[a]).slice(0, 3);
+    const improvingCats = categoriesList.filter(c => catDelta[c] < -2).sort((a,b) => catDelta[a] - catDelta[b]).slice(0, 3);
+    const worseningCats = categoriesList.filter(c => catDelta[c] > 2).sort((a,b) => catDelta[b] - catDelta[a]).slice(0, 3);
 
     const insights = [];
     if (trendDelta < -3) insights.push({ icon: '📈', text: `Качество растёт: за вторую половину периода % ошибок снизился на ${Math.abs(trendDelta).toFixed(1)} п.п.`, type: 'good' });
     else if (trendDelta > 3) insights.push({ icon: '📉', text: `Качество падает: за вторую половину периода % ошибок вырос на ${trendDelta.toFixed(1)} п.п.`, type: 'bad' });
     else insights.push({ icon: '➡️', text: `Стабильно: % ошибок держится примерно на одном уровне`, type: 'neutral' });
 
-    if (problemCats.length > 0) {
-        const worst = problemCats[0];
-        insights.push({ icon: '⚠️', text: `Проблемная категория: ${CAT_SHORT_LABELS[worst] || worst} — ${catPct[worst].toFixed(1)}% (по команде ${teamAvg.catPct[worst].toFixed(1)}%)`, type: 'bad' });
-    }
-    if (improvingCats.length > 0) {
-        const best = improvingCats[0];
-        insights.push({ icon: '✅', text: `Улучшение: ${CAT_SHORT_LABELS[best] || best} снизился на ${Math.abs(catDelta[best]).toFixed(1)} п.п.`, type: 'good' });
-    }
-    if (worseningCats.length > 0) {
-        const worst = worseningCats[0];
-        insights.push({ icon: '🚨', text: `Растёт: ${CAT_SHORT_LABELS[worst] || worst} +${catDelta[worst].toFixed(1)} п.п.`, type: 'bad' });
-    }
+    if (problemCats.length > 0) insights.push({ icon: '⚠️', text: `Проблемная категория: ${CAT_SHORT_LABELS[problemCats[0]] || problemCats[0]} — ${catPct[problemCats[0]].toFixed(1)}% (по команде ${teamAvg.catPct[problemCats[0]].toFixed(1)}%)`, type: 'bad' });
+    if (improvingCats.length > 0) insights.push({ icon: '✅', text: `Улучшение: ${CAT_SHORT_LABELS[improvingCats[0]] || improvingCats[0]} снизился на ${Math.abs(catDelta[improvingCats[0]]).toFixed(1)} п.п.`, type: 'good' });
+    if (worseningCats.length > 0) insights.push({ icon: '🚨', text: `Растёт: ${CAT_SHORT_LABELS[worseningCats[0]] || worseningCats[0]} +${catDelta[worseningCats[0]].toFixed(1)} п.п.`, type: 'bad' });
 
     const diffWithTeam = errPct - teamAvg.errPct;
     if (Math.abs(diffWithTeam) > 1) {
@@ -1730,14 +1116,11 @@ function buildRecommendations(userId, tasks, fromStr, toStr) {
         else insights.push({ icon: '🏆', text: `Ниже среднего по команде на ${Math.abs(diffWithTeam).toFixed(1)} п.п. (у вас ${errPct.toFixed(1)}%, у команды ${teamAvg.errPct.toFixed(1)}%)`, type: 'good' });
     }
 
-    const vksEntries = Object.entries(userVks[userId] || {})
-        .map(([d, e]) => ({ date: d, ...e }))
-        .filter(e => {
-            if (fromStr && e.date < fromStr) return false;
-            if (toStr && e.date > toStr) return false;
-            return true;
-        })
-        .sort((a,b) => b.date.localeCompare(a.date));
+    const vksEntries = Object.entries(userVks[userId] || {}).map(([d, e]) => ({ date: d, ...e })).filter(e => {
+        if (fromStr && e.date < fromStr) return false;
+        if (toStr && e.date > toStr) return false;
+        return true;
+    }).sort((a,b) => b.date.localeCompare(a.date));
 
     const lastVks = vksEntries[0];
     const daysSinceVks = lastVks ? Math.floor((new Date() - new Date(lastVks.date)) / (1000*60*60*24)) : null;
@@ -1816,19 +1199,15 @@ function buildRecommendations(userId, tasks, fromStr, toStr) {
 function buildMessageTemplate(name, errPct, teamErrPct, problemCats, improvingCats, vksFormat, catCounts) {
     const firstName = name.split(' ')[0];
     let msg = `Привет, ${firstName}!\n\n`;
-
     if (errPct < teamErrPct) msg += `По последним задачам вижу хороший результат — ${errPct.toFixed(1)}% ошибок, это ниже среднего по команде (${teamErrPct.toFixed(1)}%). Молодец!\n\n`;
     else if (errPct > teamErrPct + 3) msg += `По последним задачам % ошибок — ${errPct.toFixed(1)}%, это чуть выше среднего по команде (${teamErrPct.toFixed(1)}%). Давай разберёмся, что можно подтянуть.\n\n`;
     else msg += `По последним задачам % ошибок — ${errPct.toFixed(1)}%, это на уровне команды (${teamErrPct.toFixed(1)}%). Стабильно!\n\n`;
-
     if (improvingCats.length > 0) msg += `Хорошо продвинулся по: ${improvingCats.map(c => CAT_SHORT_LABELS[c] || c).join(', ')}.\n\n`;
-
     if (problemCats.length > 0) {
         msg += `Предлагаю на следующей ВКС (${vksFormat}) разобрать: ${CAT_SHORT_LABELS[problemCats[0]] || problemCats[0]}`;
         if (problemCats.length > 1) msg += ` и ${problemCats.slice(1).map(c => CAT_SHORT_LABELS[c] || c).join(', ')}`;
         msg += `.\n\n`;
     }
-
     msg += `Если хочешь, могу скинуть примеры и чек-лист. Хорошей недели! 🙌`;
     return msg;
 }
@@ -1854,7 +1233,6 @@ function openCard(userId) {
 
     const comments = (taskComments[userId] || []).slice().sort((a,b)=>b.date.localeCompare(a.date));
     const links = card.links || [];
-
     const rec = buildRecommendations(userId, user.tasks, null, null);
 
     let recHtml = '';
@@ -2097,9 +1475,7 @@ function copyMessageTemplate(userId) {
     const el = document.getElementById('msgTemplate-' + userId);
     if (!el) return;
     navigator.clipboard.writeText(el.value).then(() => showToast('шаблон скопирован')).catch(() => {
-        el.select();
-        document.execCommand('copy');
-        showToast('шаблон скопирован');
+        el.select(); document.execCommand('copy'); showToast('шаблон скопирован');
     });
 }
 
@@ -2117,7 +1493,6 @@ function pad2(n) { return n < 10 ? '0' + n : '' + n; }
 function renderCalendar(userId) {
     const dows = ['пн','вт','ср','чт','пт','сб','вс'];
     let html = dows.map(d => `<div class="vks-dow">${d}</div>`).join('');
-
     const first = new Date(calYear, calMonth, 1);
     let firstDow = first.getDay();
     firstDow = (firstDow === 0) ? 6 : firstDow - 1;
@@ -2196,9 +1571,7 @@ function openVksDay(userId, dateKey) {
     document.getElementById('vksModalOverlay').classList.add('open');
 }
 
-function closeVksModal() {
-    document.getElementById('vksModalOverlay').classList.remove('open');
-}
+function closeVksModal() { document.getElementById('vksModalOverlay').classList.remove('open'); }
 
 function saveVksDay(userId, dateKey) {
     const present = document.getElementById('vksPresent').value;
@@ -2226,15 +1599,12 @@ function saveCard(userId) {
 
     const newMark = document.getElementById('cardMark').value;
     const newPaint = document.getElementById('cardPaint').value;
-    
     if (newMark === '') delete userMarks[userId]; else userMarks[userId] = newMark;
-    
     if (newPaint === '') {
         if (userPaints[userId] && typeof userPaints[userId] === 'string') delete userPaints[userId];
     } else {
         userPaints[userId] = newPaint; 
     }
-
     persistAll();
     showToast('сохранено');
     applyFilters();
@@ -2281,31 +1651,23 @@ function parseVksReport() {
     const text = document.getElementById('vksReportData').value;
     const date = document.getElementById('vksImportDate').value;
     const cat = document.getElementById('vksImportCategory').value;
-    
     if (!text.trim()) { alert('вставь данные в поле'); return; }
     if (!date) { alert('выбери дату ВКС'); return; }
 
     const statusEl = document.getElementById('vksImportStatus');
     const resultsEl = document.getElementById('vksImportResults');
-    
     if (globalReport.length === 0) {
         statusEl.innerHTML = '<span style="color:var(--c-red);">❌ сначала загрузи основной отчёт на первой вкладке.</span>';
         return;
     }
 
-    const allNames = globalReport.map(u => {
-        const firstName = u.name.split(' ')[0];
-        return { id: u.id, fullName: u.name, firstName: firstName };
-    });
-
+    const allNames = globalReport.map(u => ({ id: u.id, fullName: u.name, firstName: u.name.split(' ')[0] }));
     const lines = text.split(/\r?\n/);
     let foundCount = 0;
-    let html = `<table class="summary-table" style="white-space: normal;">
-        <thead><tr><th>сотрудник</th><th>найденный текст</th><th>действие</th></tr></thead><tbody>`;
+    let html = `<table class="summary-table" style="white-space: normal;"><thead><tr><th>сотрудник</th><th>найденный текст</th><th>действие</th></tr></thead><tbody>`;
 
-    lines.forEach((line, idx) => {
+    lines.forEach(line => {
         if (!line.trim()) return;
-        
         allNames.forEach(u => {
             if (line.toLowerCase().includes(u.firstName.toLowerCase())) {
                 foundCount++;
@@ -2355,7 +1717,6 @@ function calcQuality() {
 
     const dataRaw = document.getElementById('qDataInput').value;
     const nameRaw = document.getElementById('qNameInput').value;
-
     const lines = dataRaw.split(/\r?\n/);
     const records = [];
     let total = 0, skipped = 0;
@@ -2379,7 +1740,6 @@ function calcQuality() {
     }
 
     if (!records.length) { alert('не нашлось подходящих строк'); return; }
-
     const names = parseNames(nameRaw);
 
     if (qCurrentMode === 'trainer') {
@@ -2387,8 +1747,7 @@ function calcQuality() {
         for (const r of records) {
             const key = r.id.toLowerCase().trim();
             if (!groups[key]) groups[key] = { id: r.id, sum: 0, count: 0, sumOriginal: 0 };
-            groups[key].sum += r.real; groups[key].count++;
-            groups[key].sumOriginal += r.original;
+            groups[key].sum += r.real; groups[key].count++; groups[key].sumOriginal += r.original;
         }
         qAllRows = Object.values(groups).map(g => ({ id: g.id, name: names[g.id] || '', avg: g.sum / g.count, avgOriginal: g.sumOriginal / g.count, count: g.count }));
         document.getElementById('qResultTitle').textContent = 'среднее качество по тренерам';
@@ -2397,8 +1756,7 @@ function calcQuality() {
         const byDay = {};
         for (const r of records) {
             if (!byDay[r.date]) byDay[r.date] = { sum: 0, count: 0, sumOriginal: 0 };
-            byDay[r.date].sum += r.real; byDay[r.date].count++;
-            byDay[r.date].sumOriginal += r.original;
+            byDay[r.date].sum += r.real; byDay[r.date].count++; byDay[r.date].sumOriginal += r.original;
         }
         qAllRows = Object.keys(byDay).map(d => ({ date: d, avg: byDay[d].sum / byDay[d].count, avgOriginal: byDay[d].sumOriginal / byDay[d].count, count: byDay[d].count }));
         document.getElementById('qResultTitle').textContent = 'среднее качество по дням';
@@ -2408,51 +1766,35 @@ function calcQuality() {
         for (const r of records) {
             const key = r.date + '|' + r.id.toLowerCase().trim();
             if (!groups[key]) groups[key] = { date: r.date, id: r.id, sum: 0, count: 0, sumOriginal: 0 };
-            groups[key].sum += r.real; groups[key].count++;
-            groups[key].sumOriginal += r.original;
+            groups[key].sum += r.real; groups[key].count++; groups[key].sumOriginal += r.original;
         }
         qAllRows = Object.values(groups).map(g => ({ date: g.date, id: g.id, name: names[g.id] || '', avg: g.sum / g.count, avgOriginal: g.sumOriginal / g.count, count: g.count }));
         document.getElementById('qResultTitle').textContent = 'среднее качество по дням и тренерам';
         qSortKey = 'date'; qSortDir = 'asc';
     } else if (qCurrentMode === 'week') {
-        const weeks = {}; 
-        const empWeeks = {}; 
-        
+        const weeks = {}; const empWeeks = {}; 
         for (const r of records) {
             const d = new Date(r.date);
             const day = d.getDay() || 7; 
-            const monday = new Date(d);
-            monday.setDate(d.getDate() - day + 1);
-            
-            const sunday = new Date(monday);
-            sunday.setDate(monday.getDate() + 6);
-
+            const monday = new Date(d); monday.setDate(d.getDate() - day + 1);
+            const sunday = new Date(monday); sunday.setDate(monday.getDate() + 6);
             const wKey = monday.toISOString().slice(0,10) + '_' + sunday.toISOString().slice(0,10);
             const wLabel = `${monday.getDate().toString().padStart(2,'0')}.${(monday.getMonth()+1).toString().padStart(2,'0')} - ${sunday.getDate().toString().padStart(2,'0')}.${(sunday.getMonth()+1).toString().padStart(2,'0')}`;
-            
             weeks[wKey] = wLabel;
-
             const empKey = r.id.toLowerCase().trim();
             if (!empWeeks[empKey]) empWeeks[empKey] = { id: r.id, name: names[r.id] || '', weeksData: {} };
-            
             if (!empWeeks[empKey].weeksData[wKey]) empWeeks[empKey].weeksData[wKey] = { sum: 0, count: 0 };
             empWeeks[empKey].weeksData[wKey].sum += r.real;
             empWeeks[empKey].weeksData[wKey].count++;
         }
-
         const sortedWeeks = Object.keys(weeks).sort();
-        
         qAllRows = Object.values(empWeeks).map(emp => {
             const weekAvgs = {};
-            for (const [wKey, data] of Object.entries(emp.weeksData)) {
-                weekAvgs[wKey] = data.sum / data.count;
-            }
+            for (const [wKey, data] of Object.entries(emp.weeksData)) weekAvgs[wKey] = data.sum / data.count;
             return { id: emp.id, name: emp.name, weekAvgs: weekAvgs };
         });
-
         document.getElementById('qResultTitle').textContent = 'сводная таблица по неделям';
         qSortKey = 'name'; qSortDir = 'asc';
-        
         window._currentWeeksList = sortedWeeks.map(k => ({ key: k, label: weeks[k] }));
     }
 
@@ -2484,7 +1826,6 @@ function renderEmployeeChips() {
     if (!qAllEmployeeIds || qAllEmployeeIds.length === 0) return;
     const query = document.getElementById('qEmpSearch').value.toLowerCase().trim();
     const map = {}; qAllRows.forEach(r => { if (r.id) map[r.id] = r.name || ''; });
-
     let html = '';
     qAllEmployeeIds.slice().sort((a,b) => (map[a]||'').localeCompare(map[b]||'')).forEach(id => {
         const name = map[id] || id;
@@ -2500,17 +1841,13 @@ function renderEmployeeChips() {
 }
 
 function toggleEmployee(id, checked) {
-    if (checked) qSelectedEmployees.add(id);
-    else qSelectedEmployees.delete(id);
-    renderEmployeeChips();
-    applyEmployeeFilter();
+    if (checked) qSelectedEmployees.add(id); else qSelectedEmployees.delete(id);
+    renderEmployeeChips(); applyEmployeeFilter();
 }
 
 function selectAllEmployees(select) {
-    if (select) qSelectedEmployees = new Set(qAllEmployeeIds);
-    else qSelectedEmployees = new Set();
-    renderEmployeeChips();
-    applyEmployeeFilter();
+    if (select) qSelectedEmployees = new Set(qAllEmployeeIds); else qSelectedEmployees = new Set();
+    renderEmployeeChips(); applyEmployeeFilter();
 }
 
 function updateThresholdHint() {
@@ -2539,20 +1876,16 @@ function buildQHeader() {
     if (qCurrentMode === 'week') {
         html += `<th data-key="name">сотрудник <span class="arrow"></span></th>`;
         if (window._currentWeeksList) {
-            window._currentWeeksList.forEach(w => {
-                html += `<th style="text-align:center; font-size:12px;">${w.label}</th>`;
-            });
+            window._currentWeeksList.forEach(w => { html += `<th style="text-align:center; font-size:12px;">${w.label}</th>`; });
         }
     } else {
         if (qCurrentMode !== 'trainer') html += `<th data-key="date">дата <span class="arrow"></span></th>`;
         if (qCurrentMode !== 'day')     html += `<th data-key="id">ID <span class="arrow"></span></th>`;
-        if (qCurrentMode === 'trainer' || qCurrentMode === 'dayTrainer')
-                                        html += `<th data-key="name">фамилия <span class="arrow"></span></th>`;
+        if (qCurrentMode === 'trainer' || qCurrentMode === 'dayTrainer') html += `<th data-key="name">фамилия <span class="arrow"></span></th>`;
         html += `<th data-key="avg">среднее качество <span class="arrow"></span></th>`;
         html += `<th data-key="count">кол-во <span class="arrow"></span></th>`;
     }
     html += '</tr>';
-    
     const head = document.getElementById('qResultHead');
     head.innerHTML = html;
     head.querySelectorAll('th').forEach(th => {
@@ -2585,7 +1918,6 @@ function applyQSort() {
 function renderQTable(rows) {
     const tbody = document.querySelector('#qResultTable tbody');
     tbody.innerHTML = '';
-    
     if (qCurrentMode === 'week') {
         rows.forEach(r => {
             const tr = document.createElement('tr');
@@ -2606,7 +1938,6 @@ function renderQTable(rows) {
         });
         return;
     }
-
     rows.forEach(r => {
         const tr = document.createElement('tr');
         let cells = '';
@@ -2636,7 +1967,6 @@ function copyQualityResult() {
     } else {
         header.push('среднее_качество', 'кол-во');
     }
-    
     const lines = [header.join('\t')];
     qResultRows.forEach(r => {
         const row = [];
@@ -2654,7 +1984,6 @@ function copyQualityResult() {
         }
         lines.push(row.join('\t'));
     });
-    
     navigator.clipboard.writeText(lines.join('\n')).then(() => {
         showToast('скопировано');
         const btn = document.getElementById('qCopyBtn');
@@ -2696,6 +2025,7 @@ function applyProgQuick(val) {
     fromEl.value = isoDateP(from);
     toEl.value = isoDateP(today);
     renderProgress();
+    debouncedSaveSettings();
 }
 
 function progBucketKey(dateStr, step) {
@@ -2805,84 +2135,27 @@ function renderProgress() {
         data: {
             labels,
             datasets: [
-                {
-                    label: 'Среднее качество команды',
-                    data: dataQuality,
-                    borderColor: '#5B9DF9',
-                    backgroundColor: 'rgba(91,157,249,0.15)',
-                    fill: 'origin',
-                    tension: 0.35,
-                    pointRadius: 4,
-                    pointHoverRadius: 7,
-                    pointBackgroundColor: '#5B9DF9',
-                    pointBorderColor: '#FFFFFF',
-                    pointBorderWidth: 2,
-                    borderWidth: 3
-                },
-                {
-                    label: `Норма (${norm.toFixed(1)}%)`,
-                    data: dataNorm,
-                    borderColor: '#FF3B30',
-                    backgroundColor: 'rgba(255,59,48,0.10)',
-                    fill: 'origin',
-                    tension: 0,
-                    pointRadius: 0,
-                    pointHoverRadius: 0,
-                    borderWidth: 2,
-                    borderDash: [6, 4]
-                }
+                { label: 'Среднее качество команды', data: dataQuality, borderColor: '#5B9DF9', backgroundColor: 'rgba(91,157,249,0.15)', fill: 'origin', tension: 0.35, pointRadius: 4, pointHoverRadius: 7, pointBackgroundColor: '#5B9DF9', pointBorderColor: '#FFFFFF', pointBorderWidth: 2, borderWidth: 3 },
+                { label: `Норма (${norm.toFixed(1)}%)`, data: dataNorm, borderColor: '#FF3B30', backgroundColor: 'rgba(255,59,48,0.10)', fill: 'origin', tension: 0, pointRadius: 0, pointHoverRadius: 0, borderWidth: 2, borderDash: [6, 4] }
             ]
         },
         options: {
-            responsive: true,
-            maintainAspectRatio: false,
+            responsive: true, maintainAspectRatio: false,
             interaction: { mode: 'index', intersect: false },
             plugins: {
-                legend: {
-                    position: 'top',
-                    labels: { font: { family: 'Inter', size: 12 }, usePointStyle: true, padding: 16 }
-                },
-                tooltip: {
-                    backgroundColor: '#1C1C1E',
-                    padding: 12,
-                    cornerRadius: 8,
-                    titleFont: { family: 'Inter' },
-                    bodyFont: { family: 'Inter' },
-                    callbacks: {
-                        label: c => `${c.dataset.label}: ${c.parsed.y.toFixed(2)}%`
-                    }
-                }
+                legend: { position: 'top', labels: { font: { family: 'Inter', size: 12 }, usePointStyle: true, padding: 16 } },
+                tooltip: { backgroundColor: '#1C1C1E', padding: 12, cornerRadius: 8, titleFont: { family: 'Inter' }, bodyFont: { family: 'Inter' }, callbacks: { label: c => `${c.dataset.label}: ${c.parsed.y.toFixed(2)}%` } }
             },
             scales: {
-                y: {
-                    beginAtZero: false,
-                    min: 0,
-                    max: 100,
-                    title: { display: true, text: '% качества', font: { family: 'Inter' } },
-                    ticks: { callback: v => v + '%', font: { family: 'Inter' } },
-                    grid: { color: 'rgba(0,0,0,0.05)' }
-                },
-                x: {
-                    grid: { display: false },
-                    ticks: { font: { family: 'Inter' }, maxRotation: 45, minRotation: 0 }
-                }
+                y: { beginAtZero: false, min: 0, max: 100, title: { display: true, text: '% качества', font: { family: 'Inter' } }, ticks: { callback: v => v + '%', font: { family: 'Inter' } }, grid: { color: 'rgba(0,0,0,0.05)' } },
+                x: { grid: { display: false }, ticks: { font: { family: 'Inter' }, maxRotation: 45, minRotation: 0 } }
             }
         }
     });
 
     const tableEl = document.getElementById('progTable');
-    if (keys.length === 0) {
-        tableEl.innerHTML = '<p style="color:var(--c-text-3); font-size:13px; padding:10px;">нет данных в выбранном периоде.</p>';
-        return;
-    }
-    let html = `<table class="progress-table"><thead><tr>
-        <th>период</th>
-        <th>задач</th>
-        <th>среднее качество</th>
-        <th>норма</th>
-        <th>Δ</th>
-        <th>статус</th>
-    </tr></thead><tbody>`;
+    if (keys.length === 0) { tableEl.innerHTML = '<p style="color:var(--c-text-3); font-size:13px; padding:10px;">нет данных в выбранном периоде.</p>'; return; }
+    let html = `<table class="progress-table"><thead><tr><th>период</th><th>задач</th><th>среднее качество</th><th>норма</th><th>Δ</th><th>статус</th></tr></thead><tbody>`;
     keys.forEach(k => {
         const b = buckets[k];
         const q = b.total ? ((b.qualitySum / b.total) * 100) : 0;
@@ -2909,7 +2182,6 @@ function exportProgress() {
     const group = document.getElementById('progGroup').value;
     const fromStr = document.getElementById('progFrom').value || null;
     const toStr = document.getElementById('progTo').value || null;
-
     const filteredUsers = globalReport.filter(u => {
         if (userCards[u.id]?.archived) return false;
         const m = userMarks[u.id];
@@ -2917,7 +2189,6 @@ function exportProgress() {
         if (group === 'experienced' && m !== 'experienced') return false;
         return true;
     });
-
     const buckets = {};
     filteredUsers.forEach(u => {
         (u.tasks || []).forEach(t => {
@@ -2928,11 +2199,9 @@ function exportProgress() {
             const k = progBucketKey(d, step);
             if (!buckets[k]) buckets[k] = { total: 0, qualitySum: 0 };
             const q = (t.quality !== undefined && !isNaN(t.quality)) ? t.quality : 0;
-            buckets[k].total++;
-            buckets[k].qualitySum += q;
+            buckets[k].total++; buckets[k].qualitySum += q;
         });
     });
-
     const wb = XLSX.utils.book_new();
     const head = ['период', 'задач', 'среднее качество', 'норма', 'Δ'];
     const rows = [head];
@@ -2941,7 +2210,6 @@ function exportProgress() {
         const q = b.total ? ((b.qualitySum / b.total) * 100) : 0;
         rows.push([progBucketLabel(k, step), b.total, q.toFixed(2) + '%', norm.toFixed(1) + '%', (q - norm).toFixed(2)]);
     });
-
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), 'прогресс');
     XLSX.writeFile(wb, `прогресс_команды_${new Date().toISOString().slice(0,10)}.xlsx`);
     showToast('экспортировано');
@@ -2954,24 +2222,18 @@ let dynChartCats = null;
 function pad2dyn(n) { return n < 10 ? '0' + n : '' + n; }
 function isoDate(d) { return d.getFullYear() + '-' + pad2dyn(d.getMonth()+1) + '-' + pad2dyn(d.getDate()); }
 
-function getDynTrainerId() {
-    return document.getElementById('dynTrainerSelect').value || null;
-}
+function getDynTrainerId() { return document.getElementById('dynTrainerSelect').value || null; }
 
 function renderDynTrainerList() {
     const sel = document.getElementById('dynTrainerSelect');
     const prev = sel.value;
     const search = (document.getElementById('dynSearch').value || '').toLowerCase().trim();
-    const list = globalReport
-        .filter(u => !(userCards[u.id] && userCards[u.id].archived))
-        .slice()
-        .sort((a,b) => a.name.localeCompare(b.name));
+    const list = globalReport.filter(u => !(userCards[u.id] && userCards[u.id].archived)).slice().sort((a,b) => a.name.localeCompare(b.name));
     sel.innerHTML = '<option value="">— выбери тренера —</option>';
     list.forEach(u => {
         if (search && !u.name.toLowerCase().includes(search) && !u.id.toLowerCase().includes(search)) return;
         const opt = document.createElement('option');
-        opt.value = u.id;
-        opt.textContent = u.name;
+        opt.value = u.id; opt.textContent = u.name;
         sel.appendChild(opt);
     });
     if (prev && list.find(u => u.id === prev)) sel.value = prev;
@@ -2988,6 +2250,7 @@ function applyDynQuick(val) {
     fromEl.value = isoDate(from);
     toEl.value = isoDate(today);
     renderDynProfile();
+    debouncedSaveSettings();
 }
 
 function dynBucketKey(dateStr, step) {
@@ -3077,14 +2340,13 @@ function renderDynKpi(user, tasks, step, fromStr, toStr) {
     const withErr = sorted.filter(t => t.hasErrors).length;
     const errPct = total ? (withErr / total * 100) : 0;
     const trend = getTrendInfo(sorted);
-
     const trendIcon = trend.trend === 'up' ? '📈' : trend.trend === 'down' ? '📉' : '➡️';
     const trendLabel = trend.trend === 'up' ? 'качество растёт' : trend.trend === 'down' ? 'качество падает' : 'стабильно';
     const deltaPct = (trend.delta * 100);
     const deltaSign = deltaPct > 0 ? '+' : '';
     const deltaColor = deltaPct < 0 ? 'var(--c-green)' : deltaPct > 0 ? 'var(--c-red)' : 'var(--c-text-3)';
-
     const borderColor = trend.trend === 'up' ? 'var(--c-green)' : trend.trend === 'down' ? 'var(--c-red)' : 'var(--c-text-3)';
+    
     const html = `
         <div style="background:var(--c-surface-2); border:1px solid var(--c-border-soft); border-radius:var(--r-md); padding:14px 16px; border-left:3px solid var(--c-text-3);">
             <div style="font-size:11px; color:var(--c-text-2); text-transform:uppercase; font-weight:600; letter-spacing:0.4px;">всего задач</div>
@@ -3106,7 +2368,6 @@ function renderDynKpi(user, tasks, step, fromStr, toStr) {
 function renderDynQualityChart(user, tasks, step) {
     const bucketsUser = {};
     const bucketsAll = {};
-
     tasks.forEach(t => {
         const d = t.startDate || t.endDate;
         if (!d) return;
@@ -3115,7 +2376,6 @@ function renderDynQualityChart(user, tasks, step) {
         bucketsUser[k].total++;
         if (t.hasErrors) bucketsUser[k].err++;
     });
-
     const fromStr = document.getElementById('dynFrom').value || null;
     const toStr = document.getElementById('dynTo').value || null;
     globalReport.forEach(u => {
@@ -3175,16 +2435,12 @@ function renderDynCatsChart(user, tasks, step) {
         const d = t.startDate || t.endDate;
         if (!d) return;
         const k = dynBucketKey(d, step);
-        if (!buckets[k]) {
-            buckets[k] = { total: 0 };
-            categoriesList.forEach(c => buckets[k][c] = 0);
-        }
+        if (!buckets[k]) { buckets[k] = { total: 0 }; categoriesList.forEach(c => buckets[k][c] = 0); }
         buckets[k].total++;
         categoriesList.forEach(c => { if (t.cats[c]) buckets[k][c]++; });
     });
     const keys = Object.keys(buckets).sort();
     const labels = keys.map(k => dynBucketLabel(k, step));
-
     const palette = ['#FF3B30','#FF9500','#FFCC00','#34C759','#00C7BE','#5B9DF9','#7B6FE8','#AF52DE'];
     const datasets = categoriesList.map((cat, i) => ({
         label: CAT_SHORT_LABELS[cat] || cat,
@@ -3214,21 +2470,16 @@ function renderDynProgressTable(user, tasks, step) {
         document.getElementById('dynProgressTable').innerHTML = '<p style="color:var(--c-text-3); font-size:13px; padding:10px;">нет задач в выбранном периоде.</p>';
         return;
     }
-
     const buckets = {};
     tasks.forEach(t => {
         const d = t.startDate || t.endDate;
         if (!d) return;
         const k = dynBucketKey(d, step);
-        if (!buckets[k]) {
-            buckets[k] = { total: 0, err: 0, cats: {} };
-            categoriesList.forEach(c => buckets[k].cats[c] = 0);
-        }
+        if (!buckets[k]) { buckets[k] = { total: 0, err: 0, cats: {} }; categoriesList.forEach(c => buckets[k].cats[c] = 0); }
         buckets[k].total++;
         if (t.hasErrors) buckets[k].err++;
         categoriesList.forEach(c => { if (t.cats[c]) buckets[k].cats[c]++; });
     });
-
     const keys = Object.keys(buckets).sort();
     if (keys.length === 0) {
         document.getElementById('dynProgressTable').innerHTML = '<p style="color:var(--c-text-3); font-size:13px; padding:10px;">нет данных.</p>';
@@ -3240,9 +2491,7 @@ function renderDynProgressTable(user, tasks, step) {
         <th>задач</th>
         <th>с ошиб.</th>
         <th>% ошибок</th>`;
-    categoriesList.forEach(cat => {
-        html += `<th title="${cat}" style="font-size:10px;">${(CAT_SHORT_LABELS[cat] || cat).slice(0, 10)}</th>`;
-    });
+    categoriesList.forEach(cat => { html += `<th title="${cat}" style="font-size:10px;">${(CAT_SHORT_LABELS[cat] || cat).slice(0, 10)}</th>`; });
     html += `</tr></thead><tbody>`;
 
     keys.forEach(k => {
@@ -3252,7 +2501,6 @@ function renderDynProgressTable(user, tasks, step) {
         if (errPct > 10) rowBg = 'background:#FEF2F2;';
         else if (errPct > 5) rowBg = 'background:#FFFBEB;';
         else rowBg = 'background:#F0FDF4;';
-
         html += `<tr style="${rowBg}">
             <td class="period-col"><b>${dynBucketLabel(k, step)}</b></td>
             <td>${b.total}</td>
@@ -3289,16 +2537,13 @@ function renderDynProgressTable(user, tasks, step) {
         });
         html += `</tr>`;
     }
-
     html += `</tbody></table>`;
     document.getElementById('dynProgressTable').innerHTML = html;
 }
 
 function renderDynVks(userId) {
     const entries = userVks[userId] || {};
-    const list = Object.entries(entries)
-        .map(([date, e]) => ({ date, ...e }))
-        .sort((a,b) => b.date.localeCompare(a.date));
+    const list = Object.entries(entries).map(([date, e]) => ({ date, ...e })).sort((a,b) => b.date.localeCompare(a.date));
     const el = document.getElementById('dynVksList');
     if (list.length === 0) { el.innerHTML = '<p style="color:var(--c-text-3); font-size:13px;">ВКС не записаны.</p>'; return; }
     const catLabel = { individual: 'индивидуальная', general: 'общая', master: 'мастер-класс' };
@@ -3314,14 +2559,12 @@ function renderDynVks(userId) {
 function renderDynComments(userId) {
     const fromStr = document.getElementById('dynFrom').value || null;
     const toStr = document.getElementById('dynTo').value || null;
-    const comments = (taskComments[userId] || [])
-        .filter(c => {
-            if (!c.date) return true;
-            if (fromStr && c.date < fromStr) return false;
-            if (toStr && c.date > toStr) return false;
-            return true;
-        })
-        .sort((a,b) => (b.date||'').localeCompare(a.date||''));
+    const comments = (taskComments[userId] || []).filter(c => {
+        if (!c.date) return true;
+        if (fromStr && c.date < fromStr) return false;
+        if (toStr && c.date > toStr) return false;
+        return true;
+    }).sort((a,b) => (b.date||'').localeCompare(a.date||''));
     const el = document.getElementById('dynCommentsList');
     if (comments.length === 0) { el.innerHTML = '<p style="color:var(--c-text-3); font-size:13px;">комментариев нет в периоде.</p>'; return; }
     el.innerHTML = comments.map(c => `
@@ -3351,25 +2594,18 @@ function exportDynProfile() {
     }).sort((a,b) => (a.startDate||'').localeCompare(b.startDate||''));
 
     const wb = XLSX.utils.book_new();
-
     const summary = [
-        ['Тренер', user.name],
-        ['marker_id', user.id],
-        ['Пометка', userMarks[user.id] || ''],
-        ['Период от', fromStr || ''],
-        ['Период до', toStr || ''],
+        ['Тренер', user.name], ['marker_id', user.id], ['Пометка', userMarks[user.id] || ''],
+        ['Период от', fromStr || ''], ['Период до', toStr || ''],
         ['Шаг агрегации', step === 'day' ? 'день' : step === 'week' ? 'неделя' : 'месяц'],
-        ['Всего задач', tasks.length],
-        ['С ошибками', tasks.filter(t => t.hasErrors).length],
+        ['Всего задач', tasks.length], ['С ошибками', tasks.filter(t => t.hasErrors).length],
         ['% ошибок', tasks.length ? (tasks.filter(t=>t.hasErrors).length / tasks.length * 100).toFixed(1) + '%' : '0%']
     ];
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(summary), 'сводка');
 
     const detailHead = ['дата начала', 'дата конца', 'с ошибками', ...categoriesList];
     const detailRows = [detailHead];
-    tasks.forEach(t => {
-        detailRows.push([t.startDate, t.endDate, t.hasErrors ? 'да' : 'нет', ...categoriesList.map(c => t.cats[c] ? 1 : 0)]);
-    });
+    tasks.forEach(t => { detailRows.push([t.startDate, t.endDate, t.hasErrors ? 'да' : 'нет', ...categoriesList.map(c => t.cats[c] ? 1 : 0)]); });
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(detailRows), 'задачи');
 
     const bucketAgg = {};
@@ -3377,12 +2613,8 @@ function exportDynProfile() {
         const d = t.startDate || t.endDate;
         if (!d) return;
         const k = dynBucketKey(d, step);
-        if (!bucketAgg[k]) {
-            bucketAgg[k] = { total: 0, err: 0 };
-            categoriesList.forEach(c => bucketAgg[k][c] = 0);
-        }
-        bucketAgg[k].total++;
-        if (t.hasErrors) bucketAgg[k].err++;
+        if (!bucketAgg[k]) { bucketAgg[k] = { total: 0, err: 0 }; categoriesList.forEach(c => bucketAgg[k][c] = 0); }
+        bucketAgg[k].total++; if (t.hasErrors) bucketAgg[k].err++;
         categoriesList.forEach(c => { if (t.cats[c]) bucketAgg[k][c]++; });
     });
     const aggHead = ['период', 'всего', 'с ошибками', '% ошибок', ...categoriesList];
@@ -3400,7 +2632,6 @@ function exportDynProfile() {
 /* ===== ОБЩИЙ ЭКСПОРТ ===== */
 function exportToExcel() {
     if (globalReport.length === 0) { alert('нет данных'); return; }
-
     const wb = XLSX.utils.book_new();
     const active = globalReport.filter(u => !(userCards[u.id]?.archived));
     const archived = globalReport.filter(u => userCards[u.id]?.archived);
@@ -3411,11 +2642,7 @@ function exportToExcel() {
         const mark = userMarks[u.id] || '';
         const paint = (userPaints[u.id] && typeof userPaints[u.id] === 'string') ? userPaints[u.id] : '';
         let dt=0, de=0; const ce = {}; categoriesList.forEach(c=>ce[c]=0);
-        u.tasks.forEach(t => {
-            dt++;
-            if (t.hasErrors) de++;
-            categoriesList.forEach(c => { if (t.cats[c]) ce[c]++; });
-        });
+        u.tasks.forEach(t => { dt++; if (t.hasErrors) de++; categoriesList.forEach(c => { if (t.cats[c]) ce[c]++; }); });
         sumRows.push([u.name, mark === 'newbie' ? 'новичок' : mark === 'experienced' ? 'опытный' : '', paint ? PAINT_LABELS[paint] : '', dt, de, ...categoriesList.map(c=>ce[c]), u.id]);
     });
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(sumRows), 'сводка');
@@ -3427,11 +2654,7 @@ function exportToExcel() {
         const mark = userMarks[u.id] || '';
         const paint = (userPaints[u.id] && typeof userPaints[u.id] === 'string') ? userPaints[u.id] : '';
         let dt=0, de=0; const ce={}; categoriesList.forEach(k=>ce[k]=0);
-        u.tasks.forEach(t => {
-            dt++;
-            if (t.hasErrors) de++;
-            categoriesList.forEach(k => { if (t.cats[k]) ce[k]++; });
-        });
+        u.tasks.forEach(t => { dt++; if (t.hasErrors) de++; categoriesList.forEach(k => { if (t.cats[k]) ce[k]++; }); });
         const pct = dt ? ((de/dt)*100).toFixed(1)+'%' : '0.0%';
         const links = (c.links||[]).map(l=>`${l.title}: ${l.url}`).join('\n');
         cardRows.push([u.name, u.id, mark === 'newbie' ? 'новичок' : mark === 'experienced' ? 'опытный' : '', paint ? PAINT_LABELS[paint] : '', c.hireDate || '', c.mentor || '', dt, de, pct, ...categoriesList.map(k=>ce[k]), c.notes || '', c.plan || '', links, c.archived ? 'да' : '']);
@@ -3479,7 +2702,6 @@ function exportToExcel() {
         });
         XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(qRows), 'качество');
     }
-
     XLSX.writeFile(wb, `отчет_сотрудники_${new Date().toISOString().slice(0,10)}.xlsx`);
 }
 
@@ -3494,7 +2716,6 @@ function importPreviousXlsx(ev) {
         try {
             const data = new Uint8Array(e.target.result);
             const wb = XLSX.read(data, { type: 'array' });
-
             const sheetName = wb.SheetNames.find(n => n.toLowerCase().includes('карточ'));
             if (!sheetName) { statusEl.innerHTML = '<span style="color:var(--c-red);">❌ не найден лист «карточки».</span>'; return; }
             
@@ -3588,7 +2809,7 @@ function importPreviousXlsx(ev) {
     ev.target.value = '';
 }
 
-/* ===== ПРОГРЕСС ПО ПЕРИОДАМ (все / выбранные) ===== */
+/* ===== ПРОГРЕСС ПО ПЕРИОДАМ ===== */
 let wpChart = null;
 
 function wpBucketKey(dateStr, step) {
@@ -3615,31 +2836,20 @@ function wpBucketLabel(key, step) {
 function renderWeekProgress() {
     const block = document.getElementById('weekProgressBlock');
     if (!block) return;
-
     const mode = document.getElementById('wpMode').value;
     const step = document.getElementById('wpStep').value;
     const metric = document.getElementById('wpMetric').value;
 
-    // определяем список сотрудников
     let usersList = [];
     if (mode === 'all') {
         usersList = globalReport.filter(u => !(userCards[u.id] && userCards[u.id].archived));
     } else {
-        // выбранные — те, что прошли фильтры
-        if (!currentFilteredUsers || currentFilteredUsers.length === 0) {
-            block.style.display = 'none';
-            return;
-        }
+        if (!currentFilteredUsers || currentFilteredUsers.length === 0) { block.style.display = 'none'; return; }
         usersList = currentFilteredUsers.map(u => globalReport.find(x => x.id === u.id)).filter(Boolean);
     }
-
-    if (!usersList || usersList.length === 0) {
-        block.style.display = 'none';
-        return;
-    }
+    if (!usersList || usersList.length === 0) { block.style.display = 'none'; return; }
     block.style.display = 'block';
 
-    // период берём из фильтров сводки
     const fDateFrom = document.getElementById('filterDateFrom').value || null;
     const fDateTo   = document.getElementById('filterDateTo').value || null;
 
@@ -3672,7 +2882,6 @@ function renderWeekProgress() {
         return (b.qSum / b.total) * 100;
     };
 
-    // ===== График =====
     if (wpChart) wpChart.destroy();
     const palette = ['#5B9DF9','#FF9500','#34C759','#FF3B30','#7B6FE8','#00C7BE','#AF52DE','#FFCC00','#FF6B6B','#69DB7C'];
     const sortedUsers = Object.values(userBuckets).sort((a,b)=>a.name.localeCompare(b.name));
@@ -3684,11 +2893,7 @@ function renderWeekProgress() {
         }),
         borderColor: palette[i % palette.length],
         backgroundColor: palette[i % palette.length] + '22',
-        tension: 0.3,
-        spanGaps: true,
-        pointRadius: 3,
-        pointHoverRadius: 6,
-        borderWidth: 2
+        tension: 0.3, spanGaps: true, pointRadius: 3, pointHoverRadius: 6, borderWidth: 2
     }));
 
     const ctx = document.getElementById('wpChart').getContext('2d');
@@ -3696,34 +2901,19 @@ function renderWeekProgress() {
         type: 'line',
         data: { labels, datasets },
         options: {
-            responsive: true,
-            maintainAspectRatio: false,
+            responsive: true, maintainAspectRatio: false,
             interaction: { mode: 'index', intersect: false },
             plugins: {
                 legend: { position: 'top', labels: { font: { family: 'Inter', size: 11 }, usePointStyle: true, padding: 10, boxWidth: 10 } },
-                tooltip: {
-                    backgroundColor: '#1C1C1E',
-                    padding: 10,
-                    cornerRadius: 8,
-                    callbacks: {
-                        label: c => `${c.dataset.label}: ${c.parsed.y === null ? '—' : c.parsed.y.toFixed(1) + '%'}`
-                    }
-                }
+                tooltip: { backgroundColor: '#1C1C1E', padding: 10, cornerRadius: 8, callbacks: { label: c => `${c.dataset.label}: ${c.parsed.y === null ? '—' : c.parsed.y.toFixed(1) + '%'}` } }
             },
             scales: {
-                y: {
-                    beginAtZero: metric === 'pct',
-                    max: metric === 'pct' ? undefined : 100,
-                    title: { display: true, text: metric === 'pct' ? '% ошибок' : '% качества' },
-                    ticks: { callback: v => v + '%' },
-                    grid: { color: 'rgba(0,0,0,0.05)' }
-                },
+                y: { beginAtZero: metric === 'pct', max: metric === 'pct' ? undefined : 100, title: { display: true, text: metric === 'pct' ? '% ошибок' : '% качества' }, ticks: { callback: v => v + '%' }, grid: { color: 'rgba(0,0,0,0.05)' } },
                 x: { grid: { display: false } }
             }
         }
     });
 
-    // ===== Таблица =====
     const pctClass = (v) => {
         if (v === null) return '';
         if (v <= 5) return 'background:#D4EDDA; color:#155724; font-weight:600;';
@@ -3740,9 +2930,7 @@ function renderWeekProgress() {
         return 'background:#F8D7DA; color:#721C24; font-weight:600;';
     };
 
-    let html = `<table class="progress-table" style="min-width:${600 + keys.length * 70}px;">
-        <thead><tr>
-            <th style="text-align:left; position:sticky; left:0; background:var(--c-surface-2); z-index:3;">сотрудник</th>`;
+    let html = `<table class="progress-table" style="min-width:${600 + keys.length * 70}px;"><thead><tr><th style="text-align:left; position:sticky; left:0; background:var(--c-surface-2); z-index:3;">сотрудник</th>`;
     keys.forEach(k => { html += `<th style="font-size:11px;">${wpBucketLabel(k, step)}</th>`; });
     html += `<th>тренд</th></tr></thead><tbody>`;
 
@@ -3752,10 +2940,7 @@ function renderWeekProgress() {
         keys.forEach(k => {
             const v = cellValue(u.buckets[k]);
             const style = v === null ? 'color:#CCC;' : (metric === 'pct' ? pctClass(v) : qualityClass(v));
-            if (v !== null) {
-                if (firstVal === null) firstVal = v;
-                lastVal = v;
-            }
+            if (v !== null) { if (firstVal === null) firstVal = v; lastVal = v; }
             html += `<td style="${style}">${v === null ? '—' : v.toFixed(1)}</td>`;
         });
         let trendHtml = '—';
@@ -3773,7 +2958,6 @@ function renderWeekProgress() {
         }
         html += `<td>${trendHtml}</td></tr>`;
     });
-
     html += `</tbody></table>`;
     document.getElementById('wpTable').innerHTML = html;
 
@@ -3781,8 +2965,7 @@ function renderWeekProgress() {
     let totalErr = 0;
     usersList.forEach(u => (u.tasks || []).forEach(t => { if (t.hasErrors) totalErr++; }));
     const avgErr = totalTasks ? (totalErr / totalTasks * 100).toFixed(1) : '0.0';
-    document.getElementById('wpSummary').innerHTML =
-        `👥 сотрудников: <b>${usersList.length}</b> · 📋 задач: <b>${totalTasks}</b> · ⚠️ средний % ошибок: <b>${avgErr}%</b> · 📅 периодов: <b>${keys.length}</b>`;
+    document.getElementById('wpSummary').innerHTML = `👥 сотрудников: <b>${usersList.length}</b> · 📋 задач: <b>${totalTasks}</b> · ⚠️ средний % ошибок: <b>${avgErr}%</b> · 📅 периодов: <b>${keys.length}</b>`;
 }
 
 function exportWeekProgress() {
@@ -3847,6 +3030,145 @@ function exportWeekProgress() {
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), 'прогресс по ' + step);
     XLSX.writeFile(wb, `прогресс_${mode === 'all' ? 'всех' : 'выбранных'}_${new Date().toISOString().slice(0,10)}.xlsx`);
     showToast('экспортировано');
+}
+
+/* ===== СРАВНЕНИЕ ПЕРИОДОВ ===== */
+function populateCompareTargets() {
+    const sel = document.getElementById('cmpTarget');
+    if (!sel) return;
+    const currentVal = sel.value;
+    sel.innerHTML = '<option value="all">🌟 Все сотрудники (суммарно)</option>';
+    const sorted = globalReport.filter(u => !(userCards[u.id]?.archived)).sort((a,b)=>a.name.localeCompare(b.name));
+    sorted.forEach(u => {
+        const opt = document.createElement('option');
+        opt.value = u.id; opt.textContent = u.name;
+        sel.appendChild(opt);
+    });
+    if (currentVal && sel.querySelector(`option[value="${currentVal}"]`)) sel.value = currentVal;
+}
+
+function switchToCompare() {
+    populateCompareTargets();
+    if (!document.getElementById('cmpAFrom').value) {
+        const today = new Date();
+        const bTo = new Date(today);
+        const bFrom = new Date(today); bFrom.setDate(bFrom.getDate() - 7);
+        const aTo = new Date(bFrom); aTo.setDate(aTo.getDate() - 1);
+        const aFrom = new Date(aTo); aFrom.setDate(aFrom.getDate() - 7);
+        document.getElementById('cmpAFrom').value = isoDateP(aFrom);
+        document.getElementById('cmpATo').value = isoDateP(aTo);
+        document.getElementById('cmpBFrom').value = isoDateP(bFrom);
+        document.getElementById('cmpBTo').value = isoDateP(bTo);
+    }
+    renderCompare();
+}
+
+function formatDateShort(dateStr) {
+    if (!dateStr) return '—';
+    const [y, m, d] = dateStr.split('-');
+    return `${d}.${m}`;
+}
+
+function renderCompare() {
+    const targetId = document.getElementById('cmpTarget').value;
+    const aFrom = document.getElementById('cmpAFrom').value;
+    const aTo = document.getElementById('cmpATo').value;
+    const bFrom = document.getElementById('cmpBFrom').value;
+    const bTo = document.getElementById('cmpBTo').value;
+
+    const resBox = document.getElementById('cmpResultBox');
+    const emptyBox = document.getElementById('cmpEmpty');
+
+    if (!aFrom || !aTo || !bFrom || !bTo) {
+        resBox.style.display = 'none'; emptyBox.style.display = 'block';
+        return;
+    }
+
+    let usersToCalc = [];
+    if (targetId === 'all') {
+        usersToCalc = globalReport.filter(u => !(userCards[u.id]?.archived));
+    } else {
+        const u = globalReport.find(x => x.id === targetId);
+        if (u) usersToCalc = [u];
+    }
+
+    const calcPeriod = (from, to) => {
+        let total = 0, errors = 0;
+        const cats = {};
+        categoriesList.forEach(c => cats[c] = 0);
+        usersToCalc.forEach(u => {
+            (u.tasks || []).forEach(t => {
+                const d = t.startDate || t.endDate;
+                if (!d) return;
+                if (d < from || d > to) return;
+                total++;
+                if (t.hasErrors) errors++;
+                categoriesList.forEach(c => { if (t.cats[c]) cats[c]++; });
+            });
+        });
+        return { total, errors, cats };
+    };
+
+    const statsA = calcPeriod(aFrom, aTo);
+    const statsB = calcPeriod(bFrom, bTo);
+
+    if (statsA.total === 0 && statsB.total === 0) {
+        resBox.style.display = 'none';
+        emptyBox.style.display = 'block';
+        emptyBox.innerHTML = 'в выбранных периодах нет данных 🤷‍♀️';
+        return;
+    }
+
+    resBox.style.display = 'block';
+    emptyBox.style.display = 'none';
+
+    const errA = statsA.errors;
+    const errB = statsB.errors;
+    let pctDiff = 0;
+    if (errA > 0) pctDiff = Math.round(((errB - errA) / errA) * 100);
+    else if (errB > 0) pctDiff = 100;
+
+    const isGood = pctDiff <= 0;
+    const bigPctEl = document.getElementById('cmpBigPct');
+    bigPctEl.textContent = (pctDiff > 0 ? '+' : '') + pctDiff + '%';
+    bigPctEl.className = 'cmp-big-pct ' + (isGood ? 'good' : 'bad');
+
+    let titleText = 'Ошибки без изменений';
+    if (pctDiff < -10) titleText = 'Ошибки ↓ почти в 2 раза';
+    else if (pctDiff < 0) titleText = 'Ошибки ↓';
+    else if (pctDiff > 10) titleText = 'Ошибки ↑';
+    else if (pctDiff > 0) titleText = 'Ошибки выросли';
+    document.getElementById('cmpTitle').textContent = titleText;
+
+    document.getElementById('cmpValA').textContent = errA;
+    document.getElementById('cmpValB').textContent = errB;
+    document.getElementById('cmpDateA').textContent = `${formatDateShort(aFrom)}–${formatDateShort(aTo)}`;
+    document.getElementById('cmpDateB').textContent = `${formatDateShort(bFrom)}–${formatDateShort(bTo)}`;
+
+    const catsEl = document.getElementById('cmpCats');
+    let catsHtml = '';
+    categoriesList.forEach(cat => {
+        const a = statsA.cats[cat];
+        const b = statsB.cats[cat];
+        if (a === 0 && b === 0) return;
+        let diff = 0;
+        if (a > 0) diff = Math.round(((b - a) / a) * 100);
+        else if (b > 0) diff = 100;
+        const shortName = CAT_SHORT_LABELS[cat] ? CAT_SHORT_LABELS[cat].toLowerCase() : cat;
+        const colorClass = diff <= 0 ? 'good' : 'bad';
+        const sign = diff > 0 ? '+' : '';
+        catsHtml += `<div class="cmp-cat-item">${shortName} <b class="${colorClass}">${sign}${diff}%</b></div>`;
+    });
+    catsEl.innerHTML = catsHtml || '<div class="cmp-cat-item">нет ошибок в категориях</div>';
+
+    const badge = document.getElementById('cmpFooterBadge');
+    if (isGood) {
+        badge.className = 'cmp-footer-badge';
+        badge.innerHTML = '🌿 качество растёт · вы молодцы';
+    } else {
+        badge.className = 'cmp-footer-badge bad';
+        badge.innerHTML = '⚠️ качество падает · нужно внимание';
+    }
 }
 
 document.addEventListener('keydown', e => {
