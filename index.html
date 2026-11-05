@@ -4474,7 +4474,10 @@ document.addEventListener('keydown', e => {
             <div class="container">
                 <div class="box" style="min-width:100%;">
                     <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:20px;">
-                        <h3 style="margin:0;">Итоговый отчёт для опер-менеджера</h3>
+                        <div style="display:flex; align-items:center; gap:12px;">
+                            <h3 style="margin:0;">Итоговый отчёт для опер-менеджера</h3>
+                            <button class="btn-copy" onclick="renderManagerReport()" style="padding:6px 12px; font-size:12px;">🔄 Обновить</button>
+                        </div>
                         <div style="display:flex; gap:8px;">
                             <button class="btn-copy" onclick="exportManagerReportExcel()" style="padding:10px 16px;">📊 Excel</button>
                             <button class="btn-copy" onclick="window.print()" style="padding:10px 16px;">🖨 PDF / Печать</button>
