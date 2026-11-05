@@ -693,6 +693,47 @@ table.progress-table td.period-col { text-align: left; font-weight: 600; color: 
             <input type="text" class="tabs-search" id="tabsSearch" placeholder="поиск по ФИО или marker_id..." oninput="renderTabs()">
             <div class="tabs-list" id="tabsList"></div>
         </div>
+
+        <!-- НОВЫЙ БЛОК: прогресс по периодам (все / выбранные) -->
+        <div class="progress-table-wrap" id="weekProgressBlock" style="display:none; margin-top:20px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:14px;">
+                <h3 style="margin:0;">📊 Прогресс по периодам</h3>
+                <div style="display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap;">
+                    <div class="field-group" style="margin:0; min-width:170px;">
+                        <label style="font-size:11px;">режим</label>
+                        <select id="wpMode" onchange="renderWeekProgress()">
+                            <option value="all" selected>Все сотрудники</option>
+                            <option value="selected">Только выбранные (по фильтрам)</option>
+                        </select>
+                    </div>
+                    <div class="field-group" style="margin:0; min-width:130px;">
+                        <label style="font-size:11px;">шаг</label>
+                        <select id="wpStep" onchange="renderWeekProgress()">
+                            <option value="week" selected>по неделям</option>
+                            <option value="day">по дням</option>
+                            <option value="month">по месяцам</option>
+                        </select>
+                    </div>
+                    <div class="field-group" style="margin:0; min-width:150px;">
+                        <label style="font-size:11px;">метрика</label>
+                        <select id="wpMetric" onchange="renderWeekProgress()">
+                            <option value="pct" selected>% ошибок</option>
+                            <option value="quality">среднее качество</option>
+                        </select>
+                    </div>
+                    <button class="btn-copy" onclick="exportWeekProgress()" style="padding:9px 14px;">📤 экспорт</button>
+                </div>
+            </div>
+
+            <div style="position:relative; height:340px; margin-bottom:20px;">
+                <canvas id="wpChart"></canvas>
+            </div>
+
+            <div style="overflow-x:auto; max-height:500px; overflow-y:auto;">
+                <div id="wpTable"></div>
+            </div>
+            <div id="wpSummary" style="margin-top:14px; font-size:13px; color:var(--c-text-2);"></div>
+        </div>
     </div>
 
     <div class="tab-content" id="tab-progress">
@@ -1448,6 +1489,7 @@ function applyFilters() {
 
     renderReport(currentFilteredUsers);
     renderTabs();
+    renderWeekProgress();
 }
 
 function resetFilters() {
@@ -3544,6 +3586,267 @@ function importPreviousXlsx(ev) {
     };
     reader.readAsArrayBuffer(file);
     ev.target.value = '';
+}
+
+/* ===== ПРОГРЕСС ПО ПЕРИОДАМ (все / выбранные) ===== */
+let wpChart = null;
+
+function wpBucketKey(dateStr, step) {
+    const d = new Date(dateStr + 'T00:00:00');
+    if (step === 'day') return dateStr;
+    if (step === 'month') return dateStr.slice(0,7);
+    const day = d.getDay() || 7;
+    const mon = new Date(d); mon.setDate(d.getDate() - day + 1);
+    return isoDateP(mon);
+}
+function wpBucketLabel(key, step) {
+    if (step === 'day') { const [y,m,dd] = key.split('-'); return dd + '.' + m; }
+    if (step === 'month') {
+        const [y,m] = key.split('-');
+        const months = ['янв','фев','мар','апр','май','июн','июл','авг','сен','окт','ноя','дек'];
+        return months[parseInt(m)-1] + ' ' + y.slice(2);
+    }
+    const [y,m,dd] = key.split('-');
+    const d = new Date(key + 'T00:00:00');
+    const sun = new Date(d); sun.setDate(d.getDate() + 6);
+    return `${dd}.${m}–${pad2p(sun.getDate())}.${pad2p(sun.getMonth()+1)}`;
+}
+
+function renderWeekProgress() {
+    const block = document.getElementById('weekProgressBlock');
+    if (!block) return;
+
+    const mode = document.getElementById('wpMode').value;
+    const step = document.getElementById('wpStep').value;
+    const metric = document.getElementById('wpMetric').value;
+
+    // определяем список сотрудников
+    let usersList = [];
+    if (mode === 'all') {
+        usersList = globalReport.filter(u => !(userCards[u.id] && userCards[u.id].archived));
+    } else {
+        // выбранные — те, что прошли фильтры
+        if (!currentFilteredUsers || currentFilteredUsers.length === 0) {
+            block.style.display = 'none';
+            return;
+        }
+        usersList = currentFilteredUsers.map(u => globalReport.find(x => x.id === u.id)).filter(Boolean);
+    }
+
+    if (!usersList || usersList.length === 0) {
+        block.style.display = 'none';
+        return;
+    }
+    block.style.display = 'block';
+
+    // период берём из фильтров сводки
+    const fDateFrom = document.getElementById('filterDateFrom').value || null;
+    const fDateTo   = document.getElementById('filterDateTo').value || null;
+
+    const userBuckets = {};
+    const allBuckets = new Set();
+
+    usersList.forEach(u => {
+        userBuckets[u.id] = { name: u.name, buckets: {} };
+        (u.tasks || []).forEach(t => {
+            const d = t.startDate || t.endDate;
+            if (!d) return;
+            if (fDateFrom && d < fDateFrom) return;
+            if (fDateTo && d > fDateTo) return;
+            const k = wpBucketKey(d, step);
+            allBuckets.add(k);
+            if (!userBuckets[u.id].buckets[k]) userBuckets[u.id].buckets[k] = { total: 0, err: 0, qSum: 0 };
+            userBuckets[u.id].buckets[k].total++;
+            if (t.hasErrors) userBuckets[u.id].buckets[k].err++;
+            const q = (t.quality !== undefined && !isNaN(t.quality)) ? t.quality : 0;
+            userBuckets[u.id].buckets[k].qSum += q;
+        });
+    });
+
+    const keys = Array.from(allBuckets).sort();
+    const labels = keys.map(k => wpBucketLabel(k, step));
+
+    const cellValue = (b) => {
+        if (!b || b.total === 0) return null;
+        if (metric === 'pct') return (b.err / b.total) * 100;
+        return (b.qSum / b.total) * 100;
+    };
+
+    // ===== График =====
+    if (wpChart) wpChart.destroy();
+    const palette = ['#5B9DF9','#FF9500','#34C759','#FF3B30','#7B6FE8','#00C7BE','#AF52DE','#FFCC00','#FF6B6B','#69DB7C'];
+    const sortedUsers = Object.values(userBuckets).sort((a,b)=>a.name.localeCompare(b.name));
+    const datasets = sortedUsers.map((u, i) => ({
+        label: u.name,
+        data: keys.map(k => {
+            const v = cellValue(u.buckets[k]);
+            return v === null ? null : +v.toFixed(2);
+        }),
+        borderColor: palette[i % palette.length],
+        backgroundColor: palette[i % palette.length] + '22',
+        tension: 0.3,
+        spanGaps: true,
+        pointRadius: 3,
+        pointHoverRadius: 6,
+        borderWidth: 2
+    }));
+
+    const ctx = document.getElementById('wpChart').getContext('2d');
+    wpChart = new Chart(ctx, {
+        type: 'line',
+        data: { labels, datasets },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: { mode: 'index', intersect: false },
+            plugins: {
+                legend: { position: 'top', labels: { font: { family: 'Inter', size: 11 }, usePointStyle: true, padding: 10, boxWidth: 10 } },
+                tooltip: {
+                    backgroundColor: '#1C1C1E',
+                    padding: 10,
+                    cornerRadius: 8,
+                    callbacks: {
+                        label: c => `${c.dataset.label}: ${c.parsed.y === null ? '—' : c.parsed.y.toFixed(1) + '%'}`
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: metric === 'pct',
+                    max: metric === 'pct' ? undefined : 100,
+                    title: { display: true, text: metric === 'pct' ? '% ошибок' : '% качества' },
+                    ticks: { callback: v => v + '%' },
+                    grid: { color: 'rgba(0,0,0,0.05)' }
+                },
+                x: { grid: { display: false } }
+            }
+        }
+    });
+
+    // ===== Таблица =====
+    const pctClass = (v) => {
+        if (v === null) return '';
+        if (v <= 5) return 'background:#D4EDDA; color:#155724; font-weight:600;';
+        if (v <= 15) return 'background:#FFF3CD; color:#856404; font-weight:600;';
+        return 'background:#F8D7DA; color:#721C24; font-weight:600;';
+    };
+    const qualityClass = (v) => {
+        if (v === null) return '';
+        const green = parseFloat(document.getElementById('thrGreen').value) || 0.97;
+        const orange = parseFloat(document.getElementById('thrOrange').value) || 0.86;
+        const val = v / 100;
+        if (val >= green) return 'background:#D4EDDA; color:#155724; font-weight:600;';
+        if (val >= orange) return 'background:#FFF3CD; color:#856404; font-weight:600;';
+        return 'background:#F8D7DA; color:#721C24; font-weight:600;';
+    };
+
+    let html = `<table class="progress-table" style="min-width:${600 + keys.length * 70}px;">
+        <thead><tr>
+            <th style="text-align:left; position:sticky; left:0; background:var(--c-surface-2); z-index:3;">сотрудник</th>`;
+    keys.forEach(k => { html += `<th style="font-size:11px;">${wpBucketLabel(k, step)}</th>`; });
+    html += `<th>тренд</th></tr></thead><tbody>`;
+
+    sortedUsers.forEach(u => {
+        html += `<tr><td class="period-col" style="position:sticky; left:0; background:var(--c-surface); z-index:2;"><b>${u.name}</b></td>`;
+        let firstVal = null, lastVal = null;
+        keys.forEach(k => {
+            const v = cellValue(u.buckets[k]);
+            const style = v === null ? 'color:#CCC;' : (metric === 'pct' ? pctClass(v) : qualityClass(v));
+            if (v !== null) {
+                if (firstVal === null) firstVal = v;
+                lastVal = v;
+            }
+            html += `<td style="${style}">${v === null ? '—' : v.toFixed(1)}</td>`;
+        });
+        let trendHtml = '—';
+        if (firstVal !== null && lastVal !== null && keys.length >= 2) {
+            const delta = lastVal - firstVal;
+            let color, arrow;
+            if (metric === 'pct') {
+                color = delta < -1 ? 'var(--c-green)' : delta > 1 ? 'var(--c-red)' : 'var(--c-text-3)';
+                arrow = delta < -1 ? '↓' : delta > 1 ? '↑' : '→';
+            } else {
+                color = delta > 1 ? 'var(--c-green)' : delta < -1 ? 'var(--c-red)' : 'var(--c-text-3)';
+                arrow = delta > 1 ? '↑' : delta < -1 ? '↓' : '→';
+            }
+            trendHtml = `<span style="color:${color}; font-weight:700;">${arrow} ${delta > 0 ? '+' : ''}${delta.toFixed(1)} п.п.</span>`;
+        }
+        html += `<td>${trendHtml}</td></tr>`;
+    });
+
+    html += `</tbody></table>`;
+    document.getElementById('wpTable').innerHTML = html;
+
+    const totalTasks = usersList.reduce((s, u) => s + (u.tasks ? u.tasks.length : 0), 0);
+    let totalErr = 0;
+    usersList.forEach(u => (u.tasks || []).forEach(t => { if (t.hasErrors) totalErr++; }));
+    const avgErr = totalTasks ? (totalErr / totalTasks * 100).toFixed(1) : '0.0';
+    document.getElementById('wpSummary').innerHTML =
+        `👥 сотрудников: <b>${usersList.length}</b> · 📋 задач: <b>${totalTasks}</b> · ⚠️ средний % ошибок: <b>${avgErr}%</b> · 📅 периодов: <b>${keys.length}</b>`;
+}
+
+function exportWeekProgress() {
+    const mode = document.getElementById('wpMode').value;
+    const step = document.getElementById('wpStep').value;
+    const metric = document.getElementById('wpMetric').value;
+    const fDateFrom = document.getElementById('filterDateFrom').value || null;
+    const fDateTo   = document.getElementById('filterDateTo').value || null;
+
+    let usersList = [];
+    if (mode === 'all') {
+        usersList = globalReport.filter(u => !(userCards[u.id] && userCards[u.id].archived));
+    } else {
+        if (!currentFilteredUsers || currentFilteredUsers.length === 0) { alert('нет выбранных сотрудников'); return; }
+        usersList = currentFilteredUsers.map(u => globalReport.find(x => x.id === u.id)).filter(Boolean);
+    }
+    if (!usersList.length) { alert('нет данных'); return; }
+
+    const userBuckets = {};
+    const allBuckets = new Set();
+    usersList.forEach(u => {
+        userBuckets[u.id] = { name: u.name, buckets: {} };
+        (u.tasks || []).forEach(t => {
+            const d = t.startDate || t.endDate;
+            if (!d) return;
+            if (fDateFrom && d < fDateFrom) return;
+            if (fDateTo && d > fDateTo) return;
+            const k = wpBucketKey(d, step);
+            allBuckets.add(k);
+            if (!userBuckets[u.id].buckets[k]) userBuckets[u.id].buckets[k] = { total: 0, err: 0, qSum: 0 };
+            userBuckets[u.id].buckets[k].total++;
+            if (t.hasErrors) userBuckets[u.id].buckets[k].err++;
+            const q = (t.quality !== undefined && !isNaN(t.quality)) ? t.quality : 0;
+            userBuckets[u.id].buckets[k].qSum += q;
+        });
+    });
+    const keys = Array.from(allBuckets).sort();
+    const cellValue = (b) => {
+        if (!b || b.total === 0) return null;
+        if (metric === 'pct') return (b.err / b.total) * 100;
+        return (b.qSum / b.total) * 100;
+    };
+
+    const head = ['сотрудник', ...keys.map(k => wpBucketLabel(k, step)), 'тренд'];
+    const rows = [head];
+    Object.values(userBuckets).sort((a,b)=>a.name.localeCompare(b.name)).forEach(u => {
+        const row = [u.name];
+        let first = null, last = null;
+        keys.forEach(k => {
+            const v = cellValue(u.buckets[k]);
+            if (v !== null) { if (first === null) first = v; last = v; }
+            row.push(v === null ? '' : v.toFixed(2));
+        });
+        if (first !== null && last !== null) {
+            const d = last - first;
+            row.push((d > 0 ? '+' : '') + d.toFixed(2) + ' п.п.');
+        } else row.push('');
+        rows.push(row);
+    });
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), 'прогресс по ' + step);
+    XLSX.writeFile(wb, `прогресс_${mode === 'all' ? 'всех' : 'выбранных'}_${new Date().toISOString().slice(0,10)}.xlsx`);
+    showToast('экспортировано');
 }
 
 document.addEventListener('keydown', e => {
