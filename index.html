@@ -3972,7 +3972,6 @@ function formatDateShort(dateStr) {
     const [y, m, d] = dateStr.split('-');
     return `${d}.${m}`;
 }
-
 function renderCompareGeneral() {
     const targetId = document.getElementById('cmpTarget').value;
     const aFrom = document.getElementById('cmpAFrom').value;
@@ -3997,9 +3996,10 @@ function renderCompareGeneral() {
     }
 
     const calcPeriod = (from, to) => {
-        let total = 0, errors = 0;
+        let total = 0, errors = 0, qSum = 0;
         const cats = {};
         categoriesList.forEach(c => cats[c] = 0);
+        
         usersToCalc.forEach(u => {
             (u.tasks || []).forEach(t => {
                 const d = t.startDate || t.endDate;
@@ -4007,10 +4007,18 @@ function renderCompareGeneral() {
                 if (d < from || d > to) return;
                 total++;
                 if (t.hasErrors) errors++;
+                const q = (t.quality !== undefined && !isNaN(t.quality)) ? t.quality : 0;
+                qSum += q;
                 categoriesList.forEach(c => { if (t.cats[c]) cats[c]++; });
             });
         });
-        return { total, errors, cats };
+        return { 
+            total, 
+            errors, 
+            cats,
+            errPct: total ? (errors / total * 100) : 0,
+            avgQ: total ? (qSum / total * 100) : 0
+        };
     };
 
     const statsA = calcPeriod(aFrom, aTo);
@@ -4026,28 +4034,26 @@ function renderCompareGeneral() {
     resBox.style.display = 'block';
     emptyBox.style.display = 'none';
 
-    const errA = statsA.errors;
-    const errB = statsB.errors;
-    let pctDiff = 0;
-    if (errA > 0) pctDiff = Math.round(((errB - errA) / errA) * 100);
-    else if (errB > 0) pctDiff = 100;
-
+    // Считаем разницу в процентах ошибок, а не в абсолютных числах
+    const pctDiff = statsB.errPct - statsA.errPct;
     const isGood = pctDiff <= 0;
+
     const bigPctEl = document.getElementById('cmpBigPct');
-    bigPctEl.textContent = (pctDiff > 0 ? '+' : '') + pctDiff + '%';
+    bigPctEl.textContent = (pctDiff > 0 ? '+' : '') + pctDiff.toFixed(1) + ' п.п.';
     bigPctEl.className = 'cmp-big-pct ' + (isGood ? 'good' : 'bad');
 
-    let titleText = 'Ошибки без изменений';
-    if (pctDiff < -10) titleText = 'Ошибки ↓ почти в 2 раза';
-    else if (pctDiff < 0) titleText = 'Ошибки ↓';
-    else if (pctDiff > 10) titleText = 'Ошибки ↑';
-    else if (pctDiff > 0) titleText = 'Ошибки выросли';
+    let titleText = 'Уровень ошибок не изменился';
+    if (pctDiff < -2) titleText = 'Ошибок стало меньше ↓';
+    else if (pctDiff > 2) titleText = 'Ошибок стало больше ↑';
     document.getElementById('cmpTitle').textContent = titleText;
 
-    document.getElementById('cmpValA').textContent = errA;
-    document.getElementById('cmpValB').textContent = errB;
-    document.getElementById('cmpDateA').textContent = `${formatDateShort(aFrom)}–${formatDateShort(aTo)}`;
-    document.getElementById('cmpDateB').textContent = `${formatDateShort(bFrom)}–${formatDateShort(bTo)}`;
+    // В карточки выводим и абсолютное число ошибок, и процент
+    document.getElementById('cmpValA').innerHTML = `${statsA.errors} <span style="font-size:16px; color:var(--c-text-3); font-weight:500;">(${statsA.errPct.toFixed(1)}%)</span>`;
+    document.getElementById('cmpValB').innerHTML = `${statsB.errors} <span style="font-size:16px; color:var(--c-text-3); font-weight:500;">(${statsB.errPct.toFixed(1)}%)</span>`;
+    
+    // Добавляем качество в подписи под датами
+    document.getElementById('cmpDateA').innerHTML = `${formatDateShort(aFrom)}–${formatDateShort(aTo)}<br><small style="color:var(--c-text-3);">Q: ${statsA.avgQ.toFixed(1)}%</small>`;
+    document.getElementById('cmpDateB').innerHTML = `${formatDateShort(bFrom)}–${formatDateShort(bTo)}<br><small style="color:var(--c-text-3);">Q: ${statsB.avgQ.toFixed(1)}%</small>`;
 
     const catsEl = document.getElementById('cmpCats');
     let catsHtml = '';
@@ -4055,26 +4061,29 @@ function renderCompareGeneral() {
         const a = statsA.cats[cat];
         const b = statsB.cats[cat];
         if (a === 0 && b === 0) return;
-        let diff = 0;
-        if (a > 0) diff = Math.round(((b - a) / a) * 100);
-        else if (b > 0) diff = 100;
+        
+        // Считаем разницу в процентах внутри категории
+        let diffPct = 0;
+        if (a > 0) diffPct = Math.round(((b - a) / a) * 100);
+        else if (b > 0) diffPct = 100;
+
         const shortName = CAT_SHORT_LABELS[cat] ? CAT_SHORT_LABELS[cat].toLowerCase() : cat;
-        const colorClass = diff <= 0 ? 'good' : 'bad';
-        const sign = diff > 0 ? '+' : '';
-        catsHtml += `<div class="cmp-cat-item">${shortName} <b class="${colorClass}">${sign}${diff}%</b></div>`;
+        const colorClass = diffPct <= 0 ? 'good' : 'bad';
+        const sign = diffPct > 0 ? '+' : '';
+        
+        catsHtml += `<div class="cmp-cat-item" title="Было: ${a}, Стало: ${b}">${shortName} <b class="${colorClass}">${sign}${diffPct}%</b></div>`;
     });
     catsEl.innerHTML = catsHtml || '<div class="cmp-cat-item">нет ошибок в категориях</div>';
 
     const badge = document.getElementById('cmpFooterBadge');
     if (isGood) {
         badge.className = 'cmp-footer-badge';
-        badge.innerHTML = '🌿 качество растёт · вы молодцы';
+        badge.innerHTML = '🌿 динамика положительная';
     } else {
         badge.className = 'cmp-footer-badge bad';
-        badge.innerHTML = '⚠️ качество падает · нужно внимание';
+        badge.innerHTML = '⚠️ динамика отрицательная';
     }
 }
-
 /* ===== ВКЛАДКА СРАВНЕНИЯ (ТАБЛИЦА) ===== */
 function getWeekRange(dateStr) {
     const d = new Date(dateStr + 'T00:00:00');
@@ -4434,6 +4443,516 @@ window.onload = () => {
 document.addEventListener('keydown', e => {
     if (e.key === 'Escape') { closeModal(); closeVksModal(); }
 });
+</script>
+    <script>
+(function() {
+    // 1. Добавляем кнопку в главное меню
+    const tabsContainer = document.querySelector('.main-tabs');
+    if (tabsContainer && !document.getElementById('btn-manager-report')) {
+        const btn = document.createElement('button');
+        btn.id = 'btn-manager-report';
+        btn.className = 'main-tab-btn';
+        btn.innerHTML = '📋 Итоговый отчёт';
+        btn.onclick = function() { switchTab('manager-report', this); };
+        tabsContainer.appendChild(btn);
+    }
+
+    // 2. Добавляем саму вкладку в HTML
+    const appScreen = document.getElementById('appScreen');
+    if (appScreen && !document.getElementById('tab-manager-report')) {
+        const tabDiv = document.createElement('div');
+        tabDiv.className = 'tab-content';
+        tabDiv.id = 'tab-manager-report';
+        tabDiv.innerHTML = `
+            <div class="container">
+                <div class="box" style="min-width:100%;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:20px;">
+                        <h3 style="margin:0;">Итоговый отчёт для опер-менеджера</h3>
+                        <div style="display:flex; gap:8px;">
+                            <button class="btn-copy" onclick="exportManagerReportExcel()" style="padding:10px 16px;">📊 Excel</button>
+                            <button class="btn-copy" onclick="window.print()" style="padding:10px 16px;">🖨 PDF / Печать</button>
+                        </div>
+                    </div>
+
+                    <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:14px; margin-bottom:20px; background:var(--c-surface-2); padding:16px; border-radius:var(--r-md); border:1px solid var(--c-border-soft);">
+                        <div class="field-group" style="margin:0;">
+                            <label>Пресет</label>
+                            <select id="repPreset" onchange="applyReportPreset(this.value)">
+                                <option value="week">неделя</option>
+                                <option value="2weeks">2 недели</option>
+                                <option value="month" selected>месяц</option>
+                                <option value="quarter">квартал</option>
+                                <option value="custom">вручную</option>
+                            </select>
+                        </div>
+                        <div class="field-group" style="margin:0;"><label>Период с</label><input type="date" id="repDateFrom" onchange="renderManagerReport()"></div>
+                        <div class="field-group" style="margin:0;"><label>Период по</label><input type="date" id="repDateTo" onchange="renderManagerReport()"></div>
+                        <div class="field-group" style="margin:0; justify-content:center;">
+                            <label style="display:flex; align-items:center; gap:8px; cursor:pointer; margin-top:10px;">
+                                <input type="checkbox" id="repCompare" onchange="renderManagerReport()" style="width:auto;"> Сравнить с пред.
+                            </label>
+                        </div>
+                        <div class="field-group" style="margin:0;">
+                            <label>Группа</label>
+                            <select id="repGroup" onchange="renderManagerReport()">
+                                <option value="all">все</option>
+                                <option value="newbie">новички</option>
+                                <option value="experienced">опытные</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div id="repBody"></div>
+
+                    <div class="field-group" style="margin-top:30px;">
+                        <label>Комментарий менеджера</label>
+                        <textarea id="repManagerNote" placeholder="выводы, решения, что взяли в работу..." onchange="saveManagerNote()"></textarea>
+                    </div>
+                </div>
+            </div>
+        `;
+        appScreen.appendChild(tabDiv);
+    }
+
+    // 3. Перехватываем переключение вкладок, чтобы отрисовывать отчёт
+    const originalSwitchTab = window.switchTab;
+    window.switchTab = function(tabId, btn) {
+        originalSwitchTab(tabId, btn);
+        if (tabId === 'manager-report') {
+            renderManagerReport();
+        }
+    };
+
+    // 4. Инициализация дат при первом открытии
+    window.applyReportPreset = function(val) {
+        const fromEl = document.getElementById('repDateFrom');
+        const toEl = document.getElementById('repDateTo');
+        const today = new Date();
+        const to = today.toISOString().slice(0,10);
+        let from;
+        if (val === 'week') { const d = new Date(today); d.setDate(d.getDate() - 7); from = d.toISOString().slice(0,10); }
+        else if (val === '2weeks') { const d = new Date(today); d.setDate(d.getDate() - 14); from = d.toISOString().slice(0,10); }
+        else if (val === 'month') { const d = new Date(today); d.setDate(d.getDate() - 30); from = d.toISOString().slice(0,10); }
+        else if (val === 'quarter') { const d = new Date(today); d.setDate(d.getDate() - 90); from = d.toISOString().slice(0,10); }
+        else return;
+        fromEl.value = from; toEl.value = to;
+        renderManagerReport();
+    };
+
+    window.saveManagerNote = function() {
+        if (typeof debouncedSaveSettings === 'function') debouncedSaveSettings();
+        if (typeof showToast === 'function') showToast('комментарий сохранён');
+    };
+
+    // 5. Основная логика отрисовки
+    window.renderManagerReport = function() {
+        const body = document.getElementById('repBody');
+        if (!body) return;
+        if (!window.globalReport || window.globalReport.length === 0) {
+            body.innerHTML = '<p style="color:var(--c-text-3); text-align:center; padding:20px;">Сначала загрузите данные в «Сводке».</p>';
+            return;
+        }
+
+        const from = document.getElementById('repDateFrom').value;
+        const to = document.getElementById('repDateTo').value;
+        if (!from || !to) return;
+
+        const group = document.getElementById('repGroup').value;
+        const users = window.globalReport.filter(u => {
+            if (window.userCards[u.id]?.archived) return false;
+            const m = window.userMarks[u.id];
+            if (group === 'newbie' && m !== 'newbie') return false;
+            if (group === 'experienced' && m !== 'experienced') return false;
+            return true;
+        });
+
+        const cur = aggregateReportPeriod(users, from, to);
+        
+        // Сравнение с предыдущим
+        const doCompare = document.getElementById('repCompare').checked;
+        let old = null; let prev = null;
+        if (doCompare) {
+            const f = new Date(from + 'T00:00:00');
+            const t = new Date(to + 'T00:00:00');
+            const days = Math.max(1, Math.round((t - f) / 86400000) + 1);
+            const pTo = new Date(f); pTo.setDate(pTo.getDate() - 1);
+            const pFrom = new Date(pTo); pFrom.setDate(pFrom.getDate() - days + 1);
+            prev = { from: pFrom.toISOString().slice(0,10), to: pTo.toISOString().slice(0,10) };
+            old = aggregateReportPeriod(users, prev.from, prev.to);
+        }
+
+        body.innerHTML = 
+            renderReportKpi(cur, old, prev) +
+            renderReportErrors(cur, old, from, to) +
+            renderReportInsights(cur, old, prev) +
+            renderReportUsers(cur, old) +
+            renderReportHeatmap(users, from, to);
+    };
+
+    // --- Вспомогательные функции ---
+
+    function aggregateReportPeriod(users, from, to) {
+        let total = 0, errors = 0, qSum = 0;
+        const cats = {}; (window.categoriesList||[]).forEach(c => cats[c]=0);
+        const byUser = {}; 
+        const byDay = {};
+
+        users.forEach(u => {
+            byUser[u.id] = { id: u.id, name: u.name, total: 0, errors: 0, qSum: 0, cats: {} };
+            (window.categoriesList||[]).forEach(c => byUser[u.id].cats[c] = 0);
+            
+            (u.tasks || []).forEach(t => {
+                const d = t.startDate || t.endDate;
+                if (!d || d < from || d > to) return;
+                
+                total++;
+                byUser[u.id].total++;
+                const q = (t.quality !== undefined && !isNaN(t.quality)) ? t.quality : 0;
+                qSum += q;
+                byUser[u.id].qSum += q;
+
+                if (t.hasErrors) {
+                    errors++;
+                    byUser[u.id].errors++;
+                }
+                (window.categoriesList||[]).forEach(c => {
+                    if (t.cats[c]) { cats[c]++; byUser[u.id].cats[c]++; }
+                });
+
+                if (!byDay[d]) byDay[d] = { total: 0, errors: 0 };
+                byDay[d].total++;
+                if (t.hasErrors) byDay[d].errors++;
+            });
+        });
+
+        return {
+            total, errors, qSum, byUser, byDay, cats,
+            errPct: total ? (errors/total*100) : 0,
+            avgQ: total ? (qSum/total*100) : 0
+        };
+    }
+
+    function deltaSpan(cur, old, invert) {
+        if (old === null || old === undefined) return '';
+        const d = cur - old;
+        if (Math.abs(d) < 0.01) return `<span style="color:var(--c-text-3); font-size:12px;"> → 0</span>`;
+        const isGood = invert ? d < 0 : d > 0;
+        const color = isGood ? 'var(--c-green)' : 'var(--c-red)';
+        const sign = d > 0 ? '+' : '';
+        return `<span style="color:${color}; font-size:12px; font-weight:700;"> ${d>0?'↑':'↓'} ${sign}${d.toFixed(1)}</span>`;
+    }
+
+    function renderReportKpi(cur, old, prev) {
+        const cmp = old ? `<div class="sub" style="font-size:11px; color:var(--c-text-3);">vs ${prev.from}–${prev.to}</div>` : '';
+        return `
+        <div class="progress-kpi-grid" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:14px; margin-bottom:20px;">
+            <div class="progress-kpi" style="border-left-color:var(--c-primary);">
+                <div class="lbl">Задач за период</div>
+                <div class="val">${cur.total}${old ? deltaSpan(cur.total, old.total, false) : ''}</div>
+                ${cmp}
+            </div>
+            <div class="progress-kpi" style="border-left-color:var(--c-red);">
+                <div class="lbl">С ошибками</div>
+                <div class="val">${cur.errors}${old ? deltaSpan(cur.errors, old.errors, true) : ''}</div>
+                ${cmp}
+            </div>
+            <div class="progress-kpi" style="border-left-color:var(--c-orange);">
+                <div class="lbl">% ошибок</div>
+                <div class="val">${cur.errPct.toFixed(1)}%${old ? deltaSpan(cur.errPct, old.errPct, true) : ''}</div>
+                ${cmp}
+            </div>
+            <div class="progress-kpi" style="border-left-color:var(--c-green);">
+                <div class="lbl">Среднее качество</div>
+                <div class="val">${cur.avgQ.toFixed(1)}%${old ? deltaSpan(cur.avgQ, old.avgQ, false) : ''}</div>
+                ${cmp}
+            </div>
+        </div>`;
+    }
+
+    function renderReportErrors(cur, old, from, to) {
+        const rows = (window.categoriesList||[]).map(c => {
+            const cv = cur.cats[c] || 0;
+            const ov = old ? (old.cats[c] || 0) : null;
+            let delta = null;
+            if (ov !== null) {
+                if (ov === 0 && cv === 0) delta = 0;
+                else if (ov === 0) delta = null;
+                else delta = ((cv - ov) / ov) * 100;
+            }
+            
+            let status = '';
+            if (old) {
+                if (ov === 0 && cv > 0) status = '<span style="color:var(--c-red); font-weight:700;">новое</span>';
+                else if (ov > 0 && cv === 0) status = '<span style="color:var(--c-green); font-weight:700;">ушло</span>';
+                else if (delta !== null && delta < -5) status = '<span style="color:var(--c-green);">падает</span>';
+                else if (delta !== null && delta > 5) status = '<span style="color:var(--c-red);">растёт</span>';
+                else status = '<span style="color:var(--c-text-3);">стабильно</span>';
+            }
+            const pct = cur.total ? (cv / cur.total * 100) : 0;
+            if (cv === 0 && (old === null || ov === 0)) return '';
+            
+            return `<tr>
+                <td><a href="#" onclick="openDrillDown('${c.replace(/'/g,"\\'")}','${from}','${to}'); return false;" style="color:var(--c-primary); font-weight:600; text-decoration:none; border-bottom:1px dashed var(--c-primary);">${window.CAT_SHORT_LABELS[c] || c}</a></td>
+                <td>${cv}</td>
+                <td>${pct.toFixed(1)}%</td>
+                <td>${ov === null ? '—' : ov}</td>
+                <td>${delta === null ? '—' : (delta > 0 ? '+' : '') + delta.toFixed(0) + '%'}</td>
+                <td>${status || '—'}</td>
+            </tr>`;
+        }).filter(Boolean).join('');
+
+        if (!rows) return '<div class="progress-table-wrap" style="margin-bottom:20px;"><p style="color:var(--c-text-3); text-align:center;">ошибок за период нет 🎉</p></div>';
+
+        return `<div class="progress-table-wrap" style="margin-bottom:20px; border-left:3px solid var(--c-red);">
+            <h3 style="margin-bottom:14px; font-size:16px;">Типовые ошибки (клик по категории → список)</h3>
+            <table class="progress-table">
+                <thead><tr>
+                    <th style="text-align:left;">категория</th>
+                    <th>кол-во</th>
+                    <th>доля от задач</th>
+                    <th>было</th>
+                    <th>Δ %</th>
+                    <th>статус</th>
+                </tr></thead>
+                <tbody>${rows}</tbody>
+            </table>
+        </div>`;
+    }
+
+    function renderReportInsights(cur, old, prev) {
+        const ins = [];
+        if (old) {
+            (window.categoriesList||[]).forEach(c => {
+                const cv = cur.cats[c] || 0, ov = old.cats[c] || 0;
+                if (ov === 0 && cv > 0) ins.push({ icon: '🆕', type: 'bad', text: `Новая ошибка: «${window.CAT_SHORT_LABELS[c]||c}» — ${cv} случаев` });
+                if (ov > 0 && cv === 0) ins.push({ icon: '✅', type: 'good', text: `Ушло: «${window.CAT_SHORT_LABELS[c]||c}» — было ${ov}, теперь 0` });
+                if (ov > 0 && cv > 0) {
+                    const d = ((cv - ov) / ov) * 100;
+                    if (d > 20) ins.push({ icon: '🚨', type: 'bad', text: `Растёт: «${window.CAT_SHORT_LABELS[c]||c}» +${d.toFixed(0)}% (${ov} → ${cv})` });
+                    else if (d < -20) ins.push({ icon: '📈', type: 'good', text: `Снижается: «${window.CAT_SHORT_LABELS[c]||c}» ${d.toFixed(0)}% (${ov} → ${cv})` });
+                }
+            });
+        }
+        
+        const catTop = (window.categoriesList||[]).map(c => ({c, v: cur.cats[c]||0})).sort((a,b)=>b.v-a.v)[0];
+        if (catTop && catTop.v > 0) {
+            const involved = Object.values(cur.byUser).filter(u => (u.cats[catTop.c]||0) > 0)
+                .sort((a,b) => (b.cats[catTop.c]||0) - (a.cats[catTop.c]||0)).slice(0,3).map(u => u.name.split(' ')[0]);
+            if (involved.length) ins.push({ icon: '🎯', type: 'warn', text: `Топ ошибка «${window.CAT_SHORT_LABELS[catTop.c]||catTop.c}» — ${catTop.v} случаев. Чаще всего у: ${involved.join(', ')}` });
+        }
+
+        const days = Object.entries(cur.byDay).map(([d,v]) => ({ d, rate: v.total ? v.errors/v.total*100 : 0, total: v.total }));
+        if (days.length >= 5) {
+            const mean = days.reduce((s,x)=>s+x.rate,0)/days.length;
+            const std = Math.sqrt(days.reduce((s,x)=>s+Math.pow(x.rate-mean,2),0)/days.length);
+            days.forEach(x => {
+                if (x.total >= 3 && x.rate > mean + 2*std && x.rate > 10)
+                    ins.push({ icon: '⚠️', type: 'bad', text: `Аномальный день ${x.d}: ${x.rate.toFixed(1)}% ошибок (среднее ${mean.toFixed(1)}%)` });
+            });
+        }
+        
+        if (!ins.length) ins.push({ icon: '✅', type: 'good', text: 'Существенных изменений и аномалий не выявлено.' });
+
+        return `<div class="progress-table-wrap" style="margin-bottom:20px; border-left:3px solid var(--c-primary);">
+            <h3 style="margin-bottom:14px; font-size:16px;">💡 Инсайты</h3>
+            <div style="display:flex; flex-direction:column; gap:8px;">
+                ${ins.map(i => `<div style="display:flex; gap:10px; padding:10px 14px; background:var(--c-surface-2); border-radius:8px; border-left:3px solid ${i.type==='good'?'var(--c-green)':i.type==='bad'?'var(--c-red)':'var(--c-orange)'};">
+                    <span style="font-size:16px;">${i.icon}</span><span style="font-size:13px;">${i.text}</span>
+                </div>`).join('')}
+            </div>
+        </div>`;
+    }
+
+    function renderReportUsers(cur, old) {
+        const rows = Object.values(cur.byUser).map(u => {
+            const oldU = old ? (old.byUser[u.id] || null) : null;
+            const errPct = u.total ? (u.errors/u.total*100) : 0;
+            const oldPct = oldU && oldU.total ? (oldU.errors/oldU.total*100) : null;
+            const delta = oldPct !== null ? errPct - oldPct : null;
+            const topCat = (window.categoriesList||[]).map(c => ({c, v: u.cats[c]||0})).sort((a,b)=>b.v-a.v)[0];
+            
+            let badge = '';
+            if (errPct <= 5) badge = '<span class="badge badge-good">отлично</span>';
+            else if (errPct <= 15) badge = '<span class="badge badge-warn">средне</span>';
+            else badge = '<span class="badge badge-bad">плохо</span>';
+
+            return `<tr onclick="if(typeof openCard==='function')openCard('${u.id}')" style="cursor:pointer;">
+                <td class="period-col">${u.name}</td>
+                <td>${u.total}</td>
+                <td>${u.errors}</td>
+                <td><b>${errPct.toFixed(1)}%</b></td>
+                <td>${delta === null ? '—' : `<span style="color:${delta<0?'var(--c-green)':delta>0?'var(--c-red)':'var(--c-text-3)'}; font-weight:700;">${delta>0?'+':''}${delta.toFixed(1)} п.п.</span>`}</td>
+                <td>${topCat && topCat.v ? (window.CAT_SHORT_LABELS[topCat.c]||topCat.c) + ' (' + topCat.v + ')' : '—'}</td>
+                <td>${badge}</td>
+            </tr>`;
+        }).filter(Boolean).join('');
+
+        if (!rows) return '';
+        return `<div class="progress-table-wrap" style="margin-bottom:20px; border-left:3px solid var(--c-purple);">
+            <h3 style="margin-bottom:14px; font-size:16px;">Разрез по сотрудникам (клик → карточка)</h3>
+            <table class="progress-table">
+                <thead><tr>
+                    <th style="text-align:left;">сотрудник</th><th>задач</th><th>с ошиб.</th><th>% ошибок</th><th>Δ к прошлому</th><th>топ-ошибка</th><th>статус</th>
+                </tr></thead>
+                <tbody>${rows}</tbody>
+            </table>
+        </div>`;
+    }
+
+    function renderReportHeatmap(users, from, to) {
+        const days = ['пн','вт','ср','чт','пт','сб','вс'];
+        const hours = Array.from({length:24},(_,i)=>i);
+        const grid = {}; days.forEach(d => { grid[d] = {}; hours.forEach(h => grid[d][h] = 0); });
+        let max = 0;
+        
+        users.forEach(u => (u.tasks || []).forEach(t => {
+            const raw = t.startTime || t.startDate;
+            if (!raw) return;
+            const dStr = raw.slice(0,10);
+            if (from && dStr < from) return;
+            if (to && dStr > to) return;
+            if (!t.hasErrors) return;
+            const dt = new Date(raw.includes('T') ? raw : raw + 'T00:00:00');
+            if (isNaN(dt)) return;
+            const day = days[(dt.getDay()||7)-1];
+            const h = dt.getHours();
+            grid[day][h]++;
+            if (grid[day][h] > max) max = grid[day][h];
+        }));
+        
+        if (max === 0) return '';
+        
+        const colorFor = (v) => {
+            if (!v) return 'transparent';
+            const a = Math.min(1, 0.15 + (v/max)*0.85);
+            return `rgba(239,68,68,${a.toFixed(2)})`;
+        };
+        
+        let html = `<div class="progress-table-wrap" style="margin-bottom:20px; border-left:3px solid var(--c-orange);">
+            <h3 style="margin-bottom:14px; font-size:16px;">🔥 Тепловая карта ошибок: день недели × час</h3>
+            <div style="overflow-x:auto;">
+            <table style="border-collapse:collapse; font-size:11px; width:100%;">
+                <thead><tr><th style="padding:4px 8px;"></th>${hours.map(h=>`<th style="padding:2px; color:var(--c-text-3); font-weight:600; text-align:center;">${h}</th>`).join('')}</tr></thead>
+                <tbody>`;
+        days.forEach(d => {
+            html += `<tr><td style="padding:4px 8px; font-weight:700; color:var(--c-text-2);">${d}</td>`;
+            hours.forEach(h => {
+                const v = grid[d][h];
+                html += `<td title="${d} ${h}:00 — ${v}" style="width:22px; height:22px; background:${colorFor(v)}; border:1px solid var(--c-border-soft); text-align:center; color:${v && v/max > 0.6 ? '#FFF' : 'var(--c-text-2)'}; font-weight:600;">${v || ''}</td>`;
+            });
+            html += `</tr>`;
+        });
+        html += `</tbody></table></div></div>`;
+        return html;
+    }
+
+    // --- Экспорт и Drill-down ---
+    
+    window.exportManagerReportExcel = function() {
+        if (!window.globalReport || !window.globalReport.length) { alert('нет данных'); return; }
+        if (typeof XLSX === 'undefined') { alert('XLSX не подключён'); return; }
+        
+        const from = document.getElementById('repDateFrom').value;
+        const to = document.getElementById('repDateTo').value;
+        const group = document.getElementById('repGroup').value;
+        const users = window.globalReport.filter(u => {
+            if (window.userCards[u.id]?.archived) return false;
+            const m = window.userMarks[u.id];
+            if (group === 'newbie' && m !== 'newbie') return false;
+            if (group === 'experienced' && m !== 'experienced') return false;
+            return true;
+        });
+        
+        const cur = aggregateReportPeriod(users, from, to);
+        const wb = XLSX.utils.book_new();
+
+        const summary = [
+            ['Период', `${from} — ${to}`],
+            ['Всего задач', cur.total],
+            ['С ошибками', cur.errors],
+            ['% ошибок', cur.errPct.toFixed(1) + '%'],
+            ['Среднее качество', cur.avgQ.toFixed(1) + '%']
+        ];
+        const note = document.getElementById('repManagerNote')?.value;
+        if (note) { summary.push([]); summary.push(['Комментарий менеджера', note]); }
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(summary), 'Сводка');
+
+        const errHead = ['категория', 'кол-во', 'доля %'];
+        const errRows = [errHead];
+        (window.categoriesList||[]).forEach(c => {
+            const cv = cur.cats[c]||0;
+            if (cv > 0) errRows.push([window.CAT_SHORT_LABELS[c] || c, cv, cur.total ? (cv/cur.total*100).toFixed(1) : '0']);
+        });
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(errRows), 'Ошибки');
+
+        const uHead = ['сотрудник', 'задач', 'с ошиб.', '% ошибок'];
+        const uRows = [uHead];
+        Object.values(cur.byUser).forEach(u => {
+            const errPct = u.total ? (u.errors/u.total*100) : 0;
+            uRows.push([u.name, u.total, u.errors, errPct.toFixed(1) + '%']);
+        });
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(uRows), 'Сотрудники');
+
+        XLSX.writeFile(wb, `итоговый_отчет_${from}_${to}.xlsx`);
+        if (typeof showToast === 'function') showToast('отчёт экспортирован');
+    };
+
+    window.openDrillDown = function(category, from, to) {
+        const items = [];
+        (window.globalReport || []).forEach(u => {
+            (window.taskComments[u.id] || []).forEach(c => {
+                if (c.category !== category) return;
+                const d = c.date || (c.taskStart ? c.taskStart.slice(0,10) : '');
+                if (from && d < from) return;
+                if (to && d > to) return;
+                items.push({ user: u.name, date: d, time: c.taskStart ? c.taskStart.slice(11,16) : '', text: c.text });
+            });
+        });
+        items.sort((a,b) => (b.date || '').localeCompare(a.date || ''));
+        
+        const listHtml = items.length === 0
+            ? '<p style="color:var(--c-text-3); text-align:center; padding:20px;">за период записей нет.</p>'
+            : items.map(it => `
+                <div class="comment-item" style="margin-bottom:8px;">
+                    <span class="comment-date">${it.date}${it.time ? ' ' + it.time : ''}</span>
+                    <span class="comment-cat">${escapeHtml(it.user)}</span>
+                    <div style="margin-top:6px;">${escapeHtml(it.text)}</div>
+                </div>`).join('');
+                
+        let drillModal = document.getElementById('drillOverlay');
+        if (!drillModal) {
+            drillModal = document.createElement('div');
+            drillModal.id = 'drillOverlay';
+            drillModal.className = 'modal-overlay';
+            drillModal.innerHTML = `<div class="modal" id="drillModalContent" style="max-width:700px;"></div>`;
+            document.body.appendChild(drillModal);
+        }
+        
+        document.getElementById('drillModalContent').innerHTML = `
+            <button class="modal-close" onclick="document.getElementById('drillOverlay').classList.remove('open')">×</button>
+            <h3 style="margin-top:0;">${window.CAT_SHORT_LABELS[category] || category}</h3>
+            <div style="font-size:13px; color:var(--c-text-2); margin-bottom:14px;">Период ${from}–${to} · записей: <b>${items.length}</b></div>
+            <div style="max-height:60vh; overflow-y:auto;">${listHtml}</div>
+            <div class="modal-actions" style="margin-top:16px;">
+                <button class="btn-cancel" onclick="document.getElementById('drillOverlay').classList.remove('open')">закрыть</button>
+            </div>
+        `;
+        drillModal.classList.add('open');
+    };
+
+    // Задаем дефолтные даты при инициализации
+    window.addEventListener('load', () => {
+        setTimeout(() => {
+            const fromEl = document.getElementById('repDateFrom');
+            const toEl = document.getElementById('repDateTo');
+            if (fromEl && !fromEl.value) {
+                const t = new Date(); t.setDate(t.getDate() - 30);
+                fromEl.value = t.toISOString().slice(0,10);
+            }
+            if (toEl && !toEl.value) toEl.value = new Date().toISOString().slice(0,10);
+        }, 500);
+    });
+})();
 </script>
 </body>
 </html>
