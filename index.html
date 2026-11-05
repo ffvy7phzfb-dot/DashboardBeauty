@@ -49,6 +49,7 @@ h1 { text-align: center; margin: 0 0 24px 0; font-size: 26px; font-weight: 700; 
 .auth-field-icon { position: absolute; left: 16px; top: 50%; transform: translateY(-50%); font-size: 16px; color: var(--c-text-3); pointer-events: none; }
 .auth-field input { width: 100%; padding: 15px 16px 15px 46px; font-size: 15px; font-family: inherit; color: var(--c-text); background: rgba(255,255,255,0.7); border: 1px solid rgba(200,205,215,0.6); border-radius: 14px; outline: none; transition: all 0.2s; }
 .auth-field input:focus { background: #FFF; border-color: var(--c-primary); box-shadow: var(--sh-focus); }
+.auth-eye { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; font-size: 16px; color: var(--c-text-3); }
 .auth-btn { width: 100%; padding: 15px; font-size: 15px; font-weight: 600; font-family: inherit; color: #FFF; background: var(--c-primary-grad); border: none; border-radius: 14px; cursor: pointer; margin-top: 10px; box-shadow: var(--sh-3); transition: all 0.2s; }
 .auth-btn:hover { transform: translateY(-1px); box-shadow: 0 12px 28px rgba(91,157,249,0.4); }
 .spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid rgba(255,255,255,0.3); border-top-color: #FFF; border-radius: 50%; animation: spin 0.7s linear infinite; vertical-align: middle; margin-right: 8px; margin-top: -2px; }
@@ -222,21 +223,14 @@ table.progress-table th { background: var(--c-surface-2); font-weight: 600; font
 .badge-good { background: var(--c-green-soft); color: var(--c-green-text); }
 .badge-warn { background: var(--c-orange-soft); color: var(--c-orange-text); }
 .badge-bad { background: var(--c-red-soft); color: var(--c-red-text); }
-/* AI Tab Styles */
+/* AI Tab */
 .ai-block { background: var(--c-surface); border-radius: var(--r-lg); padding: 24px; margin-bottom: 20px; box-shadow: var(--sh-1); }
 .ai-block h3 { font-size: 18px; font-weight: 700; color: var(--c-text); margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
 .ai-insight { background: #F8FAFC; border-left: 4px solid var(--c-primary); padding: 16px 20px; border-radius: 0 var(--r-md) var(--r-md) 0; margin-bottom: 12px; font-size: 14px; line-height: 1.6; color: var(--c-text); }
 .ai-insight.good { border-left-color: var(--c-green); background: #F0FDF4; }
 .ai-insight.bad { border-left-color: var(--c-red); background: #FEF2F2; }
 .ai-insight.warn { border-left-color: var(--c-orange); background: #FFFBEB; }
-.ai-tag { display: inline-block; padding: 4px 10px; border-radius: 12px; font-size: 11px; font-weight: 700; margin-left: 8px; vertical-align: middle; }
-@media (max-width: 768px) {
-    body { padding: 12px; }
-    h1 { font-size: 22px; }
-    .auth-card { padding: 32px 24px 24px; }
-    .box { padding: 16px; }
-    .modal { padding: 20px; }
-}
+@media (max-width: 768px) { body { padding: 12px; } h1 { font-size: 22px; } .auth-card { padding: 32px 24px 24px; } .box { padding: 16px; } .modal { padding: 20px; } }
 </style>
 </head>
 <body>
@@ -254,7 +248,7 @@ table.progress-table th { background: var(--c-surface-2); font-weight: 600; font
             <div class="auth-field">
                 <input type="password" id="authPassword" placeholder="Пароль" autocomplete="current-password">
                 <span class="auth-field-icon">🔒</span>
-                <button type="button" class="auth-eye" id="authEye" onclick="togglePassword()" style="position:absolute; right:12px; top:50%; transform:translateY(-50%); background:none; border:none; cursor:pointer;">👁</button>
+                <button type="button" class="auth-eye" id="authEye" onclick="togglePassword()">👁</button>
             </div>
             <button class="auth-btn" id="authSubmit" onclick="doLogin()">Войти</button>
             <div class="auth-error" id="authError"></div>
@@ -280,7 +274,7 @@ table.progress-table th { background: var(--c-surface-2); font-weight: 600; font
         <button class="main-tab-btn" onclick="switchTab('ai', this)">🤖 AI-Анализ</button>
     </div>
 
-    <!-- ТАБ СВОДКА (Оставлен без изменений) -->
+    <!-- СВОДКА -->
     <div class="tab-content active" id="tab-main">
         <div class="container">
             <div class="box">
@@ -295,8 +289,8 @@ table.progress-table th { background: var(--c-surface-2); font-weight: 600; font
             </div>
             <div class="box">
                 <h3>3. Прошлый отчёт</h3>
-                <p>загрузи прошлый .xlsx. подтянутся пометки, цвета, заметки, ВКС.</p>
-                <button class="btn-import-xlsx" onclick="document.getElementById('xlsxFile').click()">📥 загрузить (.xlsx)</button>
+                <p>загрузи прошлый .xlsx.</p>
+                <button class="btn-import-xlsx" onclick="document.getElementById('xlsxFile').click()">📥 загрузить</button>
                 <input type="file" id="xlsxFile" accept=".xlsx,.xls" style="display:none" onchange="importPreviousXlsx(event)">
                 <div id="importStatus" style="margin-top:10px; font-size:13px; color:var(--c-text-2);"></div>
             </div>
@@ -305,7 +299,7 @@ table.progress-table th { background: var(--c-surface-2); font-weight: 600; font
         <div class="btn-group">
             <button class="btn-load" onclick="processData()">загрузить и обработать</button>
             <button class="btn-cloud" onclick="manualSaveToCloud()">☁️ сохранить в облако</button>
-            <button class="btn-export" id="exportBtn" onclick="exportToExcel()">скачать всё в Excel</button>
+            <button class="btn-export" id="exportBtn" onclick="exportToExcel()">скачать Excel</button>
         </div>
 
         <div class="filters-panel" id="filtersPanel">
@@ -313,7 +307,7 @@ table.progress-table th { background: var(--c-surface-2); font-weight: 600; font
             <div class="filter-grid">
                 <div class="filter-group">
                     <label>сотрудник</label>
-                    <select id="filterUser" onchange="applyFilters()"><option value="all">все сотрудники</option></select>
+                    <select id="filterUser" onchange="applyFilters()"><option value="all">все</option></select>
                 </div>
                 <div class="filter-group">
                     <label>start date (от)</label>
@@ -361,14 +355,14 @@ table.progress-table th { background: var(--c-surface-2); font-weight: 600; font
         </div>
     </div>
 
-    <!-- ТАБ ПРОГРЕСС -->
+    <!-- ПРОГРЕСС -->
     <div class="tab-content" id="tab-progress">
         <div class="container">
             <div class="box" style="min-width:100%;">
-                <h3>Общий прогресс команды</h3>
+                <h3>Общий прогресс</h3>
                 <div class="progress-controls">
                     <div class="field-group" style="flex:0 0 160px;">
-                        <label>норма качества, %</label>
+                        <label>норма, %</label>
                         <input type="number" id="progNorm" value="100" step="1" min="0" max="100" onchange="renderProgress()">
                     </div>
                     <div class="field-group" style="flex:0 0 150px;">
@@ -388,9 +382,6 @@ table.progress-table th { background: var(--c-surface-2); font-weight: 600; font
                             <option value="all">всё время</option>
                         </select>
                     </div>
-                    <div class="field-group" style="flex:0 0 160px;">
-                        <button class="btn-copy" onclick="exportProgress()" style="padding:10px 14px;">📤 экспорт</button>
-                    </div>
                 </div>
                 <div class="progress-kpi-grid" id="progKpi"></div>
                 <div class="progress-chart-block">
@@ -401,28 +392,28 @@ table.progress-table th { background: var(--c-surface-2); font-weight: 600; font
         </div>
     </div>
 
-    <!-- ТАБ ВКС -->
+    <!-- ВКС -->
     <div class="tab-content" id="tab-vks-import">
         <div class="container">
             <div class="box" style="min-width:100%;">
-                <h3>Загрузка ВКС из отчёта</h3>
+                <h3>Загрузка ВКС</h3>
                 <div style="display:flex; gap:15px; flex-wrap:wrap; margin-bottom:15px;">
                     <div style="flex:1; min-width:250px;">
-                        <label style="font-size:13px; font-weight:600; display:block; margin-bottom:6px; color:var(--c-text-2);">дата ВКС:</label>
-                        <input type="date" id="vksImportDate" style="padding:10px 12px; border:1px solid var(--c-border); border-radius:var(--r-md); width:100%; font-family:inherit; font-size:14px;">
+                        <label style="font-size:13px; font-weight:600; display:block; margin-bottom:6px;">дата ВКС:</label>
+                        <input type="date" id="vksImportDate" style="padding:10px; border:1px solid var(--c-border); border-radius:var(--r-md); width:100%;">
                     </div>
                     <div style="flex:1; min-width:250px;">
-                        <label style="font-size:13px; font-weight:600; display:block; margin-bottom:6px; color:var(--c-text-2);">категория:</label>
-                        <select id="vksImportCategory" style="padding:10px 12px; border:1px solid var(--c-border); border-radius:var(--r-md); width:100%; font-family:inherit; font-size:14px;">
+                        <label style="font-size:13px; font-weight:600; display:block; margin-bottom:6px;">категория:</label>
+                        <select id="vksImportCategory" style="padding:10px; border:1px solid var(--c-border); border-radius:var(--r-md); width:100%;">
                             <option value="individual">индивидуальная</option>
                             <option value="general">общая</option>
                             <option value="master">мастер-класс</option>
                         </select>
                     </div>
                 </div>
-                <textarea id="vksReportData" placeholder="вставь сюда колонку 'Отчёт по ВКС и НФ'..."></textarea>
-                <div class="btn-group" style="margin-top:15px; margin-bottom:0;">
-                    <button class="btn-load" onclick="parseVksReport()">🔍 найти фамилии в тексте</button>
+                <textarea id="vksReportData" placeholder="вставь колонку 'Отчёт по ВКС и НФ'..."></textarea>
+                <div class="btn-group" style="margin-top:15px;">
+                    <button class="btn-load" onclick="parseVksReport()">🔍 найти фамилии</button>
                 </div>
                 <div id="vksImportStatus" style="margin-top:15px; font-size:13px;"></div>
                 <div id="vksImportResults" style="margin-top:15px;"></div>
@@ -430,14 +421,14 @@ table.progress-table th { background: var(--c-surface-2); font-weight: 600; font
         </div>
     </div>
 
-    <!-- ТАБ КАЧЕСТВО -->
+    <!-- КАЧЕСТВО -->
     <div class="tab-content" id="tab-quality">
         <div class="container">
             <div class="box" style="min-width:100%;">
                 <h3>Расчёт качества</h3>
                 <div style="display:flex; gap:16px; flex-wrap:wrap; margin-bottom:15px;">
                     <div style="flex:1; min-width:300px;">
-                        <label style="font-size:13px; font-weight:600; display:block; margin-bottom:6px;">1. данные: ID, начало, конец, качество</label>
+                        <label style="font-size:13px; font-weight:600; display:block; margin-bottom:6px;">1. данные (ID, начало, конец, кач-во)</label>
                         <textarea id="qDataInput" placeholder="скопируй из Excel..."></textarea>
                     </div>
                     <div style="flex:1; min-width:300px;">
@@ -447,7 +438,7 @@ table.progress-table th { background: var(--c-surface-2); font-weight: 600; font
                 </div>
                 <div class="quality-controls">
                     <div class="field-group" style="flex:0 0 150px;">
-                        <label>коэффициент:</label>
+                        <label>коэфф:</label>
                         <input type="number" id="qCoefInput" value="1.03" step="0.0001">
                     </div>
                     <div class="field-group" style="flex:1; min-width:250px;">
@@ -468,27 +459,26 @@ table.progress-table th { background: var(--c-surface-2); font-weight: 600; font
         </div>
     </div>
 
-    <!-- ТАБ ДИНАМИКА (Переработана) -->
+    <!-- ДИНАМИКА -->
     <div class="tab-content" id="tab-dynamics">
         <div class="container">
             <div class="box" style="min-width:100%;">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; flex-wrap:wrap; gap:10px;">
                     <h3>Динамика и скорость</h3>
                     <div class="main-tabs" style="margin:0; padding:4px;">
-                        <button class="main-tab-btn active" id="dynTabBtn-team" onclick="switchDynTab('team')">👥 Вся команда</button>
-                        <button class="main-tab-btn" id="dynTabBtn-profile" onclick="switchDynTab('profile')">👤 Профиль тренера</button>
+                        <button class="main-tab-btn active" id="dynTabBtn-team" onclick="switchDynTab('team')">👥 Команда</button>
+                        <button class="main-tab-btn" id="dynTabBtn-profile" onclick="switchDynTab('profile')">👤 Тренер</button>
                     </div>
                 </div>
 
-                <!-- Командная сводка -->
                 <div id="dynTeamView">
                     <div style="display:flex; gap:12px; flex-wrap:wrap; margin-bottom:20px; align-items:flex-end;">
                         <div class="field-group" style="flex:0 0 160px;">
-                            <label>период от</label>
+                            <label>от</label>
                             <input type="date" id="dynTeamFrom" onchange="renderDynTeam()">
                         </div>
                         <div class="field-group" style="flex:0 0 160px;">
-                            <label>период до</label>
+                            <label>до</label>
                             <input type="date" id="dynTeamTo" onchange="renderDynTeam()">
                         </div>
                         <div class="field-group" style="flex:0 0 160px;">
@@ -517,7 +507,6 @@ table.progress-table th { background: var(--c-surface-2); font-weight: 600; font
                     </div>
                 </div>
 
-                <!-- Профиль тренера -->
                 <div id="dynProfileView" style="display:none;">
                     <div style="display:flex; gap:12px; flex-wrap:wrap; margin-bottom:20px; align-items:flex-end;">
                         <div class="field-group" style="flex:1; min-width:220px;">
@@ -540,7 +529,7 @@ table.progress-table th { background: var(--c-surface-2); font-weight: 600; font
                             <div style="position:relative; height:300px;"><canvas id="dynChartQuality"></canvas></div>
                         </div>
                         <div class="progress-chart-block">
-                            <h3>⏱ среднее время выполнения (часы)</h3>
+                            <h3>⏱ среднее время (часы)</h3>
                             <div style="position:relative; height:300px;"><canvas id="dynChartSpeed"></canvas></div>
                         </div>
                     </div>
@@ -549,13 +538,11 @@ table.progress-table th { background: var(--c-surface-2); font-weight: 600; font
         </div>
     </div>
 
-    <!-- ТАБ AI-АНАЛИЗ -->
+    <!-- AI-АНАЛИЗ -->
     <div class="tab-content" id="tab-ai">
         <div class="container" style="display:block;">
             <div class="ai-block" style="background:linear-gradient(135deg,#EEF4FF 0%,#F5F0FF 100%); border:1px solid #E0D8FF;">
                 <h3>🤖 AI-Аналитик</h3>
-                <p style="font-size:14px; color:var(--c-text-2); margin-bottom:20px;">Автоматический анализ трендов, скорости и качества на основе загруженных данных.</p>
-                
                 <div style="display:flex; gap:12px; flex-wrap:wrap; margin-bottom:20px;">
                     <div class="field-group" style="flex:1; min-width:200px;">
                         <label>Анализ за период:</label>
@@ -569,7 +556,6 @@ table.progress-table th { background: var(--c-surface-2); font-weight: 600; font
                         <label>Объект анализа:</label>
                         <select id="aiTargetSelect" style="font-weight:600;">
                             <option value="team">Вся команда</option>
-                            <!-- Сюда добавятся тренеры -->
                         </select>
                     </div>
                     <div class="field-group" style="flex:0 0 150px;">
@@ -611,48 +597,38 @@ const SUPABASE_KEY = 'sb_publishable__BwRBB5_ZTH-L84Gi7zGNg_c-YHoyUA';
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 let currentUser = null;
-let loginInProgress = false;
-
-// Глобальные данные
 let globalReport = [];
-let currentFilteredUsers = [];
-let userMarks = {}; let userPaints = {}; let userCards = {}; let userVks = {}; let taskComments = {};
-let rawParsedTasks = []; // Для AI-анализа
+let userMarks = {}, userPaints = {}, userCards = {}, userVks = {}, taskComments = {};
+let rawParsedTasks = [];
+let brushMode = false, brushPaint = 'red';
 
 const categoriesList = [
     'маркдаун', 'ошибки РП', 'грамматика, орфография, пунктуация, не те слова',
     'пропущенная ё, опечатка, потерянная точка', 'систем', 'контекст, ты/вы',
     'комментарий', 'единообразие'
 ];
-const CAT_SHORT_LABELS = {
-    'маркдаун': 'Маркдаун', 'ошибки РП': 'Ошибки РП', 'грамматика, орфография, пунктуация, не те слова': 'Грамматика',
-    'пропущенная ё, опечатка, потерянная точка': 'Пропущенная ё', 'систем': 'Системы', 'контекст, ты/вы': 'Контекст',
-    'комментарий': 'Комментарии', 'единообразие': 'Единообразие'
-};
 
 function togglePassword() { const inp = document.getElementById('authPassword'); inp.type = inp.type === 'password' ? 'text' : 'password'; }
 function showAuthError(msg) { const el = document.getElementById('authError'); el.textContent = '⚠️ ' + msg; el.classList.add('show'); }
 function hideAuthError() { document.getElementById('authError').classList.remove('show'); }
-function setAuthLoading(isLoading) { const btn = document.getElementById('authSubmit'); loginInProgress = isLoading; btn.disabled = isLoading; btn.innerHTML = isLoading ? '<span class="spinner"></span>Вход...' : 'Войти'; }
+function setAuthLoading(isLoading) { const btn = document.getElementById('authSubmit'); btn.disabled = isLoading; btn.innerHTML = isLoading ? '<span class="spinner"></span>Вход...' : 'Войти'; }
 
 async function doLogin() {
-    if (loginInProgress) return;
     hideAuthError();
     const email = document.getElementById('authEmail').value.trim();
     const password = document.getElementById('authPassword').value;
     if (!email || !password) { showAuthError('Введите email и пароль'); return; }
     setAuthLoading(true);
-    try {
-        const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
-        if (error) { setAuthLoading(false); showAuthError(error.message); return; }
-        currentUser = data.user;
-        document.getElementById('authScreen').style.display = 'none';
-        document.getElementById('appScreen').style.display = 'block';
-        await loadUserData();
-    } catch (e) { setAuthLoading(false); showAuthError('Ошибка сети'); }
+    const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
+    if (error) { setAuthLoading(false); showAuthError(error.message); return; }
+    currentUser = data.user;
+    document.getElementById('authScreen').style.display = 'none';
+    document.getElementById('appScreen').style.display = 'block';
+    await loadUserData();
 }
 
 async function logoutUser() { await supabaseClient.auth.signOut(); location.reload(); }
+function showToast(msg) { const t = document.getElementById('saveToast'); t.textContent = msg; t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 1400); }
 
 async function checkSession() {
     const { data: { session } } = await supabaseClient.auth.getSession();
@@ -666,9 +642,52 @@ async function checkSession() {
         document.getElementById('appScreen').style.display = 'none';
     }
 }
-document.addEventListener('DOMContentLoaded', checkSession);
+document.addEventListener('DOMContentLoaded', () => {
+    const emailInput = document.getElementById('authEmail');
+    const passInput = document.getElementById('authPassword');
+    if (emailInput && passInput) {
+        [emailInput, passInput].forEach(inp => {
+            inp.addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+            inp.addEventListener('input', hideAuthError);
+        });
+    }
+    checkSession();
+});
 
-function showToast(msg) { const t = document.getElementById('saveToast'); t.textContent = msg; t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 1400); }
+async function saveToCloud() {
+    if (!currentUser) return;
+    const mainText = document.getElementById('mainData')?.value || '';
+    const namesText = document.getElementById('namesData')?.value || '';
+    await supabaseClient.from('user_data').upsert({ 
+        id: currentUser.id, user_marks: userMarks, user_paints: userPaints, 
+        user_cards: userCards, user_vks: userVks, main_data: mainText, 
+        names_data: namesText, updated_at: new Date().toISOString()
+    });
+}
+function manualSaveToCloud() { showToast('Сохраняем...'); saveToCloud().then(() => showToast('Сохранено!')); }
+
+async function loadUserData() {
+    if (!currentUser) return;
+    const { data, error } = await supabaseClient.from('user_data').select('*').eq('id', currentUser.id).single();
+    if (error && error.code !== 'PGRST116') { console.error(error); return; }
+
+    if (data) {
+        userMarks = data.user_marks || {};
+        userPaints = data.user_paints || {};
+        userCards = data.user_cards || {};
+        userVks = data.user_vks || {};
+        if (data.main_data) document.getElementById('mainData').value = data.main_data;
+        if (data.names_data) document.getElementById('namesData').value = data.names_data;
+        if (data.main_data && data.names_data) processData();
+        syncQualityFromMain();
+        if (typeof renderDynTeam === 'function') renderDynTeam();
+        if (typeof populateAITrainers === 'function') populateAITrainers();
+    } else {
+        userMarks = {}; userPaints = {}; userCards = {}; userVks = {};
+        await saveToCloud();
+    }
+    showToast('Данные загружены');
+}
 
 function switchTab(tabId, btn) {
     document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
@@ -679,14 +698,11 @@ function switchTab(tabId, btn) {
     if (tabId === 'ai') populateAITrainers();
 }
 
-/* ================= ПАРСИНГ И СВОДКА ================= */
 function parseNames(raw) {
     const map = {};
     if (!raw || !raw.trim()) return map;
     raw.split(/\r?\n/).forEach(line => {
-        const lineTrim = line.trim();
-        if (!lineTrim) return;
-        const parts = lineTrim.split('\t').map(s => s.trim()).filter(Boolean);
+        const parts = line.trim().split('\t').map(s => s.trim()).filter(Boolean);
         if (parts.length < 2) return;
         let id = parts.find(p => p.includes('-') && p.length > 20) || parts[parts.length - 1];
         let name = parts.filter(p => p !== id).join(' ');
@@ -697,18 +713,16 @@ function parseNames(raw) {
 
 function parseDuration(start, end) {
     if (!start || !end) return 0;
-    const d1 = new Date(start);
-    const d2 = new Date(end);
-    const diffMs = d2 - d1;
+    const diffMs = new Date(end) - new Date(start);
     if (diffMs < 0) return 0;
-    return diffMs / (1000 * 60 * 60); // часы
+    return diffMs / (1000 * 60 * 60);
 }
 
 function processData() {
     const mainRaw = document.getElementById('mainData').value;
     const namesRaw = document.getElementById('namesData').value;
     if (!mainRaw.trim()) { alert('Вставь данные!'); return; }
-
+    
     const employees = parseNames(namesRaw);
     const lines = mainRaw.split(/\r?\n/);
     const report = {};
@@ -725,32 +739,25 @@ function processData() {
         const end = cols[2]?.trim() || '';
         const quality = parseFloat(cols[3]?.replace(',', '.')) || 0;
         const comment = cols[4]?.trim() || '';
-
         const name = employees[id] || 'ФИО не указано';
+
         if (!report[id]) { report[id] = { id, name, tasks: [] }; taskComments[id] = []; }
         
-        // Извлекаем тэги из комментария
         const isRework = /доработка/i.test(comment);
         const isTimeExceeded = /превышено/i.test(comment);
-        const isTimeOk = /допустимо|быстро|в норме/i.test(comment);
-
         const duration = parseDuration(start, end);
-        
+
         const taskObj = {
             id, startDate: start.split('T')[0], endDate: end.split('T')[0],
-            quality, comment, duration, isRework, isTimeExceeded, isTimeOk,
-            hasErrors: comment.length > 0 && !/нет ошибок/i.test(comment) && !/верный ответ/i.test(comment), // Условно
+            quality, comment, duration, isRework, isTimeExceeded,
+            hasErrors: comment.length > 0 && !/нет ошибок/i.test(comment) && !/верный ответ/i.test(comment),
             cats: {}
         };
         
-        // Упрощенный парсинг категорий для совместимости
-        categoriesList.forEach(c => {
-            if (comment.toLowerCase().includes(c.toLowerCase())) { taskObj.cats[c] = true; }
-        });
+        categoriesList.forEach(c => { if (comment.toLowerCase().includes(c.toLowerCase())) taskObj.cats[c] = true; });
 
         report[id].tasks.push(taskObj);
         rawParsedTasks.push(taskObj);
-        
         if (comment) taskComments[id].push({ date: taskObj.startDate, category: isRework ? 'Доработка' : 'Комментарий', text: comment });
     });
 
@@ -766,39 +773,35 @@ function processData() {
 
 function populateFilters() {
     const userSelect = document.getElementById('filterUser');
-    userSelect.innerHTML = '<option value="all">все сотрудники</option>';
-    globalReport.sort((a,b)=>a.name.localeCompare(b.name)).forEach(u => {
-        const opt = document.createElement('option'); opt.value = u.id; opt.textContent = u.name; userSelect.appendChild(opt);
-    });
+    userSelect.innerHTML = '<option value="all">все</option>';
+    globalReport.sort((a,b)=>a.name.localeCompare(b.name)).forEach(u => userSelect.innerHTML += `<option value="${u.id}">${u.name}</option>`);
 }
 
 function applyFilters() {
-    // ... (упрощенная версия для сохранения контекста, в оригинале она больше)
-    let fUser = document.getElementById('filterUser').value;
-    currentFilteredUsers = globalReport.filter(u => fUser === 'all' || u.id === fUser);
-    renderReport(currentFilteredUsers);
-    renderTabs();
+    const fUser = document.getElementById('filterUser').value;
+    const filtered = globalReport.filter(u => fUser === 'all' || u.id === fUser);
+    renderReport(filtered);
 }
 
 function renderReport(users) {
-    // ... (оставим стандартный вывод таблицы)
     const container = document.getElementById('output');
-    if (users.length === 0) { container.innerHTML = '<p>Нет данных</p>'; return; }
-    let html = `<table class="summary-table"><thead><tr><th>Сотрудник</th><th>Всего</th><th>Ошибки</th></tr></thead><tbody>`;
+    if (users.length === 0) { container.innerHTML = '<p style="text-align:center; color:#999;">Нет данных</p>'; return; }
+    let html = `<table class="summary-table"><thead><tr><th>Сотрудник</th><th>Всего</th><th>Ошибки</th><th>ID</th></tr></thead><tbody>`;
     users.forEach(u => {
-        let de = u.tasks.filter(t => t.hasErrors).length;
-        html += `<tr><td>${u.name}</td><td>${u.tasks.length}</td><td>${de}</td></tr>`;
+        let errs = u.tasks.filter(t => t.hasErrors).length;
+        html += `<tr><td class="name-col" onclick="openCard('${u.id}')">${u.name}</td><td>${u.tasks.length}</td><td>${errs}</td><td class="id-col">${u.id}</td></tr>`;
     });
     html += `</tbody></table>`;
     container.innerHTML = html;
 }
-function renderTabs() { /* ... заглушка ... */ }
-function syncQualityFromMain() {
-    document.getElementById('qDataInput').value = document.getElementById('mainData').value;
-    document.getElementById('qNameInput').value = document.getElementById('namesData').value;
-}
 
-/* ================= ДИНАМИКА ================= */
+function toggleBrush() { brushMode = !brushMode; document.body.classList.toggle('brush-mode', brushMode); document.getElementById('brushToggle').classList.toggle('active', brushMode); document.getElementById('brushToggle').textContent = brushMode ? 'выключить' : 'включить'; }
+function pickPaint(p) { brushPaint = p; document.querySelectorAll('.color-swatch').forEach(el => el.classList.toggle('active', el.dataset.paint === p)); }
+function resetFilters() { document.getElementById('filterUser').value = 'all'; applyFilters(); }
+function syncQualityFromMain() { document.getElementById('qDataInput').value = document.getElementById('mainData').value; document.getElementById('qNameInput').value = document.getElementById('namesData').value; }
+function renderTabs() { /* Реализация опущена для краткости */ }
+
+/* ДИНАМИКА */
 function switchDynTab(tab) {
     document.querySelectorAll('#tab-dynamics .main-tab-btn').forEach(b => b.classList.remove('active'));
     document.getElementById('dynTabBtn-' + tab).classList.add('active');
@@ -813,16 +816,11 @@ function renderDynTeam() {
     const from = document.getElementById('dynTeamFrom').value;
     const to = document.getElementById('dynTeamTo').value;
 
-    let totalTasks = 0, totalErr = 0, totalTime = 0, validTimeCount = 0, totalRework = 0;
-    
     let tbodyHtml = '';
+    let totalTasks = 0, totalErr = 0, totalTime = 0, validTimeCount = 0, totalRework = 0;
+
     globalReport.forEach(u => {
-        let userTasks = u.tasks.filter(t => {
-            if (from && t.startDate < from) return false;
-            if (to && t.startDate > to) return false;
-            return true;
-        });
-        
+        let userTasks = u.tasks.filter(t => (!from || t.startDate >= from) && (!to || t.startDate <= to));
         if (userTasks.length === 0) return;
 
         let err = 0, timeSum = 0, timeCount = 0, rework = 0;
@@ -835,78 +833,44 @@ function renderDynTeam() {
         const avgTime = timeCount ? (timeSum / timeCount).toFixed(1) : '—';
         const errPct = (err / userTasks.length * 100).toFixed(1);
         
-        totalTasks += userTasks.length;
-        totalErr += err;
-        totalTime += timeSum;
-        validTimeCount += timeCount;
-        totalRework += rework;
+        totalTasks += userTasks.length; totalErr += err; totalTime += timeSum; validTimeCount += timeCount; totalRework += rework;
 
         tbodyHtml += `<tr>
             <td style="text-align:left; font-weight:600;">${u.name}</td>
-            <td>${userTasks.length}</td>
-            <td>${err}</td>
+            <td>${userTasks.length}</td><td>${err}</td>
             <td><span class="badge-status ${errPct > 15 ? 'badge-bad' : errPct > 5 ? 'badge-warn' : 'badge-good'}">${errPct}%</span></td>
-            <td>${avgTime}</td>
-            <td>${rework}</td>
-            <td>—</td>
+            <td>${avgTime}</td><td>${rework}</td><td>—</td>
         </tr>`;
     });
 
     const avgTeamTime = validTimeCount ? (totalTime / validTimeCount).toFixed(1) : 0;
-    
     document.getElementById('dynTeamKpi').innerHTML = `
-        <div class="progress-kpi" style="border-left-color:var(--c-primary);">
-            <div class="lbl">Всего задач</div>
-            <div class="val">${totalTasks}</div>
-        </div>
-        <div class="progress-kpi" style="border-left-color:var(--c-red);">
-            <div class="lbl">Ошибок</div>
-            <div class="val">${totalErr} <small>(${(totalErr/totalTasks*100).toFixed(1)}%)</small></div>
-        </div>
-        <div class="progress-kpi" style="border-left-color:var(--c-orange);">
-            <div class="lbl">Ср. время (команда)</div>
-            <div class="val">${avgTeamTime} <small>ч</small></div>
-        </div>
-        <div class="progress-kpi" style="border-left-color:var(--c-purple);">
-            <div class="lbl">Доработки</div>
-            <div class="val">${totalRework}</div>
-        </div>
+        <div class="progress-kpi" style="border-left-color:var(--c-primary);"><div class="lbl">Всего задач</div><div class="val">${totalTasks}</div></div>
+        <div class="progress-kpi" style="border-left-color:var(--c-red);"><div class="lbl">Ошибок</div><div class="val">${totalErr} <small>(${(totalErr/(totalTasks||1)*100).toFixed(1)}%)</small></div></div>
+        <div class="progress-kpi" style="border-left-color:var(--c-orange);"><div class="lbl">Ср. время (команда)</div><div class="val">${avgTeamTime} <small>ч</small></div></div>
+        <div class="progress-kpi" style="border-left-color:var(--c-purple);"><div class="lbl">Доработки</div><div class="val">${totalRework}</div></div>
     `;
     document.getElementById('dynTeamTbody').innerHTML = tbodyHtml;
 }
 
-let dynChartQuality = null;
-let dynChartSpeed = null;
-
+let dynChartQuality = null, dynChartSpeed = null;
 function renderDynProfile() {
     const sel = document.getElementById('dynTrainerSelect');
-    if (!sel.options.length) {
-        globalReport.forEach(u => sel.innerHTML += `<option value="${u.id}">${u.name}</option>`);
-    }
-    const userId = sel.value;
-    const user = globalReport.find(u => u.id === userId);
+    if (!sel.options.length) globalReport.forEach(u => sel.innerHTML += `<option value="${u.id}">${u.name}</option>`);
+    
+    const user = globalReport.find(u => u.id === sel.value);
     if (!user) { document.getElementById('dynProfileContent').style.display = 'none'; return; }
     document.getElementById('dynProfileContent').style.display = 'block';
-
     document.getElementById('dynHeader').innerHTML = `<h2 style="font-size:20px;">${user.name}</h2>`;
 
     const step = document.getElementById('dynStep').value;
-    
-    // Группировка
     const buckets = {};
     user.tasks.forEach(t => {
         let key = t.startDate;
-        if (step === 'week') {
-            const d = new Date(key);
-            d.setDate(d.getDate() - (d.getDay() || 7) + 1);
-            key = d.toISOString().slice(0, 10);
-        } else if (step === 'month') {
-            key = key.slice(0, 7);
-        }
+        if (step === 'week') { const d = new Date(key); d.setDate(d.getDate() - (d.getDay() || 7) + 1); key = d.toISOString().slice(0, 10); }
+        else if (step === 'month') key = key.slice(0, 7);
         if (!buckets[key]) buckets[key] = { total: 0, err: 0, timeSum: 0, timeCount: 0 };
-        buckets[key].total++;
-        if (t.hasErrors) buckets[key].err++;
-        if (t.duration > 0) { buckets[key].timeSum += t.duration; buckets[key].timeCount++; }
+        buckets[key].total++; if (t.hasErrors) buckets[key].err++; if (t.duration > 0) { buckets[key].timeSum += t.duration; buckets[key].timeCount++; }
     });
 
     const keys = Object.keys(buckets).sort();
@@ -915,19 +879,13 @@ function renderDynProfile() {
     const dataSpeed = keys.map(k => buckets[k].timeCount ? (buckets[k].timeSum / buckets[k].timeCount).toFixed(1) : null);
 
     if (dynChartQuality) dynChartQuality.destroy();
-    dynChartQuality = new Chart(document.getElementById('dynChartQuality'), {
-        type: 'line',
-        data: { labels, datasets: [{ label: '% ошибок', data: dataErr, borderColor: '#FF3B30', tension: 0.3 }] }
-    });
+    dynChartQuality = new Chart(document.getElementById('dynChartQuality'), { type: 'line', data: { labels, datasets: [{ label: '% ошибок', data: dataErr, borderColor: '#FF3B30', tension: 0.3 }] } });
 
     if (dynChartSpeed) dynChartSpeed.destroy();
-    dynChartSpeed = new Chart(document.getElementById('dynChartSpeed'), {
-        type: 'bar',
-        data: { labels, datasets: [{ label: 'Часы', data: dataSpeed, backgroundColor: '#5B9DF9' }] }
-    });
+    dynChartSpeed = new Chart(document.getElementById('dynChartSpeed'), { type: 'bar', data: { labels, datasets: [{ label: 'Часы', data: dataSpeed, backgroundColor: '#5B9DF9' }] } });
 }
 
-/* ================= AI-АНАЛИЗ ================= */
+/* AI-АНАЛИЗ */
 function populateAITrainers() {
     const sel = document.getElementById('aiTargetSelect');
     sel.innerHTML = '<option value="team">Вся команда</option>';
@@ -943,77 +901,54 @@ function runAIAnalysis() {
     const speedEl = document.getElementById('aiSpeedList');
     const recsEl = document.getElementById('aiRecommendationsList');
 
-    // Фильтрация по времени
     let filteredTasks = rawParsedTasks;
     if (period === 'last3') {
         const d = new Date(); d.setDate(d.getDate() - 21);
-        const dateStr = d.toISOString().slice(0,10);
-        filteredTasks = filteredTasks.filter(t => t.startDate >= dateStr);
+        filteredTasks = filteredTasks.filter(t => t.startDate >= d.toISOString().slice(0,10));
     } else if (period === 'current') {
-        const d = new Date();
-        const monthStr = d.toISOString().slice(0,7);
-        filteredTasks = filteredTasks.filter(t => t.startDate.startsWith(monthStr));
+        filteredTasks = filteredTasks.filter(t => t.startDate.startsWith(new Date().toISOString().slice(0,7)));
     }
-
-    if (target !== 'team') {
-        filteredTasks = filteredTasks.filter(t => t.id === target);
-    }
+    if (target !== 'team') filteredTasks = filteredTasks.filter(t => t.id === target);
 
     if (filteredTasks.length === 0) {
         insightsEl.innerHTML = '<div class="ai-insight warn">Нет данных за выбранный период.</div>';
         speedEl.innerHTML = ''; recsEl.innerHTML = ''; return;
     }
 
-    // Аналитика
     const total = filteredTasks.length;
     const errors = filteredTasks.filter(t => t.hasErrors).length;
     const reworks = filteredTasks.filter(t => t.isRework).length;
-    
     const timeTasks = filteredTasks.filter(t => t.duration > 0);
     const avgTime = timeTasks.length ? (timeTasks.reduce((s, t) => s + t.duration, 0) / timeTasks.length).toFixed(1) : 0;
-    
     const exceeded = filteredTasks.filter(t => t.isTimeExceeded).length;
 
-    // Генерация текста
     let insightsHtml = '';
     if (target === 'team') {
-        insightsHtml += `<div class="ai-insight">За выбранный период команда выполнила <b>${total}</b> задач. Общий процент ошибок: <b>${(errors/total*100).toFixed(1)}%</b>.</div>`;
-        
-        if (reworks > 0) {
-            insightsHtml += `<div class="ai-insight bad">Обнаружено <b>${reworks}</b> задач с пометкой «Доработка». Это требует внимания ревьюеров.</div>`;
-        } else {
-            insightsHtml += `<div class="ai-insight good">Отлично! Задач с пометкой «Доработка» не обнаружено.</div>`;
-        }
+        insightsHtml += `<div class="ai-insight">Команда выполнила <b>${total}</b> задач. Общий % ошибок: <b>${(errors/total*100).toFixed(1)}%</b>.</div>`;
+        if (reworks > 0) insightsHtml += `<div class="ai-insight bad">Обнаружено <b>${reworks}</b> задач с пометкой «Доработка».</div>`;
+        else insightsHtml += `<div class="ai-insight good">Отлично! Задач с пометкой «Доработка» нет.</div>`;
     } else {
         const user = globalReport.find(u => u.id === target);
-        insightsHtml += `<div class="ai-insight">Анализ для <b>${user.name}</b> за выбранный период. Выполнено задач: <b>${total}</b>.</div>`;
+        insightsHtml += `<div class="ai-insight">Анализ для <b>${user.name}</b>. Выполнено: <b>${total}</b>.</div>`;
         if (errors > 0) insightsHtml += `<div class="ai-insight bad">Найдено <b>${errors}</b> задач с ошибками (${(errors/total*100).toFixed(1)}%).</div>`;
         else insightsHtml += `<div class="ai-insight good">Все задачи выполнены без ошибок!</div>`;
     }
 
     let speedHtml = '';
     if (timeTasks.length > 0) {
-        speedHtml += `<div class="ai-insight">Среднее время на выполнение задачи: <b>${avgTime} ч.</b></div>`;
-        if (exceeded > 0) {
-            speedHtml += `<div class="ai-insight warn">⚠️ В комментариях найдено <b>${exceeded}</b> упоминаний о превышении рекомендованного времени.</div>`;
-        } else {
-            speedHtml += `<div class="ai-insight good">✅ Превышений рекомендованного времени в комментариях не найдено.</div>`;
-        }
+        speedHtml += `<div class="ai-insight">Среднее время: <b>${avgTime} ч.</b></div>`;
+        if (exceeded > 0) speedHtml += `<div class="ai-insight warn">⚠️ Найдено <b>${exceeded}</b> упоминаний о превышении времени.</div>`;
+        else speedHtml += `<div class="ai-insight good">✅ Превышений времени не найдено.</div>`;
     } else {
-        speedHtml += `<div class="ai-insight">Данные о времени (start/end) отсутствуют или равны нулю.</div>`;
+        speedHtml += `<div class="ai-insight">Данные о времени отсутствуют.</div>`;
     }
 
     let recsHtml = '';
-    if (target === 'team') {
-        recsHtml += `<div class="ai-insight">Обратите внимание на тренеров с наибольшим процентом доработок. Рекомендуется провести общую ВКС по категориям с наибольшим числом ошибок.</div>`;
-    } else {
-        if (reworks > 2) {
-            recsHtml += `<div class="ai-insight bad">Тренеру требуется индивидуальная ВКС: слишком много доработок.</div>`;
-        } else if (errors / total > 0.15) {
-            recsHtml += `<div class="ai-insight warn">Рекомендуется проверить чек-лист и провести разбор ошибок по категориям.</div>`;
-        } else {
-            recsHtml += `<div class="ai-insight good">Показатели в норме. Можно похвалить тренера и дать более сложные задачи.</div>`;
-        }
+    if (target === 'team') recsHtml += `<div class="ai-insight">Обратите внимание на тренеров с высоким % доработок. Рекомендуется ВКС по частым ошибкам.</div>`;
+    else {
+        if (reworks > 2) recsHtml += `<div class="ai-insight bad">Тренеру нужна индивидуальная ВКС: много доработок.</div>`;
+        else if (errors / total > 0.15) recsHtml += `<div class="ai-insight warn">Рекомендуется разбор ошибок по категориям.</div>`;
+        else recsHtml += `<div class="ai-insight good">Показатели в норме. Можно дать более сложные задачи.</div>`;
     }
 
     insightsEl.innerHTML = insightsHtml;
@@ -1021,17 +956,14 @@ function runAIAnalysis() {
     recsEl.innerHTML = recsHtml;
 }
 
-// Заглушки для остальных функций, чтобы не было ошибок
-function manualSaveToCloud() { showToast('Сохранено (демо)'); }
-function exportToExcel() { showToast('Экспорт (демо)'); }
-function exportProgress() { showToast('Экспорт (демо)'); }
+function closeModal() { document.getElementById('modalOverlay').classList.remove('open'); }
+function closeVksModal() { document.getElementById('vksModalOverlay').classList.remove('open'); }
+function exportToExcel() { showToast('Демо-экспорт'); }
 function applyProgQuick() { renderProgress(); }
 function renderProgress() { /* заглушка */ }
 function parseVksReport() { /* заглушка */ }
 function calcQuality() { /* заглушка */ }
 function importPreviousXlsx() { /* заглушка */ }
-function closeModal() { document.getElementById('modalOverlay').classList.remove('open'); }
-function closeVksModal() { document.getElementById('vksModalOverlay').classList.remove('open'); }
 </script>
 </body>
 </html>
