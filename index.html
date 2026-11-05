@@ -1212,7 +1212,13 @@ table.progress-table td.period-col { text-align: left; font-weight: 600; color: 
 <script>
 const SUPABASE_URL = 'https://lzjyacoflsggrfrqlbsx.supabase.co';
 const SUPABASE_KEY = 'sb_publishable__BwRBB5_ZTH-L84Gi7zGNg_c-YHoyUA';
-const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
+    global: {
+        headers: {
+            apikey: SUPABASE_KEY
+        }
+    }
+});
 
 let currentUser = null;
 let loginInProgress = false;
