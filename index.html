@@ -4520,15 +4520,6 @@ document.addEventListener('keydown', e => {
         appScreen.appendChild(tabDiv);
     }
 
-    // 3. Перехватываем переключение вкладок, чтобы отрисовывать отчёт
-    const originalSwitchTab = window.switchTab;
-    window.switchTab = function(tabId, btn) {
-        originalSwitchTab(tabId, btn);
-        if (tabId === 'manager-report') {
-            renderManagerReport();
-        }
-    };
-
     // 4. Инициализация дат при первом открытии
     window.applyReportPreset = function(val) {
         const fromEl = document.getElementById('repDateFrom');
@@ -4945,22 +4936,21 @@ document.addEventListener('keydown', e => {
         `;
         drillModal.classList.add('open');
     };
-    // Функция для принудительного обновления (если поменяли период)
+      // Правильный перехват switchTab (только один раз!)
+    const originalSwitchTab = window.switchTab;
+    window.switchTab = function(tabId, btn) {
+        originalSwitchTab(tabId, btn);
+        if (tabId === 'manager-report') {
+            renderManagerReport();
+        }
+    };
+
+    // Кнопка ручного обновления на всякий случай
     window.refreshManagerReport = function() {
         renderManagerReport();
     };
 
-    // Автоматическое обновление при переключении вкладки
-    const origSwitchTab = window.switchTab;
-    window.switchTab = function(tabId, btn) {
-        origSwitchTab(tabId, btn);
-        if (tabId === 'manager-report') {
-            // Небольшая задержка, чтобы данные успели подгрузиться
-            setTimeout(() => renderManagerReport(), 50); 
-        }
-    };
-
-    // Задаем дефолтные даты и перерисовываем при загрузке
+    // Инициализация дат и первая отрисовка
     window.addEventListener('load', () => {
         setTimeout(() => {
             const fromEl = document.getElementById('repDateFrom');
@@ -4971,12 +4961,13 @@ document.addEventListener('keydown', e => {
             }
             if (toEl && !toEl.value) toEl.value = new Date().toISOString().slice(0,10);
             
-            // Если данные уже загружены к моменту открытия — рисуем
+            // Отрисовываем только если данные уже есть в памяти
             if (window.globalReport && window.globalReport.length > 0) {
                 renderManagerReport();
             }
-        }, 1500); // Ждем 1.5 секунды, пока Supabase отдаст данные
+        }, 800);
     });
+})();
 })();
 </script>
 </body>
