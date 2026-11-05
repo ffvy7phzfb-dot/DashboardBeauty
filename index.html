@@ -4556,28 +4556,20 @@ document.addEventListener('keydown', e => {
     };
 
     // 5. Основная логика отрисовки
+    // 5. Основная логика отрисовки
     window.renderManagerReport = function() {
         const body = document.getElementById('repBody');
         if (!body) return;
 
-        // Если глобальная переменная пуста, попробуем взять данные прямо из "Сводки"
+        // Если глобальная переменная пуста, пробуем взять данные из "Сводки"
         let users = window.globalReport;
         if (!users || users.length === 0) {
-            const mainDataInput = document.getElementById('mainData');
-            if (!mainDataInput || !mainDataInput.value.trim()) {
-                body.innerHTML = '<p style="color:var(--c-red); text-align:center; padding:20px; font-weight:600;">Нет данных. Вставь данные в «Сводку» и нажми «загрузить и обработать».</p>';
-                return;
-            }
-            // Если в поле есть данные, но globalReport пуст (не сработал processData)
-            body.innerHTML = '<p style="color:var(--c-text-2); text-align:center; padding:20px;">Обрабатываем данные...</p>';
-            if (typeof processData === 'function') {
-                processData(); // Принудительно запускаем парсинг
-                users = window.globalReport;
-            }
-        }
-
-        if (!users || users.length === 0) {
-            body.innerHTML = '<p style="color:var(--c-red); text-align:center; padding:20px;">Ошибка: данные не распознались. Проверьте колонки в «Сводке».</p>';
+            body.innerHTML = `
+                <div style="text-align:center; padding:40px;">
+                    <p style="color:var(--c-text-2); margin-bottom:16px;">Данные ещё не загружены в память.</p>
+                    <button class="btn-load" onclick="processData(); setTimeout(renderManagerReport, 500);" style="padding:10px 24px;">🔄 Загрузить данные из Сводки и построить отчёт</button>
+                </div>
+            `;
             return;
         }
 
