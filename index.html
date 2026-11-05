@@ -4559,15 +4559,25 @@ document.addEventListener('keydown', e => {
     window.renderManagerReport = function() {
         const body = document.getElementById('repBody');
         if (!body) return;
-        
-        // Проверяем, загружены ли данные
-        if (!window.globalReport || window.globalReport.length === 0) {
-            body.innerHTML = `
-                <div style="text-align:center; padding:40px;">
-                    <p style="color:var(--c-text-2); margin-bottom:16px;">Сначала загрузите данные в «Сводке», затем нажмите кнопку ниже.</p>
-                    <button class="btn-load" onclick="renderManagerReport()" style="padding:10px 24px;">🔄 Я загрузил данные, обновить</button>
-                </div>
-            `;
+
+        // Если глобальная переменная пуста, попробуем взять данные прямо из "Сводки"
+        let users = window.globalReport;
+        if (!users || users.length === 0) {
+            const mainDataInput = document.getElementById('mainData');
+            if (!mainDataInput || !mainDataInput.value.trim()) {
+                body.innerHTML = '<p style="color:var(--c-red); text-align:center; padding:20px; font-weight:600;">Нет данных. Вставь данные в «Сводку» и нажми «загрузить и обработать».</p>';
+                return;
+            }
+            // Если в поле есть данные, но globalReport пуст (не сработал processData)
+            body.innerHTML = '<p style="color:var(--c-text-2); text-align:center; padding:20px;">Обрабатываем данные...</p>';
+            if (typeof processData === 'function') {
+                processData(); // Принудительно запускаем парсинг
+                users = window.globalReport;
+            }
+        }
+
+        if (!users || users.length === 0) {
+            body.innerHTML = '<p style="color:var(--c-red); text-align:center; padding:20px;">Ошибка: данные не распознались. Проверьте колонки в «Сводке».</p>';
             return;
         }
 
@@ -4576,7 +4586,7 @@ document.addEventListener('keydown', e => {
         if (!from || !to) return;
 
         const group = document.getElementById('repGroup').value;
-        const users = window.globalReport.filter(u => {
+        const filteredUsers = users.filter(u => {
             if (window.userCards[u.id]?.archived) return false;
             const m = window.userMarks[u.id];
             if (group === 'newbie' && m !== 'newbie') return false;
@@ -4584,7 +4594,7 @@ document.addEventListener('keydown', e => {
             return true;
         });
 
-        const cur = aggregateReportPeriod(users, from, to);
+        const cur = aggregateReportPeriod(filteredUsers, from, to);
         
         const doCompare = document.getElementById('repCompare').checked;
         let old = null; let prev = null;
@@ -4595,7 +4605,7 @@ document.addEventListener('keydown', e => {
             const pTo = new Date(f); pTo.setDate(pTo.getDate() - 1);
             const pFrom = new Date(pTo); pFrom.setDate(pFrom.getDate() - days + 1);
             prev = { from: pFrom.toISOString().slice(0,10), to: pTo.toISOString().slice(0,10) };
-            old = aggregateReportPeriod(users, prev.from, prev.to);
+            old = aggregateReportPeriod(filteredUsers, prev.from, prev.to);
         }
 
         body.innerHTML = 
@@ -4603,7 +4613,7 @@ document.addEventListener('keydown', e => {
             renderReportErrors(cur, old, from, to) +
             renderReportInsights(cur, old, prev) +
             renderReportUsers(cur, old) +
-            renderReportHeatmap(users, from, to);
+            renderReportHeatmap(filteredUsers, from, to);
     };
 
     // --- Вспомогательные функции ---
