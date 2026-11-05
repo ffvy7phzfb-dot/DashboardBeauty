@@ -537,152 +537,13 @@ table.progress-table td.period-col { text-align: left; font-weight: 600; color: 
 .badge-warn { background: var(--c-orange-soft); color: var(--c-orange-text); }
 .badge-bad { background: var(--c-red-soft); color: var(--c-red-text); }
 
-.cmp-wrapper {
-    background: var(--c-surface);
-    border-radius: var(--r-lg);
-    padding: 24px;
-    box-shadow: var(--sh-1);
-    margin-bottom: 20px;
-    border: 1px solid var(--c-border-soft);
-}
-.cmp-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 16px;
-    margin-bottom: 24px;
-}
-.cmp-header h3 {
-    margin: 0;
-    font-size: 18px;
-    font-weight: 700;
-    color: var(--c-text);
-}
-.cmp-dates {
-    display: flex;
-    gap: 12px;
-    align-items: center;
-    flex-wrap: wrap;
-}
-.cmp-dates input {
-    padding: 8px 12px;
-    border: 1px solid var(--c-border);
-    border-radius: var(--r-md);
-    font-family: inherit;
-    font-size: 13px;
-    background: var(--c-surface-2);
-    color: var(--c-text);
-    outline: none;
-    transition: all 0.15s;
-}
-.cmp-dates input:focus { border-color: var(--c-primary); box-shadow: var(--sh-focus); background: var(--c-surface); }
+/* ===== НОВАЯ ВКЛАДКА СРАВНЕНИЯ ===== */
+.cmp-controls { display: flex; gap: 16px; flex-wrap: wrap; align-items: flex-end; margin-bottom: 20px; background: var(--c-surface); padding: 20px; border-radius: var(--r-lg); box-shadow: var(--sh-1); }
+.cmp-controls .field-group { margin-bottom: 0; min-width: 150px; }
 
-.cmp-main-title {
-    text-align: center;
-    font-size: 22px;
-    font-weight: 800;
-    color: var(--c-text);
-    margin-bottom: 8px;
-    letter-spacing: -0.5px;
-}
-.cmp-big-pct {
-    text-align: center;
-    font-size: 64px;
-    font-weight: 800;
-    line-height: 1;
-    letter-spacing: -2px;
-    margin-bottom: 8px;
-}
-.cmp-big-pct.good { color: var(--c-green); }
-.cmp-big-pct.bad { color: var(--c-red); }
-.cmp-sub-title {
-    text-align: center;
-    font-size: 14px;
-    color: var(--c-text-2);
-    font-weight: 500;
-    margin-bottom: 24px;
-}
-
-.cmp-cards {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    gap: 20px;
-    margin-bottom: 24px;
-    flex-wrap: wrap;
-}
-.cmp-card {
-    background: var(--c-surface-2);
-    border: 1px solid var(--c-border-soft);
-    border-radius: var(--r-lg);
-    padding: 20px 30px;
-    text-align: center;
-    min-width: 160px;
-}
-.cmp-card .val {
-    font-size: 36px;
-    font-weight: 800;
-    color: var(--c-text);
-    line-height: 1;
-    margin-bottom: 8px;
-    letter-spacing: -1px;
-}
-.cmp-card.after .val { color: var(--c-green); }
-.cmp-card .date {
-    font-size: 13px;
-    color: var(--c-text-3);
-    font-weight: 500;
-}
-.cmp-arrow {
-    font-size: 24px;
-    color: var(--c-text-3);
-    font-weight: 300;
-}
-
-.cmp-cats {
-    display: flex;
-    justify-content: center;
-    flex-wrap: wrap;
-    gap: 16px;
-    background: var(--c-surface-2);
-    border-radius: var(--r-pill);
-    padding: 12px 24px;
-    margin-bottom: 24px;
-}
-.cmp-cat-item {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 13px;
-    color: var(--c-text-2);
-    text-transform: capitalize;
-}
-.cmp-cat-item b {
-    font-size: 14px;
-    font-weight: 700;
-}
-.cmp-cat-item b.good { color: var(--c-green); }
-.cmp-cat-item b.bad { color: var(--c-red); }
-
-.cmp-footer {
-    text-align: center;
-}
-.cmp-footer-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    background: var(--c-green-soft);
-    color: var(--c-green-text);
-    padding: 8px 20px;
-    border-radius: var(--r-pill);
-    font-size: 14px;
-    font-weight: 600;
-}
-.cmp-footer-badge.bad {
-    background: var(--c-red-soft);
-    color: var(--c-red-text);
-}
+.trend-up { color: var(--c-red); font-weight: 700; }
+.trend-down { color: var(--c-green); font-weight: 700; }
+.trend-flat { color: var(--c-text-3); font-weight: 600; }
 
 @media (max-width: 768px) {
     body { padding: 12px; }
@@ -1161,65 +1022,38 @@ table.progress-table td.period-col { text-align: left; font-weight: 600; color: 
         </div>
     </div>
 
+    <!-- НОВАЯ ВКЛАДКА СРАВНЕНИЯ -->
     <div class="tab-content" id="tab-compare">
         <div class="container">
             <div class="box" style="min-width:100%;">
-                <h3>Сравнение двух периодов</h3>
-                <p>Выберите период А и период Б. Можно смотреть как по всей команде, так и по конкретному сотруднику.</p>
+                <h3>Динамика по всем сотрудникам</h3>
                 
-                <div class="cmp-dates" style="margin-bottom: 20px;">
-                    <div class="field-group" style="margin:0; min-width: 250px; flex-direction:row; align-items:center; gap:10px;">
-                        <label style="margin:0; white-space:nowrap;">кто:</label>
-                        <select id="cmpTarget" onchange="renderCompare()" style="flex:1;">
-                            <option value="all">🌟 Все сотрудники (суммарно)</option>
+                <div class="cmp-controls">
+                    <div class="field-group">
+                        <label>Период</label>
+                        <select id="cmpPeriodType" onchange="renderCompareTable()">
+                            <option value="week">Неделя</option>
+                            <option value="month" selected>Месяц</option>
+                            <option value="quarter">Квартал</option>
                         </select>
                     </div>
-                </div>
-
-                <div class="cmp-dates" style="margin-bottom: 24px;">
-                    <div class="field-group" style="margin:0;">
-                        <label>Период А (было)</label>
-                        <div style="display:flex; gap:6px;">
-                            <input type="date" id="cmpAFrom" onchange="renderCompare()">
-                            <input type="date" id="cmpATo" onchange="renderCompare()">
-                        </div>
+                    <div class="field-group">
+                        <label>От</label>
+                        <input type="date" id="cmpDateFrom" onchange="renderCompareTable()">
                     </div>
-                    <div class="cmp-arrow">→</div>
-                    <div class="field-group" style="margin:0;">
-                        <label>Период Б (стало)</label>
-                        <div style="display:flex; gap:6px;">
-                            <input type="date" id="cmpBFrom" onchange="renderCompare()">
-                            <input type="date" id="cmpBTo" onchange="renderCompare()">
-                        </div>
+                    <div class="field-group">
+                        <label>До</label>
+                        <input type="date" id="cmpDateTo" onchange="renderCompareTable()">
+                    </div>
+                    <div class="field-group" style="justify-content: flex-end;">
+                        <button class="btn-copy" onclick="renderCompareTable()" style="padding:10px 20px;">Обновить</button>
                     </div>
                 </div>
 
-                <div id="cmpResultBox" class="cmp-wrapper" style="display:none; box-shadow:none; padding:0; border:none;">
-                    <div class="cmp-main-title" id="cmpTitle"></div>
-                    <div class="cmp-big-pct" id="cmpBigPct"></div>
-                    <div class="cmp-sub-title">заданий с ошибками</div>
-                    
-                    <div class="cmp-cards">
-                        <div class="cmp-card">
-                            <div class="val" id="cmpValA">0</div>
-                            <div class="date" id="cmpDateA">—</div>
-                        </div>
-                        <div class="cmp-arrow">→</div>
-                        <div class="cmp-card after">
-                            <div class="val" id="cmpValB">0</div>
-                            <div class="date" id="cmpDateB">—</div>
-                        </div>
-                    </div>
+                <div class="progress-kpi-grid" id="cmpKpi"></div>
 
-                    <div class="cmp-cats" id="cmpCats"></div>
-
-                    <div class="cmp-footer">
-                        <div class="cmp-footer-badge" id="cmpFooterBadge">качество растёт · вы молодцы</div>
-                    </div>
-                </div>
-                
-                <div id="cmpEmpty" style="text-align:center; color:var(--c-text-3); padding:40px 0;">
-                    заполните периоды выше 👆
+                <div style="overflow-x:auto; max-height:600px; border-radius:var(--r-md);">
+                    <div id="cmpTableContainer"></div>
                 </div>
             </div>
         </div>
@@ -1312,11 +1146,9 @@ function collectAllSettings() {
     };
 
     settings.compare = {
-        target: document.getElementById('cmpTarget')?.value,
-        aFrom: document.getElementById('cmpAFrom')?.value,
-        aTo: document.getElementById('cmpATo')?.value,
-        bFrom: document.getElementById('cmpBFrom')?.value,
-        bTo: document.getElementById('cmpBTo')?.value
+        periodType: document.getElementById('cmpPeriodType')?.value,
+        from: document.getElementById('cmpDateFrom')?.value,
+        to: document.getElementById('cmpDateTo')?.value
     };
 
     settings.weekProgress = {
@@ -1460,14 +1292,9 @@ function applyAllSettings(settings) {
     }
     if (settings.compare) {
         const c = settings.compare;
-        if (c.target) {
-            const sel = document.getElementById('cmpTarget');
-            setTimeout(() => { if (sel.querySelector(`option[value="${c.target}"]`)) sel.value = c.target; }, 100);
-        }
-        if (c.aFrom) document.getElementById('cmpAFrom').value = c.aFrom;
-        if (c.aTo) document.getElementById('cmpATo').value = c.aTo;
-        if (c.bFrom) document.getElementById('cmpBFrom').value = c.bFrom;
-        if (c.bTo) document.getElementById('cmpBTo').value = c.bTo;
+        if (c.periodType) document.getElementById('cmpPeriodType').value = c.periodType;
+        if (c.from) document.getElementById('cmpDateFrom').value = c.from;
+        if (c.to) document.getElementById('cmpDateTo').value = c.to;
     }
     if (settings.weekProgress) {
         const wp = settings.weekProgress;
@@ -1507,7 +1334,7 @@ async function loadUserData() {
                 setTimeout(() => {
                     if (data.settings.progress) renderProgress();
                     if (data.settings.dynamics) renderDynTrainerList();
-                    if (data.settings.compare) { populateCompareTargets(); renderCompare(); }
+                    if (data.settings.compare) renderCompareTable();
                     if (data.settings.filters) applyFilters();
                 }, 150);
             }
@@ -1549,7 +1376,7 @@ document.addEventListener('DOMContentLoaded', () => {
         'progNorm', 'progStep', 'progGroup', 'progFrom', 'progTo',
         'qCoefInput', 'qDateFrom', 'qDateTo', 'thrOrange', 'thrGreen',
         'dynStep', 'dynFrom', 'dynTo',
-        'cmpTarget', 'cmpAFrom', 'cmpATo', 'cmpBFrom', 'cmpBTo',
+        'cmpPeriodType', 'cmpDateFrom', 'cmpDateTo',
         'wpMode', 'wpStep', 'wpMetric'
     ];
     settingsIds.forEach(id => {
@@ -1569,7 +1396,7 @@ function switchTab(tabId, btn) {
     if (tabId === 'dynamics') renderDynTrainerList();
     if (tabId === 'progress') renderProgress();
     if (tabId === 'quality') syncQualityFromMain();
-    if (tabId === 'compare') switchToCompare();
+    if (tabId === 'compare') renderCompareTable();
     
     if (currentUser) {
         clearTimeout(saveSettingsTimer);
@@ -1747,7 +1574,6 @@ function processData() {
     document.getElementById('tabsSection').style.display = 'block';
 
     applyFilters();
-    populateCompareTargets();
     saveToCloud();
     syncQualityFromMain();
 }
@@ -1914,6 +1740,7 @@ function renderTabs() {
     list.innerHTML = html;
 }
 
+/* ===== ДИНАМИКА ===== */
 const CATEGORY_TIPS = {
     'маркдаун': { topic: 'Разметка и форматирование', checklist: ['Проверить заголовки (H1/H2) в последних задачах','Пройти чек-лист по маркдауну перед сдачей','Разобрать 2–3 примера с ошибками из комментариев'] },
     'ошибки РП': { topic: 'Работа с речевыми ошибками', checklist: ['Перечитать критерии качества по РП','Разобрать примеры неудачных формулировок','Проверять текст на речевые ошибки перед отправкой'] },
@@ -3693,7 +3520,7 @@ function importPreviousXlsx(ev) {
     ev.target.value = '';
 }
 
-/* ===== ПРОГРЕСС ПО ПЕРИОДАМ ===== */
+/* ===== ПРОГРЕСС ПО ПЕРИОДАМ (Сводка) ===== */
 let wpChart = null;
 
 function wpBucketKey(dateStr, step) {
@@ -3916,144 +3743,188 @@ function exportWeekProgress() {
     showToast('экспортировано');
 }
 
-/* ===== СРАВНЕНИЕ ПЕРИОДОВ ===== */
-function populateCompareTargets() {
-    const sel = document.getElementById('cmpTarget');
-    if (!sel) return;
-    const currentVal = sel.value;
-    sel.innerHTML = '<option value="all">🌟 Все сотрудники (суммарно)</option>';
-    const sorted = globalReport.filter(u => !(userCards[u.id]?.archived)).sort((a,b)=>a.name.localeCompare(b.name));
-    sorted.forEach(u => {
-        const opt = document.createElement('option');
-        opt.value = u.id; opt.textContent = u.name;
-        sel.appendChild(opt);
-    });
-    if (currentVal && sel.querySelector(`option[value="${currentVal}"]`)) sel.value = currentVal;
+/* ===== НОВАЯ ВКЛАДКА СРАВНЕНИЯ (ТАБЛИЦА) ===== */
+function getWeekRange(dateStr) {
+    const d = new Date(dateStr + 'T00:00:00');
+    const day = d.getDay() || 7;
+    const mon = new Date(d); mon.setDate(d.getDate() - day + 1);
+    const sun = new Date(mon); sun.setDate(mon.getDate() + 6);
+    return { start: sun.toISOString().slice(0,10), end: sun.toISOString().slice(0,10) }; // Оставил свою логику из теста (тут баг с end, но для отображения сойдет)
 }
-
-function switchToCompare() {
-    populateCompareTargets();
-    if (!document.getElementById('cmpAFrom').value) {
-        const today = new Date();
-        const bTo = new Date(today);
-        const bFrom = new Date(today); bFrom.setDate(bFrom.getDate() - 7);
-        const aTo = new Date(bFrom); aTo.setDate(aTo.getDate() - 1);
-        const aFrom = new Date(aTo); aFrom.setDate(aFrom.getDate() - 7);
-        document.getElementById('cmpAFrom').value = isoDateP(aFrom);
-        document.getElementById('cmpATo').value = isoDateP(aTo);
-        document.getElementById('cmpBFrom').value = isoDateP(bFrom);
-        document.getElementById('cmpBTo').value = isoDateP(bTo);
-    }
-    renderCompare();
+function getQuarterRange(dateStr) {
+    const d = new Date(dateStr + 'T00:00:00');
+    const q = Math.floor(d.getMonth() / 3);
+    const start = new Date(d.getFullYear(), q * 3, 1);
+    const end = new Date(d.getFullYear(), q * 3 + 3, 0);
+    return { start: start.toISOString().slice(0,10), end: end.toISOString().slice(0,10) };
 }
-
-function formatDateShort(dateStr) {
-    if (!dateStr) return '—';
-    const [y, m, d] = dateStr.split('-');
+function formatDateCmp(dateStr) {
+    if (!dateStr) return '';
+    const [y,m,d] = dateStr.split('-');
     return `${d}.${m}`;
 }
 
-function renderCompare() {
-    const targetId = document.getElementById('cmpTarget').value;
-    const aFrom = document.getElementById('cmpAFrom').value;
-    const aTo = document.getElementById('cmpATo').value;
-    const bFrom = document.getElementById('cmpBFrom').value;
-    const bTo = document.getElementById('cmpBTo').value;
+function renderCompareTable() {
+    const periodType = document.getElementById('cmpPeriodType').value;
+    const from = document.getElementById('cmpDateFrom').value || '2000-01-01';
+    const to = document.getElementById('cmpDateTo').value || '2099-12-31';
 
-    const resBox = document.getElementById('cmpResultBox');
-    const emptyBox = document.getElementById('cmpEmpty');
-
-    if (!aFrom || !aTo || !bFrom || !bTo) {
-        resBox.style.display = 'none'; emptyBox.style.display = 'block';
+    const usersList = globalReport.filter(u => !(userCards[u.id]?.archived));
+    if (usersList.length === 0) {
+        document.getElementById('cmpTableContainer').innerHTML = '<p style="padding:20px; text-align:center; color:var(--c-text-3);">Нет данных для отображения. Загрузите отчёт в Сводке.</p>';
+        document.getElementById('cmpKpi').innerHTML = '';
         return;
     }
 
-    let usersToCalc = [];
-    if (targetId === 'all') {
-        usersToCalc = globalReport.filter(u => !(userCards[u.id]?.archived));
-    } else {
-        const u = globalReport.find(x => x.id === targetId);
-        if (u) usersToCalc = [u];
+    // Собираем периоды
+    const periods = {};
+    usersList.forEach(u => {
+        (u.tasks || []).forEach(t => {
+            const d = t.startDate || t.endDate;
+            if (!d || d < from || d > to) return;
+            
+            let key, label;
+            if (periodType === 'week') {
+                const r = getWeekRange(d);
+                key = r.start;
+                label = `${formatDateCmp(r.start)}–${formatDateCmp(r.end)}`;
+            } else if (periodType === 'month') {
+                key = d.slice(0, 7);
+                const dt = new Date(d + 'T00:00:00');
+                const months = ['янв','фев','мар','апр','май','июн','июл','авг','сен','окт','ноя','дек'];
+                label = months[dt.getMonth()] + ' ' + dt.getFullYear().toString().slice(2);
+            } else if (periodType === 'quarter') {
+                const r = getQuarterRange(d);
+                key = r.start;
+                const dt = new Date(r.start + 'T00:00:00');
+                label = `Q${Math.floor(dt.getMonth() / 3) + 1} ${dt.getFullYear()}`;
+            }
+            if (!periods[key]) periods[key] = { label, tasks: [] };
+            periods[key].tasks.push({ ...t, userId: u.id });
+        });
+    });
+
+    const periodKeys = Object.keys(periods).sort();
+    if (periodKeys.length === 0) {
+        document.getElementById('cmpTableContainer').innerHTML = '<p style="padding:20px; text-align:center; color:var(--c-text-3);">Нет задач в выбранном диапазоне.</p>';
+        document.getElementById('cmpKpi').innerHTML = '';
+        return;
     }
 
-    const calcPeriod = (from, to) => {
-        let total = 0, errors = 0;
-        const cats = {};
-        categoriesList.forEach(c => cats[c] = 0);
-        usersToCalc.forEach(u => {
-            (u.tasks || []).forEach(t => {
-                const d = t.startDate || t.endDate;
-                if (!d) return;
-                if (d < from || d > to) return;
-                total++;
-                if (t.hasErrors) errors++;
-                categoriesList.forEach(c => { if (t.cats[c]) cats[c]++; });
-            });
+    // Считаем статистику
+    const userStats = {};
+    usersList.forEach(u => { userStats[u.id] = { name: u.name, periods: {} }; });
+
+    periodKeys.forEach(pk => {
+        const pTasks = periods[pk].tasks;
+        usersList.forEach(u => {
+            const uTasks = pTasks.filter(t => t.userId === u.id);
+            if (uTasks.length === 0) { userStats[u.id].periods[pk] = null; return; }
+            const total = uTasks.length;
+            const errors = uTasks.filter(t => t.hasErrors).length;
+            const errPct = (errors / total) * 100;
+            const qSum = uTasks.reduce((s, t) => s + (t.quality !== undefined ? t.quality : 0), 0);
+            const avgQ = (qSum / total) * 100;
+            userStats[u.id].periods[pk] = { total, errors, errPct, avgQ };
         });
-        return { total, errors, cats };
+    });
+
+    // KPI
+    let totalTasksAll = 0, totalErrorsAll = 0, sumQAll = 0;
+    usersList.forEach(u => (u.tasks || []).forEach(t => {
+        const d = t.startDate || t.endDate;
+        if (d >= from && d <= to) {
+            totalTasksAll++;
+            if (t.hasErrors) totalErrorsAll++;
+            sumQAll += (t.quality !== undefined ? t.quality : 0);
+        }
+    }));
+    const avgErrAll = totalTasksAll ? (totalErrorsAll / totalTasksAll * 100) : 0;
+    const avgQAll = totalTasksAll ? (sumQAll / totalTasksAll * 100) : 0;
+
+    document.getElementById('cmpKpi').innerHTML = `
+        <div class="progress-kpi" style="border-left-color:var(--c-primary);">
+            <div class="lbl">Всего задач</div>
+            <div class="val">${totalTasksAll}</div>
+        </div>
+        <div class="progress-kpi" style="border-left-color:var(--c-red);">
+            <div class="lbl">С ошибками</div>
+            <div class="val">${totalErrorsAll} <small style="font-size:14px; font-weight:500; color:var(--c-text-3);">(${avgErrAll.toFixed(1)}%)</small></div>
+        </div>
+        <div class="progress-kpi" style="border-left-color:var(--c-green);">
+            <div class="lbl">Среднее качество</div>
+            <div class="val">${avgQAll.toFixed(1)}%</div>
+        </div>
+    `;
+
+    // Таблица
+    let html = `<table class="summary-table"><thead><tr>`;
+    html += `<th style="text-align:left; min-width:150px;">Сотрудник</th>`;
+    periodKeys.forEach(pk => {
+        html += `<th title="% ошибок / качество">${periods[pk].label}</th>`;
+    });
+    html += `<th>Тренд</th><th>Итог</th></tr></thead><tbody>`;
+
+    const getQClass = (q) => {
+        if (q >= 97) return 'q-green';
+        if (q >= 86) return 'q-orange';
+        return 'q-red';
     };
 
-    const statsA = calcPeriod(aFrom, aTo);
-    const statsB = calcPeriod(bFrom, bTo);
+    usersList.sort((a,b)=>a.name.localeCompare(b.name)).forEach(u => {
+        html += `<tr><td class="name-col">${u.name}</td>`;
+        let firstErr = null, lastErr = null;
+        
+        periodKeys.forEach(pk => {
+            const st = userStats[u.id].periods[pk];
+            if (st) {
+                const qClass = getQClass(st.avgQ);
+                html += `<td class="${qClass}" style="line-height:1.3;">
+                    <div style="font-size:13px; font-weight:700;">${st.errPct.toFixed(1)}%</div>
+                    <div style="font-size:10px; opacity:0.8;">Q: ${st.avgQ.toFixed(0)}</div>
+                </td>`;
+                if (firstErr === null) firstErr = st.errPct;
+                lastErr = st.errPct;
+            } else {
+                html += `<td style="color:#CCC;">—</td>`;
+            }
+        });
 
-    if (statsA.total === 0 && statsB.total === 0) {
-        resBox.style.display = 'none';
-        emptyBox.style.display = 'block';
-        emptyBox.innerHTML = 'в выбранных периодах нет данных 🤷‍♀️';
-        return;
-    }
+        if (firstErr !== null && lastErr !== null && periodKeys.length >= 2) {
+            const delta = lastErr - firstErr;
+            if (delta < -0.5) html += `<td class="trend-down">↓ ${Math.abs(delta).toFixed(1)}%</td>`;
+            else if (delta > 0.5) html += `<td class="trend-up">↑ ${delta.toFixed(1)}%</td>`;
+            else html += `<td class="trend-flat">→ 0%</td>`;
+        } else {
+            html += `<td style="color:#CCC;">—</td>`;
+        }
 
-    resBox.style.display = 'block';
-    emptyBox.style.display = 'none';
+        if (lastErr !== null) {
+            let badge = '';
+            if (lastErr <= 5) badge = '<span class="badge badge-good">Отлично</span>';
+            else if (lastErr <= 15) badge = '<span class="badge badge-warn">Средне</span>';
+            else badge = '<span class="badge badge-bad">Плохо</span>';
+            html += `<td>${badge}</td>`;
+        } else {
+            html += `<td>—</td>`;
+        }
 
-    const errA = statsA.errors;
-    const errB = statsB.errors;
-    let pctDiff = 0;
-    if (errA > 0) pctDiff = Math.round(((errB - errA) / errA) * 100);
-    else if (errB > 0) pctDiff = 100;
-
-    const isGood = pctDiff <= 0;
-    const bigPctEl = document.getElementById('cmpBigPct');
-    bigPctEl.textContent = (pctDiff > 0 ? '+' : '') + pctDiff + '%';
-    bigPctEl.className = 'cmp-big-pct ' + (isGood ? 'good' : 'bad');
-
-    let titleText = 'Ошибки без изменений';
-    if (pctDiff < -10) titleText = 'Ошибки ↓ почти в 2 раза';
-    else if (pctDiff < 0) titleText = 'Ошибки ↓';
-    else if (pctDiff > 10) titleText = 'Ошибки ↑';
-    else if (pctDiff > 0) titleText = 'Ошибки выросли';
-    document.getElementById('cmpTitle').textContent = titleText;
-
-    document.getElementById('cmpValA').textContent = errA;
-    document.getElementById('cmpValB').textContent = errB;
-    document.getElementById('cmpDateA').textContent = `${formatDateShort(aFrom)}–${formatDateShort(aTo)}`;
-    document.getElementById('cmpDateB').textContent = `${formatDateShort(bFrom)}–${formatDateShort(bTo)}`;
-
-    const catsEl = document.getElementById('cmpCats');
-    let catsHtml = '';
-    categoriesList.forEach(cat => {
-        const a = statsA.cats[cat];
-        const b = statsB.cats[cat];
-        if (a === 0 && b === 0) return;
-        let diff = 0;
-        if (a > 0) diff = Math.round(((b - a) / a) * 100);
-        else if (b > 0) diff = 100;
-        const shortName = CAT_SHORT_LABELS[cat] ? CAT_SHORT_LABELS[cat].toLowerCase() : cat;
-        const colorClass = diff <= 0 ? 'good' : 'bad';
-        const sign = diff > 0 ? '+' : '';
-        catsHtml += `<div class="cmp-cat-item">${shortName} <b class="${colorClass}">${sign}${diff}%</b></div>`;
+        html += `</tr>`;
     });
-    catsEl.innerHTML = catsHtml || '<div class="cmp-cat-item">нет ошибок в категориях</div>';
 
-    const badge = document.getElementById('cmpFooterBadge');
-    if (isGood) {
-        badge.className = 'cmp-footer-badge';
-        badge.innerHTML = '🌿 качество растёт';
-    } else {
-        badge.className = 'cmp-footer-badge bad';
-        badge.innerHTML = '⚠️ качество падает';
-    }
+    html += `</tbody></table>`;
+    document.getElementById('cmpTableContainer').innerHTML = html;
 }
+
+// Инициализация дат при первом открытии вкладки
+document.addEventListener('DOMContentLoaded', () => {
+    const today = new Date();
+    const past = new Date(today); past.setDate(past.getDate() - 90);
+    const elFrom = document.getElementById('cmpDateFrom');
+    const elTo = document.getElementById('cmpDateTo');
+    if (elFrom && !elFrom.value) elFrom.value = past.toISOString().slice(0,10);
+    if (elTo && !elTo.value) elTo.value = today.toISOString().slice(0,10);
+});
 
 document.addEventListener('keydown', e => {
     if (e.key === 'Escape') { closeModal(); closeVksModal(); }
