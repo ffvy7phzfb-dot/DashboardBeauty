@@ -4529,7 +4529,8 @@ document.addEventListener('keydown', e => {
     window.switchTab = function(tabId, btn) {
         if (typeof originalSwitchTab === 'function') originalSwitchTab(tabId, btn);
         if (tabId === 'manager-report') {
-            renderManagerReport();
+            // Небольшая задержка, чтобы данные успели подгрузиться
+            setTimeout(renderManagerReport, 100); 
         }
     };
 
@@ -4561,7 +4562,12 @@ document.addEventListener('keydown', e => {
         
         // Проверяем, загружены ли данные
         if (!window.globalReport || window.globalReport.length === 0) {
-            body.innerHTML = '<p style="color:var(--c-red); text-align:center; padding:20px; font-weight:600;">Данные не найдены. Вернитесь на вкладку «Сводка» и нажмите «загрузить и обработать».</p>';
+            body.innerHTML = `
+                <div style="text-align:center; padding:40px;">
+                    <p style="color:var(--c-text-2); margin-bottom:16px;">Сначала загрузите данные в «Сводке», затем нажмите кнопку ниже.</p>
+                    <button class="btn-load" onclick="renderManagerReport()" style="padding:10px 24px;">🔄 Я загрузил данные, обновить</button>
+                </div>
+            `;
             return;
         }
 
