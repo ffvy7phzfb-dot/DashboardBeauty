@@ -1398,6 +1398,21 @@ async function doLogin() {
             return;
         }
         currentUser = data.user;
+        
+        // --- СОХРАНЯЕМ СЕССИЮ ДЛЯ БЫСТРОГО ПЕРЕКЛЮЧЕНИЯ ---
+        const { data: sessionData } = await supabaseClient.auth.getSession();
+        if (sessionData.session) {
+            let saved = JSON.parse(localStorage.getItem('saved_supabase_sessions') || '[]');
+            saved = saved.filter(s => s.user.email !== currentUser.email); // Убираем старую копию
+            saved.push({ user: currentUser, session: sessionData.session, lastUsed: Date.now() });
+            localStorage.setItem('saved_supabase_sessions', JSON.stringify(saved));
+            
+            // Показываем кнопку "Сменить аккаунт"
+            const btn = document.getElementById('switchAccountBtn');
+            if (btn) btn.style.display = 'inline-block';
+        }
+        // --------------------------------------------------
+
         document.getElementById('authScreen').style.display = 'none';
         document.getElementById('appScreen').style.display = 'block';
         await loadUserData();
@@ -1408,10 +1423,13 @@ async function doLogin() {
 }
 
 async function logoutUser() {
+    const isSure = confirm('Выйти из текущего аккаунта? (Данные входа сохранятся для быстрого переключения)');
+    if (!isSure) return;
+    
+    // Сессия уже сохранена при входе, поэтому просто выходим
     await supabaseClient.auth.signOut();
     location.reload();
 }
-
 function applyAllSettings(settings) {
     if (!settings) return;
     if (settings.filters) {
