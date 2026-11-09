@@ -625,16 +625,15 @@ table.progress-table td.period-col { text-align: left; font-weight: 600; color: 
 </div>
 
 <div id="appScreen">
-    <div class="app-header">
-        <h1>Дашборд</h1>
         <div class="header-actions">
             <a href="https://ffvy7phzfb-dot.github.io/Analytic-/" target="_blank" class="btn-header ghost">AI Аналитик</a>
+            <button class="btn-header ghost" onclick="openAccountSwitcher()" style="display:none;" id="switchAccountBtn">🔄 Сменить аккаунт</button>
             <button class="btn-header danger" onclick="logoutUser()">Выйти</button>
         </div>
-    </div>
 
     <div class="main-tabs">
         <button class="main-tab-btn active" onclick="switchTab('main', this)">📊 Сводка</button>
+        <button class="main-tab-btn" onclick="switchTab('projects', this)">🏗 Проекты</button>
         <button class="main-tab-btn" onclick="switchTab('progress', this)">📈 Общий прогресс</button>
         <button class="main-tab-btn" onclick="switchTab('vks-import', this)">📥 ВКС из отчёта</button>
         <button class="main-tab-btn" onclick="switchTab('quality', this)">🌟 Качество</button>
@@ -4453,7 +4452,9 @@ document.addEventListener('keydown', e => {
 </script>
 <script>
 (function() {
-    // 1. Добавляем кнопку в главное меню
+    // ==========================================
+    // 1. ВКЛАДКА "ИТОГОВЫЙ ОТЧЁТ"
+    // ==========================================
     const tabsContainer = document.querySelector('.main-tabs');
     if (tabsContainer && !document.getElementById('btn-manager-report')) {
         const btn = document.createElement('button');
@@ -4464,30 +4465,20 @@ document.addEventListener('keydown', e => {
         tabsContainer.appendChild(btn);
     }
 
-    // 2. Добавляем саму вкладку в HTML
     const appScreen = document.getElementById('appScreen');
     if (appScreen && !document.getElementById('tab-manager-report')) {
         const tabDiv = document.createElement('div');
         tabDiv.className = 'tab-content';
         tabDiv.id = 'tab-manager-report';
-                tabDiv.innerHTML = `
+        tabDiv.innerHTML = `
             <div class="container">
                 <div class="box" style="min-width:100%;">
                     <!-- ПЛАШКА "В РАЗРАБОТКЕ" -->
-                    <div style="
-                        display:flex; align-items:center; gap:12px;
-                        background:linear-gradient(135deg,#FFF3CD 0%,#FFE8CC 100%);
-                        border:1px solid #FFD8A8; border-left:4px solid var(--c-orange);
-                        border-radius:var(--r-md); padding:14px 18px; margin-bottom:20px;
-                        color:var(--c-orange-text); font-size:14px; font-weight:600; line-height:1.5;
-                        box-shadow:0 2px 8px rgba(255,149,0,0.12);
-                    ">
+                    <div style="display:flex; align-items:center; gap:12px; background:linear-gradient(135deg,#FFF3CD 0%,#FFE8CC 100%); border:1px solid #FFD8A8; border-left:4px solid var(--c-orange); border-radius:var(--r-md); padding:14px 18px; margin-bottom:20px; color:var(--c-orange-text); font-size:14px; font-weight:600; line-height:1.5; box-shadow:0 2px 8px rgba(255,149,0,0.12);">
                         <span style="font-size:22px; flex-shrink:0;">🚧</span>
                         <div>
                             <div style="font-size:15px; font-weight:700; margin-bottom:2px;">Раздел в разработке</div>
-                            <div style="font-size:13px; font-weight:500; opacity:0.85;">
-                                Отчёт формируется в тестовом режиме — данные могут быть неполными, а расчёты ещё уточняются.
-                            </div>
+                            <div style="font-size:13px; font-weight:500; opacity:0.85;">Отчёт формируется в тестовом режиме — данные могут быть неполными, а расчёты ещё уточняются.</div>
                         </div>
                     </div>
                     <!-- /ПЛАШКА -->
@@ -4543,17 +4534,40 @@ document.addEventListener('keydown', e => {
         appScreen.appendChild(tabDiv);
     }
 
-    // 3. Перехватываем переключение вкладок, чтобы отрисовывать отчёт
+    // --- ВКЛАДКА ПРОЕКТОВ ---
+    if (appScreen && !document.getElementById('tab-projects')) {
+        const tabDiv = document.createElement('div');
+        tabDiv.className = 'tab-content';
+        tabDiv.id = 'tab-projects';
+        tabDiv.innerHTML = `
+            <div class="container">
+                <div class="box" style="min-width:100%;">
+                    <h3>Управление проектами</h3>
+                    <p>Создавай отдельные пулы, чтобы не смешивать статистику. Выбери проект, чтобы работать с ним.</p>
+                    
+                    <div style="display:flex; gap:10px; margin-bottom:20px; background:var(--c-surface-2); padding:16px; border-radius:var(--r-md); border:1px solid var(--c-border-soft);">
+                        <input type="text" id="newProjectName" placeholder="Название нового проекта (например, Пул 1)..." style="flex:1; padding:10px 14px; border:1px solid var(--c-border); border-radius:8px; font-family:inherit; font-size:14px; background:var(--c-surface); color:var(--c-text); outline:none;">
+                        <button class="btn-load" onclick="createProjectFromTab()" style="padding:10px 20px;">➕ Создать</button>
+                    </div>
+
+                    <div id="projectsListContainer" style="display:flex; flex-wrap:wrap; gap:12px;"></div>
+                </div>
+            </div>
+        `;
+        appScreen.appendChild(tabDiv);
+    }
+
     const originalSwitchTab = window.switchTab;
     window.switchTab = function(tabId, btn) {
         if (typeof originalSwitchTab === 'function') originalSwitchTab(tabId, btn);
         if (tabId === 'manager-report') {
-            // Небольшая задержка, чтобы данные успели подгрузиться
             setTimeout(renderManagerReport, 100); 
+        }
+        if (tabId === 'projects') {
+            renderProjectsTab();
         }
     };
 
-    // 4. Инициализация дат при первом открытии
     window.applyReportPreset = function(val) {
         const fromEl = document.getElementById('repDateFrom');
         const toEl = document.getElementById('repDateTo');
@@ -4574,13 +4588,10 @@ document.addEventListener('keydown', e => {
         if (typeof showToast === 'function') showToast('комментарий сохранён');
     };
 
-    // 5. Основная логика отрисовки
-    // 5. Основная логика отрисовки
     window.renderManagerReport = function() {
         const body = document.getElementById('repBody');
         if (!body) return;
 
-        // Если глобальная переменная пуста, пробуем взять данные из "Сводки"
         let users = window.globalReport;
         if (!users || users.length === 0) {
             body.innerHTML = `
@@ -4626,8 +4637,6 @@ document.addEventListener('keydown', e => {
             renderReportUsers(cur, old) +
             renderReportHeatmap(filteredUsers, from, to);
     };
-
-    // --- Вспомогательные функции ---
 
     function aggregateReportPeriod(users, from, to) {
         let total = 0, errors = 0, qSum = 0;
@@ -4884,8 +4893,6 @@ document.addEventListener('keydown', e => {
         return html;
     }
 
-    // --- Экспорт и Drill-down ---
-    
     window.exportManagerReportExcel = function() {
         if (!window.globalReport || !window.globalReport.length) { alert('нет данных'); return; }
         if (typeof XLSX === 'undefined') { alert('XLSX не подключён'); return; }
@@ -4978,19 +4985,175 @@ document.addEventListener('keydown', e => {
         drillModal.classList.add('open');
     };
 
-    // Задаем дефолтные даты при инициализации
-    window.addEventListener('load', () => {
+    // ==========================================
+    // 2. ПРОЕКТЫ И АККАУНТЫ
+    // ==========================================
+    window.myProjects = [];
+    let currentProjectId = 'default';
+
+    window.renderProjectsTab = function() {
+        const container = document.getElementById('projectsListContainer');
+        if (!container) return;
+        
+        let html = `
+            <div style="padding:16px; border:2px solid ${currentProjectId === 'default' ? 'var(--c-primary)' : 'var(--c-border)'}; border-radius:12px; min-width:200px; cursor:pointer; background:var(--c-surface);" onclick="switchProject('default')">
+                <h4 style="margin:0 0 8px 0; font-size:16px;">Общий проект</h4>
+                <div style="font-size:12px; color:var(--c-text-2);">По умолчанию</div>
+                ${currentProjectId === 'default' ? '<div style="margin-top:10px; color:var(--c-primary); font-weight:bold; font-size:12px;">✓ Активен</div>' : ''}
+            </div>
+        `;
+
+        (window.myProjects || []).forEach(p => {
+            const isActive = currentProjectId === p.id;
+            html += `
+                <div style="padding:16px; border:2px solid ${isActive ? 'var(--c-primary)' : 'var(--c-border)'}; border-radius:12px; min-width:200px; cursor:pointer; background:var(--c-surface); position:relative;" onclick="switchProject('${p.id}')">
+                    <h4 style="margin:0 0 8px 0; font-size:16px;">${p.name}</h4>
+                    <div style="font-size:12px; color:var(--c-text-2);">Создан: ${p.date || '—'}</div>
+                    ${isActive ? '<div style="margin-top:10px; color:var(--c-primary); font-weight:bold; font-size:12px;">✓ Активен</div>' : ''}
+                    <button onclick="event.stopPropagation(); deleteProject('${p.id}')" style="position:absolute; top:10px; right:10px; background:none; border:none; cursor:pointer; font-size:16px; color:var(--c-text-3);" title="Удалить">🗑</button>
+                </div>
+            `;
+        });
+
+        container.innerHTML = html;
+    };
+
+    window.createProjectFromTab = function() {
+        const input = document.getElementById('newProjectName');
+        const name = input.value.trim();
+        if (!name) return alert('Введите название проекта');
+
+        const newProject = { 
+            id: 'proj_' + Date.now(), 
+            name: name, 
+            date: new Date().toISOString().slice(0, 10) 
+        };
+        
+        if (!window.myProjects) window.myProjects = [];
+        window.myProjects.push(newProject);
+        
+        input.value = '';
+        
+        if (typeof saveToCloud === 'function') saveToCloud();
+        
+        renderProjectsTab();
+        renderProjectsDropdown();
+        showToast('Проект создан');
+    };
+
+    window.deleteProject = function(id) {
+        if (!confirm('Удалить проект? Данные останутся в базе, но пропадут из вида.')) return;
+        
+        window.myProjects = (window.myProjects || []).filter(p => p.id !== id);
+        if (currentProjectId === id) {
+            currentProjectId = 'default';
+        }
+        
+        if (typeof saveToCloud === 'function') saveToCloud();
+        
+        renderProjectsTab();
+        renderProjectsDropdown();
+        applyFilters();
+    };
+
+    window.switchProject = function(id) {
+        currentProjectId = id;
+        renderProjectsTab();
+        renderProjectsDropdown();
+        applyFilters();
+        if (typeof renderManagerReport === 'function') renderManagerReport();
+        showToast('Проект переключен');
+    };
+
+    window.renderProjectsDropdown = function() {
+        const sel = document.getElementById('projectSelector');
+        if (!sel) return;
+        sel.innerHTML = '<option value="default">Общий проект</option>';
+        (window.myProjects || []).forEach(p => {
+            const opt = document.createElement('option');
+            opt.value = p.id;
+            opt.textContent = p.name;
+            sel.appendChild(opt);
+        });
+        sel.value = currentProjectId;
+    };
+
+    window.openAccountSwitcher = function() {
+        const savedSessions = JSON.parse(localStorage.getItem('saved_supabase_sessions') || '[]');
+        
+        let html = `
+            <div style="background:var(--c-surface); border-radius:var(--r-lg); padding:20px; max-width:400px; margin:0 auto;">
+                <h3 style="margin-top:0; margin-bottom:16px;">Сохраненные аккаунты</h3>
+                <div style="display:flex; flex-direction:column; gap:10px;">
+        `;
+        
+        if (savedSessions.length === 0) {
+            html += `<p style="color:var(--c-text-3);">Нет сохраненных аккаунтов.</p>`;
+        } else {
+            savedSessions.forEach(s => {
+                const isCurrent = currentUser && currentUser.email === s.user.email;
+                html += `
+                    <div style="display:flex; align-items:center; justify-content:space-between; padding:12px; border:1px solid var(--c-border); border-radius:8px; background:${isCurrent ? 'var(--c-primary-soft)' : 'var(--c-surface)'};">
+                        <div>
+                            <b style="font-size:14px;">${s.user.email}</b>
+                            <div style="font-size:11px; color:var(--c-text-3);">Последний вход: ${new Date(s.lastUsed).toLocaleDateString()}</div>
+                        </div>
+                        ${isCurrent 
+                            ? `<span style="font-size:12px; color:var(--c-primary); font-weight:bold;">Активен</span>` 
+                            : `<button class="btn-load" onclick="switchToAccount('${s.user.email}')" style="padding:6px 12px; font-size:12px;">Войти</button>`
+                        }
+                        <button onclick="removeSavedAccount('${s.user.email}')" style="background:none; border:none; color:var(--c-red); cursor:pointer; font-size:16px;" title="Забыть аккаунт">×</button>
+                    </div>
+                `;
+            });
+        }
+        
+        html += `
+                </div>
+                <div style="margin-top:20px; text-align:right;">
+                    <button class="btn-cancel" onclick="closeModal()" style="padding:8px 16px;">Закрыть</button>
+                </div>
+            </div>
+        `;
+        
+        document.getElementById('modalContent').innerHTML = html;
+        document.getElementById('modalOverlay').classList.add('open');
+    };
+
+    window.switchToAccount = async function(email) {
+        const savedSessions = JSON.parse(localStorage.getItem('saved_supabase_sessions') || '[]');
+        const targetSession = savedSessions.find(s => s.user.email === email);
+        
+        if (!targetSession || !targetSession.session) {
+            alert('Ошибка: сессия не найдена. Возможно, она устарела. Войдите вручную.');
+            return;
+        }
+        
+        closeModal();
+        showToast('Переключаемся...');
+        
+        const { error } = await supabaseClient.auth.setSession(targetSession.session);
+        if (error) {
+            alert('Не удалось восстановить сессию: ' + error.message);
+            return;
+        }
+        location.reload();
+    };
+
+    window.removeSavedAccount = function(email) {
+        if (!confirm('Забыть этот аккаунт?')) return;
+        let savedSessions = JSON.parse(localStorage.getItem('saved_supabase_sessions') || '[]');
+        savedSessions = savedSessions.filter(s => s.user.email !== email);
+        localStorage.setItem('saved_supabase_sessions', JSON.stringify(savedSessions));
+        openAccountSwitcher();
+    };
+
+    document.addEventListener('DOMContentLoaded', () => {
         setTimeout(() => {
-            const fromEl = document.getElementById('repDateFrom');
-            const toEl = document.getElementById('repDateTo');
-            if (fromEl && !fromEl.value) {
-                const t = new Date(); t.setDate(t.getDate() - 30);
-                fromEl.value = t.toISOString().slice(0,10);
-            }
-            if (toEl && !toEl.value) toEl.value = new Date().toISOString().slice(0,10);
-            
-            if (window.globalReport && window.globalReport.length > 0) {
-                renderManagerReport();
+            const savedSessions = JSON.parse(localStorage.getItem('saved_supabase_sessions') || '[]');
+            if (savedSessions.length > 0) {
+                const btn = document.getElementById('switchAccountBtn');
+                if (btn) btn.style.display = 'inline-block';
             }
         }, 1000);
     });
