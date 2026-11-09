@@ -5179,12 +5179,16 @@ document.addEventListener('keydown', e => {
         openAccountSwitcher();
     };
 
-    document.addEventListener('DOMContentLoaded', () => {
+      document.addEventListener('DOMContentLoaded', () => {
         setTimeout(() => {
-            const savedSessions = JSON.parse(localStorage.getItem('saved_supabase_sessions') || '[]');
-            if (savedSessions.length > 0) {
-                const btn = document.getElementById('switchAccountBtn');
-                if (btn) btn.style.display = 'inline-block';
+            try {
+                const savedSessions = JSON.parse(localStorage.getItem('saved_supabase_sessions') || '[]');
+                if (savedSessions.length > 0) {
+                    const btn = document.getElementById('switchAccountBtn');
+                    if (btn) btn.style.display = 'inline-block';
+                }
+            } catch (e) {
+                console.warn('Ошибка проверки аккаунтов', e);
             }
         }, 1000);
     });
