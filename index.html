@@ -1792,10 +1792,10 @@ function processData() {
 
         user.tasks.push({
             startDate: startDateOnly, endDate: endDateOnly,
-            hasErrors: taskHasErrors, cats: taskCats, quality: qNum
+            hasErrors: taskHasErrors, cats: taskCats, quality: qNum,
+            projectId: typeof currentProjectId !== 'undefined' ? currentProjectId : 'default' // <--- ДОБАВИЛИ ЭТО
         });
-    });
-
+        
     globalReport = Object.values(report);
     populateFilters();
     populateCompareTargets();
@@ -1843,6 +1843,11 @@ function applyFilters() {
         .filter(u => !(userCards[u.id] && userCards[u.id].archived))
         .map(user => {
             const tasksInPeriod = user.tasks.filter(t => {
+                // Фильтр по проекту (если выбран не "Общий", показываем только его задачи)
+                if (typeof currentProjectId !== 'undefined' && currentProjectId !== 'default') {
+                    if (t.projectId !== currentProjectId) return false;
+                }
+                
                 if (fDateFrom && t.endDate && t.endDate < fDateFrom) return false;
                 if (fDateTo   && t.startDate && t.startDate > fDateTo) return false;
                 return true;
@@ -5078,8 +5083,16 @@ document.addEventListener('keydown', e => {
         currentProjectId = id;
         renderProjectsTab();
         renderProjectsDropdown();
-        applyFilters();
+        
+        // Перерисовываем всё, что зависит от данных
+        applyFilters(); // Обновляет "Сводку"
+        if (typeof renderWeekProgress === 'function') renderWeekProgress();
+        if (typeof renderCompareGeneral === 'function') renderCompareGeneral();
+        if (typeof renderCompareTable === 'function') renderCompareTable();
+        if (typeof renderProgress === 'function') renderProgress();
+        if (typeof renderDynProfile === 'function') renderDynProfile();
         if (typeof renderManagerReport === 'function') renderManagerReport();
+        
         showToast('Проект переключен');
     };
 
