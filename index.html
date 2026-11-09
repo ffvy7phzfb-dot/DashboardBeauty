@@ -1792,10 +1792,10 @@ function processData() {
 
         user.tasks.push({
             startDate: startDateOnly, endDate: endDateOnly,
-            hasErrors: taskHasErrors, cats: taskCats, quality: qNum,
-            projectId: typeof currentProjectId !== 'undefined' ? currentProjectId : 'default' // <--- ДОБАВИЛИ ЭТО
+            hasErrors: taskHasErrors, cats: taskCats, quality: qNum
         });
-        
+    });
+
     globalReport = Object.values(report);
     populateFilters();
     populateCompareTargets();
@@ -1843,11 +1843,6 @@ function applyFilters() {
         .filter(u => !(userCards[u.id] && userCards[u.id].archived))
         .map(user => {
             const tasksInPeriod = user.tasks.filter(t => {
-                // Фильтр по проекту (если выбран не "Общий", показываем только его задачи)
-                if (typeof currentProjectId !== 'undefined' && currentProjectId !== 'default') {
-                    if (t.projectId !== currentProjectId) return false;
-                }
-                
                 if (fDateFrom && t.endDate && t.endDate < fDateFrom) return false;
                 if (fDateTo   && t.startDate && t.startDate > fDateTo) return false;
                 return true;
@@ -5083,16 +5078,8 @@ document.addEventListener('keydown', e => {
         currentProjectId = id;
         renderProjectsTab();
         renderProjectsDropdown();
-        
-        // Перерисовываем всё, что зависит от данных
-        applyFilters(); // Обновляет "Сводку"
-        if (typeof renderWeekProgress === 'function') renderWeekProgress();
-        if (typeof renderCompareGeneral === 'function') renderCompareGeneral();
-        if (typeof renderCompareTable === 'function') renderCompareTable();
-        if (typeof renderProgress === 'function') renderProgress();
-        if (typeof renderDynProfile === 'function') renderDynProfile();
+        applyFilters();
         if (typeof renderManagerReport === 'function') renderManagerReport();
-        
         showToast('Проект переключен');
     };
 
@@ -5179,16 +5166,12 @@ document.addEventListener('keydown', e => {
         openAccountSwitcher();
     };
 
-      document.addEventListener('DOMContentLoaded', () => {
+    document.addEventListener('DOMContentLoaded', () => {
         setTimeout(() => {
-            try {
-                const savedSessions = JSON.parse(localStorage.getItem('saved_supabase_sessions') || '[]');
-                if (savedSessions.length > 0) {
-                    const btn = document.getElementById('switchAccountBtn');
-                    if (btn) btn.style.display = 'inline-block';
-                }
-            } catch (e) {
-                console.warn('Ошибка проверки аккаунтов', e);
+            const savedSessions = JSON.parse(localStorage.getItem('saved_supabase_sessions') || '[]');
+            if (savedSessions.length > 0) {
+                const btn = document.getElementById('switchAccountBtn');
+                if (btn) btn.style.display = 'inline-block';
             }
         }, 1000);
     });
