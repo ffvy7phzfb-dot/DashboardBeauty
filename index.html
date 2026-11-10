@@ -624,9 +624,15 @@ table.progress-table td.period-col { text-align: left; font-weight: 600; color: 
 </div>
 
 <div id="appScreen">
-    <div class="app-header">
-        <h1>Дашборд</h1>
-        <div class="header-actions">
+<div class="app-header">
+    <div style="display:flex; align-items:center; gap:12px; flex:1; min-width:220px; flex-wrap:wrap;">
+        <h1 style="margin:0; text-align:left; font-size:24px;">Дашборд</h1>
+        <select id="projectSelector" onchange="switchProject(this.value)"
+                style="padding:8px 14px; border:1px solid var(--c-border); border-radius:10px; font-family:inherit; font-size:14px; font-weight:600; background:var(--c-surface); color:var(--c-text); cursor:pointer; box-shadow:var(--sh-1); outline:none; min-width:180px;">
+            <option value="default">📁 Общий проект</option>
+        </select>
+    </div>
+    <div class="header-actions">
             <a href="https://ffvy7phzfb-dot.github.io/Analytic-/" target="_blank" class="btn-header ghost">AI Аналитик</a>
             <button class="btn-header ghost" onclick="openAccountSwitcher()" style="display:none;" id="switchAccountBtn">🔄 Сменить аккаунт</button>
             <button class="btn-header danger" onclick="logoutUser()">Выйти</button>
@@ -653,7 +659,7 @@ table.progress-table td.period-col { text-align: left; font-weight: 600; color: 
             </div>
             <div class="box">
                 <h3>2. Тренеры</h3>
-                <p>вставь Фаимилию и UUID. формат: <b>Фамилия</b> — через Tab с ID.</p>
+                <p>вставь фамилию и UUID. формат: <b>Фамилия</b> — через Tab с ID.</p>
                 <textarea id="namesData" placeholder="Иванов 81977398-70..."></textarea>
             </div>
             <div class="box">
@@ -1337,6 +1343,18 @@ async function saveToCloud() {
         const namesText = document.getElementById('namesData') ? document.getElementById('namesData').value : '';
         const settings = collectAllSettings();
 
+        // ✅ Сохраняем данные текущего проекта в его объект (в памяти)
+        if (window.currentProjectId === 'default') {
+            window._defaultMainData = mainText;
+            window._defaultNamesData = namesText;
+        } else {
+            const proj = (window.myProjects || []).find(p => p.id === window.currentProjectId);
+            if (proj) {
+                proj.mainData = mainText;
+                proj.namesData = namesText;
+            }
+        }
+
         const { error } = await supabaseClient
             .from('user_data')
             .upsert({
@@ -1527,7 +1545,10 @@ async function loadUserData() {
         userPaints = data.user_paints || {};
         userCards = data.user_cards || {};
         userVks = data.user_vks || {};
-        window.myProjects = data.projects_data || [];
+    window.myProjects = data.projects_data || [];
+// ✅ Инициализируем данные «Общего проекта» (если пользователь был в проекте при сохранении — main_data принадлежит ему; это ограничение, но допустимое)
+window._defaultMainData = data.main_data || '';
+window._defaultNamesData = data.names_data || '';
         if (data.main_data) document.getElementById('mainData').value = data.main_data;
         if (data.names_data) document.getElementById('namesData').value = data.names_data;
         
@@ -1546,6 +1567,7 @@ async function loadUserData() {
                     if (data.settings.ai) { populateAiTargets(); renderAiAnalysis(); }
                     if (data.settings.filters) applyFilters();
                     if (typeof renderProjectsTab === 'function') renderProjectsTab();
+                    if (typeof renderProjectsDropdown === 'function') renderProjectsDropdown();
                 }, 150);
             }
         }
@@ -5127,24 +5149,74 @@ document.addEventListener('keydown', e => {
         applyFilters();
     };
 
-    window.switchProject = function(id) {
-        window.currentProjectId = id;
-        // ✅ Синхронизируем глобальную переменную
-        try { currentProjectId = id; } catch(e) {}
-        
-        renderProjectsTab();
-        renderProjectsDropdown();
-        
-        applyFilters(); 
-        if (typeof renderWeekProgress === 'function') renderWeekProgress();
-        if (typeof renderCompareGeneral === 'function') renderCompareGeneral();
-        if (typeof renderCompareTable === 'function') renderCompareTable();
-        if (typeof renderProgress === 'function') renderProgress();
-        if (typeof renderDynProfile === 'function') renderDynProfile();
-        if (typeof renderManagerReport === 'function') renderManagerReport();
-        
-        showToast('Проект переключен');
-    };
+window.switchProject = function(id) {
+    if (id === window.currentProjectId) return;
+
+    // 1) Сохраняем данные текущего проекта перед уходом
+    const curMain = document.getElementById('mainData').value;
+    const curNames = document.getElementById('namesData').value;
+    if (window.currentProjectId === 'default') {
+        window._defaultMainData = curMain;
+        window._defaultNamesData = curNames;
+    } else {
+        const oldProj = (window.myProjects || []).find(p => p.id === window.currentProjectId);
+        if (oldProj) {
+            oldProj.mainData = curMain;
+            oldProj.namesData = curNames;
+        }
+    }
+
+    // 2) Переключаем активный проект
+    window.currentProjectId = id;
+    try { currentProjectId = id; } catch(e) {}
+
+    // 3) Подставляем данные нового проекта в поля
+    let newMain = '', newNames = '';
+    if (id === 'default') {
+        newMain = window._defaultMainData || '';
+        newNames = window._defaultNamesData || '';
+    } else {
+        const newProj = (window.myProjects || []).find(p => p.id === id);
+        if (newProj) {
+            newMain = newProj.mainData || '';
+            newNames = newProj.namesData || '';
+        }
+    }
+    document.getElementById('mainData').value = newMain;
+    document.getElementById('namesData').value = newNames;
+
+    // 4) Сбрасываем глобальное состояние
+    globalReport = [];
+    currentFilteredUsers = [];
+
+    // 5) Прячем все панели, зависящие от данных
+    document.getElementById('filtersPanel').style.display = 'none';
+    document.getElementById('marksPanel').style.display = 'none';
+    document.getElementById('exportBtn').style.display = 'none';
+    document.getElementById('tabsSection').style.display = 'none';
+    document.getElementById('weekProgressBlock').style.display = 'none';
+
+    // 6) Очищаем списки сотрудников
+    document.getElementById('filterUser').innerHTML = '<option value="all">все сотрудники</option>';
+    document.getElementById('cmpTarget').innerHTML = '<option value="all">🌟 Все сотрудники (суммарно)</option>';
+    document.getElementById('aiTarget').innerHTML = '<option value="all">🌟 Все сотрудники</option>';
+    document.getElementById('tabsList').innerHTML = '';
+    document.getElementById('qEmpChips').innerHTML = '<span style="font-size:12px; color:var(--c-text-3);">сначала нажми «посчитать», чтобы появился список сотрудников.</span>';
+
+    // 7) Заглушка в сводке
+    const out = document.getElementById('output');
+    if (newMain.trim()) {
+        out.innerHTML = '<h3 style="text-align:center; color:var(--c-text-3); font-size:14px;">данные проекта загружены — нажми «загрузить и обработать»</h3>';
+    } else {
+        out.innerHTML = '<h3 style="text-align:center; color:var(--c-text-3); font-size:14px;">проект пуст — вставь данные и нажми «загрузить и обработать»</h3>';
+    }
+
+    // 8) Обновляем UI проектов
+    renderProjectsTab();
+    renderProjectsDropdown();
+
+    showToast(id === 'default' ? 'Общий проект' : 'Проект переключен');
+};
 
     window.renderProjectsDropdown = function() {
         const sel = document.getElementById('projectSelector');
