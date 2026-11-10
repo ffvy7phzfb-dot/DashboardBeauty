@@ -957,7 +957,7 @@ table.progress-table td.period-col { text-align: left; font-weight: 600; color: 
         <div class="container">
             <div class="box" style="min-width:100%;">
                 <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:20px;">
-                    <h3 style="margin:0;">Итоговый отчёт для опер-менеджера</h3>
+                    <h3 style="margin:0;">Итоговый отчё</h3>
                     <div style="display:flex; gap:8px; flex-wrap:wrap;">
                         <button class="btn-copy" onclick="renderManagerReport()" style="padding:10px 16px;">🔄 Обновить</button>
                         <button class="btn-copy" onclick="exportManagerReportExcel()" style="padding:10px 16px;">📊 Excel</button>
@@ -966,10 +966,10 @@ table.progress-table td.period-col { text-align: left; font-weight: 600; color: 
                 </div>
                 <div class="progress-controls" style="margin-bottom:20px;">
                     <div class="field-group" style="flex:0 0 220px;">
-                        <label>Проект</label>
+                        <label>Пул</label>
                         <select id="repProject" onchange="renderManagerReport()">
-                            <option value="current">📁 Текущий проект</option>
-                            <option value="all">🌐 Все проекты</option>
+                            <option value="current">📁 Текущий пул</option>
+                            <option value="all">🌐 Все пулы</option>
                         </select>
                     </div>
                     <div class="field-group" style="flex:0 0 150px;">
@@ -1061,7 +1061,7 @@ let userMarks = {}; let userPaints = {}; let userCards = {}; let userVks = {}; l
 let calYear, calMonth;
 const now = new Date(); calYear = now.getFullYear(); calMonth = now.getMonth();
 
-// --- ПРОЕКТЫ (синхронизированы с window) ---
+// --- ПУЛЫ (синхронизированы с window) ---
 let currentProjectId = 'default';
 window.currentProjectId = 'default';
 window.myProjects = [];
@@ -1149,7 +1149,7 @@ function collectAllSettings() {
     return settings;
 }
 
-// ✅ ИСПРАВЛЕНО: в БД всегда пишем данные ОБЩЕГО проекта
+// ✅ ИСПРАВЛЕНО: в БД всегда пишем данные ОБЩЕГО пула
 async function saveToCloud() {
     if (!currentUser) return;
     try {
@@ -1157,7 +1157,7 @@ async function saveToCloud() {
         const mainText = document.getElementById('mainData') ? document.getElementById('mainData').value : '';
         const namesText = document.getElementById('namesData') ? document.getElementById('namesData').value : '';
 
-        // Обновляем память текущего проекта
+        // Обновляем память текущего пула
         if (window.currentProjectId === 'default') {
             window._defaultMainData = mainText;
             window._defaultNamesData = namesText;
@@ -1169,7 +1169,7 @@ async function saveToCloud() {
             }
         }
 
-        // В БД main_data = всегда «Общий проект»
+        // В БД main_data = всегда «Общий пул»
         const defaultMain = window._defaultMainData || '';
         const defaultNames = window._defaultNamesData || '';
 
@@ -1683,6 +1683,7 @@ function processData() {
     });
 
     globalReport = Object.values(report);
+    window.globalReport = globalReport;
     populateFilters();
     populateCompareTargets();
     populateAiTargets();
@@ -1748,6 +1749,7 @@ function applyFilters() {
         .filter(Boolean);
 
     renderReport(currentFilteredUsers);
+    window.currentFilteredUsers = currentFilteredUsers;
     renderTabs();
     renderWeekProgress();
 }
