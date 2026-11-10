@@ -1521,7 +1521,6 @@ function openManagerReport(projectMode) {
     
     window._reportProjectMode = projectMode;
     
-    // Переносим блок отчёта в модальное окно
     const modalContent = document.getElementById('modalContent');
     const reportBody = document.getElementById('tab-manager-report').innerHTML;
     modalContent.innerHTML = `
@@ -1529,25 +1528,18 @@ function openManagerReport(projectMode) {
         <div style="padding: 10px;">${reportBody}</div>
     `;
     
-    // Привязываем кнопку "Обновить" и вешаем слушатели на даты
     const modalRenderBtn = modalContent.querySelector('button[onclick="renderManagerReport()"]');
     if (modalRenderBtn) {
-        modalRenderBtn.onclick = () => {
-            // Принудительно читаем новые значения из полей
-            renderManagerReport();
-        };
+        modalRenderBtn.onclick = (e) => { e.preventDefault(); renderManagerReport(); };
     }
 
-    // Вешаем слушатели на изменение дат, чтобы отчёт перерисовывался сам
-    ['repDateFrom', 'repDateTo', 'repPreset', 'repGroup', 'repCompare'].forEach(id => {
+    ['repProject', 'repGroup', 'repDateFrom', 'repDateTo', 'repPreset', 'repCompare'].forEach(id => {
         const el = modalContent.querySelector('#' + id);
         if (el) {
-            el.addEventListener('change', renderManagerReport);
-            el.addEventListener('input', renderManagerReport);
+            el.addEventListener('change', function() { setTimeout(renderManagerReport, 10); });
         }
     });
 
-    // Первичная отрисовка
     renderManagerReport();
     document.getElementById('modalOverlay').classList.add('open');
 }
@@ -2644,7 +2636,18 @@ function calcQuality() {
     const uniqueIds = new Map();
     qAllRows.forEach(r => { if (r.id) uniqueIds.set(r.id, r.name || ''); });
     qAllEmployeeIds = Array.from(uniqueIds.keys());
-    qSelectedEmployees = new Set(qAllEmployeeIds);
+    
+    // ✅ НЕ СБРАСЫВАЕМ ВЫБОР, ЕСЛИ ОН УЖЕ БЫЛ
+    if (!qSelectedEmployees || qSelectedEmployees.size === 0) {
+        qSelectedEmployees = new Set(qAllEmployeeIds);
+    } else {
+        const newSet = new Set();
+        qSelectedEmployees.forEach(id => {
+            if (qAllEmployeeIds.includes(id)) newSet.add(id);
+        });
+        qSelectedEmployees = newSet;
+    }
+    
     renderEmployeeChips();
     applyEmployeeFilter();
     document.getElementById('qCopyBtn').disabled = false;
@@ -3025,13 +3028,21 @@ function exportProgress() {
     const group = document.getElementById('progGroup').value;
     const fromStr = document.getElementById('progFrom').value || null;
     const toStr = document.getElementById('progTo').value || null;
-    const filteredUsers = globalReport.filter(u => {
+    // Берем тех, кто выбран в Сводке. Если там выбрано "все", берем всех
+    const selectedUserId = document.getElementById('filterUser').value;
+    let baseUsers = globalReport;
+    if (selectedUserId && selectedUserId !== 'all') {
+        baseUsers = globalReport.filter(u => u.id === selectedUserId);
+    }
+
+    const filteredUsers = baseUsers.filter(u => {
         if (userCards[u.id]?.archived) return false;
         const m = userMarks[u.id];
         if (group === 'newbie' && m !== 'newbie') return false;
         if (group === 'experienced' && m !== 'experienced') return false;
         return true;
     });
+    
     const buckets = {};
     filteredUsers.forEach(u => {
         (u.tasks || []).forEach(t => {
@@ -4245,8 +4256,11 @@ function renderManagerReport() {
     }
     const projectMode = document.getElementById('repProject').value;
     const group = document.getElementById('repGroup').value;
-    const from = document.getElementById('repDateFrom').value || null;
-    const to = document.getElementById('repDateTo').value || null;
+    // ✅ Ищем поля как в основном окне, так и внутри модального окна
+    const dateFromEl = document.getElementById('repDateFrom');
+    const dateToEl = document.getElementById('repDateTo');
+    const from = dateFromEl ? dateFromEl.value : null;
+    const to = dateToEl ? dateToEl.value : null;
     const filteredUsers = globalReport.filter(u => {
         if (userCards[u.id]?.archived) return false;
         const m = userMarks[u.id];
@@ -4255,7 +4269,8 @@ function renderManagerReport() {
         return true;
     });
     const cur = aggregateReportPeriod(filteredUsers, from, to, projectMode);
-    const doCompare = document.getElementById('repCompare').checked;
+    const compareEl = document.getElementById('repCompare');
+    const doCompare = compareEl ? compareEl.checked : false;
     let old = null, prev = null;
     if (doCompare && from && to) {
         const f = new Date(from + 'T00:00:00');
