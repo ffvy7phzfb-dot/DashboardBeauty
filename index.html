@@ -1528,15 +1528,20 @@ function openManagerReport(projectMode) {
         <div style="padding: 10px;">${reportBody}</div>
     `;
     
+    // ✅ Привязываем кнопку "Обновить"
     const modalRenderBtn = modalContent.querySelector('button[onclick="renderManagerReport()"]');
     if (modalRenderBtn) {
         modalRenderBtn.onclick = (e) => { e.preventDefault(); renderManagerReport(); };
     }
 
+    // ✅ Главное: при изменении любого поля — пересчитываем
     ['repProject', 'repGroup', 'repDateFrom', 'repDateTo', 'repPreset', 'repCompare'].forEach(id => {
         const el = modalContent.querySelector('#' + id);
         if (el) {
-            el.addEventListener('change', function() { setTimeout(renderManagerReport, 10); });
+            // change — для date и select
+            el.addEventListener('change', () => setTimeout(renderManagerReport, 20));
+            // input — на всякий случай для быстрого ввода
+            el.addEventListener('input', () => setTimeout(renderManagerReport, 20));
         }
     });
 
@@ -4254,13 +4259,17 @@ function renderManagerReport() {
         </div>`;
         return;
     }
-    const projectMode = document.getElementById('repProject').value;
-    const group = document.getElementById('repGroup').value;
-    // ✅ Ищем поля как в основном окне, так и внутри модального окна
-    const dateFromEl = document.getElementById('repDateFrom');
-    const dateToEl = document.getElementById('repDateTo');
-    const from = dateFromEl ? dateFromEl.value : null;
-    const to = dateToEl ? dateToEl.value : null;
+
+    // ✅ Ищем поля ВНУТРИ модалки, а если её нет — в основной вкладке
+    const scope = document.getElementById('modalContent');
+    const findEl = (id) => scope ? scope.querySelector('#' + id) : document.getElementById(id);
+
+    const projectMode = (findEl('repProject')?.value) || 'current';
+    const group = (findEl('repGroup')?.value) || 'all';
+    const from = (findEl('repDateFrom')?.value) || null;
+    const to = (findEl('repDateTo')?.value) || null;
+    const doCompare = findEl('repCompare')?.checked || false;
+
     const filteredUsers = globalReport.filter(u => {
         if (userCards[u.id]?.archived) return false;
         const m = userMarks[u.id];
@@ -4268,9 +4277,8 @@ function renderManagerReport() {
         if (group === 'experienced' && m !== 'experienced') return false;
         return true;
     });
+
     const cur = aggregateReportPeriod(filteredUsers, from, to, projectMode);
-    const compareEl = document.getElementById('repCompare');
-    const doCompare = compareEl ? compareEl.checked : false;
     let old = null, prev = null;
     if (doCompare && from && to) {
         const f = new Date(from + 'T00:00:00');
@@ -4281,6 +4289,7 @@ function renderManagerReport() {
         prev = { from: pFrom.toISOString().slice(0,10), to: pTo.toISOString().slice(0,10) };
         old = aggregateReportPeriod(filteredUsers, prev.from, prev.to, projectMode);
     }
+
     body.innerHTML =
         renderReportHeader(from, to, projectMode, group, filteredUsers.length) +
         renderReportKpi(cur, old, prev) +
@@ -4290,7 +4299,6 @@ function renderManagerReport() {
         renderReportDynamics(filteredUsers, from, to, projectMode) +
         renderReportHeatmap(filteredUsers, from, to, projectMode);
 }
-
 function openDrillDown(category, from, to, projectMode) {
     const pid = window.currentProjectId;
     const items = [];
