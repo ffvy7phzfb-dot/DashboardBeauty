@@ -1513,7 +1513,7 @@ function syncQualityFromMain() {
     qNameEl.value = namesText;
     if (infoEl) infoEl.textContent = '✓ данные подставлены из сводки';
 }
-    function openManagerReport(projectMode) {
+function openManagerReport(projectMode) {
     if (!globalReport || globalReport.length === 0) {
         alert('Сначала загрузи данные в сводку (нажми «загрузить и обработать»).');
         return;
@@ -1521,6 +1521,7 @@ function syncQualityFromMain() {
     
     window._reportProjectMode = projectMode;
     
+    // Вставляем HTML отчёта в модалку
     const modalContent = document.getElementById('modalContent');
     const reportBody = document.getElementById('tab-manager-report').innerHTML;
     modalContent.innerHTML = `
@@ -1528,13 +1529,13 @@ function syncQualityFromMain() {
         <div style="padding: 10px;">${reportBody}</div>
     `;
     
-    // Кнопка "Обновить"
+    // Привязываем кнопку "Обновить"
     const modalRenderBtn = modalContent.querySelector('button[onclick="renderManagerReport()"]');
     if (modalRenderBtn) {
         modalRenderBtn.onclick = (e) => { e.preventDefault(); renderManagerReport(); };
     }
 
-    // Когда меняешь ЛЮБОЕ поле в модалке — отчёт пересчитывается
+    // ✅ Вешаем слушатели на ВСЕ поля ВНУТРИ модалки
     ['repProject', 'repGroup', 'repDateFrom', 'repDateTo', 'repPreset', 'repCompare'].forEach(id => {
         const el = modalContent.querySelector('#' + id);
         if (el) {
@@ -1543,7 +1544,7 @@ function syncQualityFromMain() {
         }
     });
 
-    // Сразу показываем отчёт
+    // Первичная отрисовка
     renderManagerReport();
     document.getElementById('modalOverlay').classList.add('open');
 }
@@ -4259,7 +4260,7 @@ function renderManagerReport() {
         return;
     }
 
-    // ✅ Ищем поля ВНУТРИ модалки, а не в скрытой вкладке
+    // ✅ Ищем поля ВНУТРИ модального окна (modalContent), а не во всём document
     const scope = document.getElementById('modalContent');
     const findEl = (id) => scope ? scope.querySelector('#' + id) : document.getElementById(id);
 
