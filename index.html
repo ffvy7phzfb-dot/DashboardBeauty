@@ -1205,16 +1205,11 @@ table.progress-table td.period-col { text-align: left; font-weight: 600; color: 
     </div>
     <div class="save-toast" id="saveToast">сохранено</div>
 </div>
-
 <script>
 const SUPABASE_URL = 'https://zgwwylbokleugpfyshzk.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inpnd3d5bGJva2xldWdwZnlzaHprIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTM5MDE3MzcsImV4cCI6MjEwOTQ3NzczN30.UfpZTrathz43IC6xoHA0AMHebhxNazG7x9ywMdPeAWQ';
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
-    global: {
-        headers: {
-            apikey: SUPABASE_KEY
-        }
-    }
+    global: { headers: { apikey: SUPABASE_KEY } }
 });
 
 let currentUser = null;
@@ -1249,10 +1244,25 @@ let userMarks = {}; let userPaints = {}; let userCards = {}; let userVks = {}; l
 let calYear, calMonth;
 const now = new Date(); calYear = now.getFullYear(); calMonth = now.getMonth();
 
-// --- ПЕРЕМЕННЫЕ ДЛЯ ПРОЕКТОВ ---
+// --- ПРОЕКТЫ: синхронизировано с window ---
 let currentProjectId = 'default';
+window.currentProjectId = 'default';
 window.myProjects = [];
-// -------------------------------
+
+// --- УНИФИЦИРОВАННЫЕ УТИЛИТЫ ---
+function pad2(n) { return n < 10 ? '0' + n : '' + n; }
+function isoDate(d) { return d.getFullYear() + '-' + pad2(d.getMonth()+1) + '-' + pad2(d.getDate()); }
+
+function escapeHtml(s) {
+    return String(s || '').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+}
+
+function showToast(msg) {
+    const t = document.getElementById('saveToast');
+    t.textContent = msg || 'сохранено';
+    t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 1400);
+}
 
 function collectAllSettings() {
     const settings = {};
@@ -1319,6 +1329,7 @@ function collectAllSettings() {
 
     return settings;
 }
+
 async function saveToCloud() {
     if (!currentUser) return;
     try {
@@ -1649,14 +1660,9 @@ function syncQualityFromMain() {
     qNameEl.value = namesText;
     if (infoEl) infoEl.textContent = '✓ данные подставлены из сводки';
 }
-
-function showToast(msg) {
-    const t = document.getElementById('saveToast');
-    t.textContent = msg || 'сохранено';
-    t.classList.add('show');
-    setTimeout(() => t.classList.remove('show'), 1400);
-}
-
+</script>
+<script>
+// --- КИСТЬ ---
 let brushMode = false;
 let brushPaint = 'red';
 
@@ -1688,17 +1694,23 @@ function handleCellClick(userId, colKey) {
     applyFilters(); 
 }
 
+// --- ПАРСИНГ ---
 function parseNames(raw) {
     const map = {};
     if (!raw || !raw.trim()) return map;
-    raw.split(/\r?\n/).forEach(line => {
+    const skipped = [];
+    raw.split(/\r?\n/).forEach((line, idx) => {
         const lineTrim = line.trim();
         if (!lineTrim) return;
         const parts = lineTrim.split('\t').map(s => s.trim()).filter(Boolean);
         if (parts.length === 0) return;
         let id = null; let name = null;
         const looksLikeId = (x) => /^[0-9a-fA-F]{8}-/.test(x) || /^\d{6,}$/.test(x);
-        if (parts.length === 1) return;
+        if (parts.length === 1) {
+            // Не теряем молча — логируем
+            skipped.push({ line: idx + 1, text: lineTrim, reason: 'нет ID' });
+            return;
+        }
         if (parts.length === 2) {
             if (looksLikeId(parts[1])) { id = parts[1]; name = parts[0]; }
             else if (looksLikeId(parts[0])) { id = parts[0]; name = parts[1]; }
@@ -1712,8 +1724,16 @@ function parseNames(raw) {
                 id = parts[parts.length - 1]; name = parts.slice(0, parts.length - 1).join(' ');
             }
         }
-        if (id && name) map[id] = name;
+        if (id && name) {
+            if (map[id] && map[id] !== name) {
+                console.warn(`Дублирование ID ${id}: "${map[id]}" → "${name}". Перезаписано.`);
+            }
+            map[id] = name;
+        }
     });
+    if (skipped.length > 0) {
+        console.warn('Пропущены строки справочника:', skipped);
+    }
     return map;
 }
 
@@ -1762,6 +1782,8 @@ function processData() {
         const user = report[markerId];
         const startDateOnly = startDate.split('T')[0];
         const endDateOnly   = endDate.split('T')[0];
+        // Сохраняем полный timestamp для тепловой карты (если есть время в ISO)
+        const startFull = startDate.includes('T') ? startDate : (startDateOnly ? startDateOnly + 'T00:00:00' : '');
 
         let taskHasErrors = false;
         const taskCats = {};
@@ -1782,6 +1804,7 @@ function processData() {
                         taskHasErrors = true;
                         taskComments[markerId].push({
                             date: startDateOnly || endDateOnly || '',
+                            taskStart: startFull,
                             category: actualCat,
                             text: cleanBlock.slice(0, 500)
                         });
@@ -1792,6 +1815,7 @@ function processData() {
 
         user.tasks.push({
             startDate: startDateOnly, endDate: endDateOnly,
+            startTime: startFull,
             hasErrors: taskHasErrors, cats: taskCats, quality: qNum,
             projectId: currentProjectId
         });
@@ -1975,6 +1999,7 @@ function renderTabs() {
     list.innerHTML = html;
 }
 
+// --- КАТЕГОРИИ / РЕКОМЕНДАЦИИ ---
 const CATEGORY_TIPS = {
     'маркдаун': { topic: 'Разметка и форматирование', checklist: ['Проверить заголовки (H1/H2) в последних задачах','Пройти чек-лист по маркдауну перед сдачей','Разобрать 2–3 примера с ошибками из комментариев'] },
     'ошибки РП': { topic: 'Работа с речевыми ошибками', checklist: ['Перечитать критерии качества по РП','Разобрать примеры неудачных формулировок','Проверять текст на речевые ошибки перед отправкой'] },
@@ -1994,6 +2019,8 @@ function getTeamAverage(excludeUserId, fromStr, toStr) {
         if (u.id === excludeUserId) return;
         if (userCards[u.id]?.archived) return;
         (u.tasks || []).forEach(t => {
+            // Фильтр по активному проекту
+            if (currentProjectId !== 'default' && t.projectId !== currentProjectId) return;
             const d = t.startDate || t.endDate;
             if (!d) return;
             if (fromStr && d < fromStr) return;
@@ -2112,7 +2139,7 @@ function buildRecommendations(userId, tasks, fromStr, toStr) {
         const mon = new Date(dt); mon.setDate(dt.getDate() - day + 1);
         const sun = new Date(mon); sun.setDate(mon.getDate() + 6);
         const key = isoDate(mon);
-        if (!weekBuckets[key]) weekBuckets[key] = { total: 0, err: 0, label: `${pad2dyn(mon.getDate())}.${pad2dyn(mon.getMonth()+1)}–${pad2dyn(sun.getDate())}.${pad2dyn(sun.getMonth()+1)}` };
+        if (!weekBuckets[key]) weekBuckets[key] = { total: 0, err: 0, label: `${pad2(mon.getDate())}.${pad2(mon.getMonth()+1)}–${pad2(sun.getDate())}.${pad2(sun.getMonth()+1)}` };
         weekBuckets[key].total++;
         if (t.hasErrors) weekBuckets[key].err++;
     });
@@ -2156,7 +2183,9 @@ function buildMessageTemplate(name, errPct, teamErrPct, problemCats, improvingCa
     msg += `Если хочешь, могу скинуть примеры и чек-лист. Хорошей недели! 🙌`;
     return msg;
 }
-
+</script>
+<script>
+// --- КАРТОЧКА СОТРУДНИКА ---
 function openCard(userId) {
     const user = globalReport.find(u => u.id === userId);
     if (!user) return;
@@ -2426,6 +2455,9 @@ function copyMessageTemplate(userId) {
 
 function closeModal() {
     document.getElementById('modalOverlay').classList.remove('open');
+    // ✅ Также закрываем drillOverlay, если открыт
+    const drill = document.getElementById('drillOverlay');
+    if (drill) drill.classList.remove('open');
     window._currentCardUserId = null;
 }
 
@@ -2433,7 +2465,6 @@ function monthTitle() {
     const months = ['январь','февраль','март','апрель','май','июнь','июль','август','сентябрь','октябрь','ноябрь','декабрь'];
     return `${months[calMonth]} ${calYear}`;
 }
-function pad2(n) { return n < 10 ? '0' + n : '' + n; }
 
 function renderCalendar(userId) {
     const dows = ['пн','вт','ср','чт','пт','сб','вс'];
@@ -2588,10 +2619,7 @@ function removeLink(userId, index) {
     openCard(userId);
 }
 
-function escapeHtml(s) {
-    return String(s || '').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
-}
-
+// --- ПАРСИНГ ВКС ИЗ ОТЧЁТА ---
 function parseVksReport() {
     const text = document.getElementById('vksReportData').value;
     const date = document.getElementById('vksImportDate').value;
@@ -2609,38 +2637,62 @@ function parseVksReport() {
     const allNames = globalReport.map(u => ({ id: u.id, fullName: u.name, firstName: u.name.split(' ')[0] }));
     const lines = text.split(/\r?\n/);
     let foundCount = 0;
-    let html = `<table class="summary-table" style="white-space: normal;"><thead><tr><th>сотрудник</th><th>найденный текст</th><th>действие</th></tr></thead><tbody>`;
 
+    // ✅ Собираем совпадения в массив, рендерим через data-* + addEventListener
+    const matches = [];
     lines.forEach(line => {
         if (!line.trim()) return;
         allNames.forEach(u => {
             if (line.toLowerCase().includes(u.firstName.toLowerCase())) {
-                foundCount++;
-                html += `<tr>
-                    <td style="text-align:left;"><b>${u.fullName}</b><br><small style="color:var(--c-text-3)">${u.id}</small></td>
-                    <td style="text-align:left; font-size:12px; color:var(--c-text-2); max-width:400px;">${escapeHtml(line.substring(0, 200))}${line.length > 200 ? '...' : ''}</td>
-                    <td><button class="btn-load" style="padding:6px 12px; font-size:12px;" onclick="addVksFromReport('${u.id}', '${date}', '${cat}', '${escapeHtml(line.substring(0, 100))}')">➕ добавить</button></td>
-                </tr>`;
+                matches.push({ userId: u.id, fullName: u.fullName, text: line });
             }
         });
     });
 
-    html += '</tbody></table>';
-    statusEl.innerHTML = `найдено совпадений: <b>${foundCount}</b>`;
-    resultsEl.innerHTML = foundCount > 0 ? html : '<p>фамилии из справочника не найдены в этом тексте.</p>';
-}
+    if (matches.length === 0) {
+        statusEl.innerHTML = 'найдено совпадений: <b>0</b>';
+        resultsEl.innerHTML = '<p>фамилии из справочника не найдены в этом тексте.</p>';
+        return;
+    }
 
-function addVksFromReport(userId, date, category, comment) {
-    if (!userVks[userId]) userVks[userId] = {};
-    userVks[userId][date] = {
-        category: category,
-        comment: comment.replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>')
-    };
-    persistAll();
-    showToast('ВКС добавлена');
-    event.target.closest('tr').style.opacity = '0.5';
-    event.target.disabled = true;
-    event.target.textContent = '✓ добавлено';
+    let html = `<table class="summary-table" style="white-space: normal;"><thead><tr><th>сотрудник</th><th>найденный текст</th><th>действие</th></tr></thead><tbody>`;
+    matches.forEach((m, idx) => {
+        const shortText = m.text.length > 200 ? m.text.substring(0, 200) + '...' : m.text;
+        html += `<tr id="vksMatchRow-${idx}">
+            <td style="text-align:left;"><b>${m.fullName}</b><br><small style="color:var(--c-text-3)">${m.userId}</small></td>
+            <td style="text-align:left; font-size:12px; color:var(--c-text-2); max-width:400px;">${escapeHtml(shortText)}</td>
+            <td><button class="btn-load vks-add-btn" style="padding:6px 12px; font-size:12px;"
+                data-user-id="${escapeHtml(m.userId)}"
+                data-date="${escapeHtml(date)}"
+                data-cat="${escapeHtml(cat)}"
+                data-comment="${escapeHtml(m.text.substring(0, 500))}"
+                data-row-idx="${idx}">➕ добавить</button></td>
+        </tr>`;
+    });
+    html += '</tbody></table>';
+    statusEl.innerHTML = `найдено совпадений: <b>${foundCount || matches.length}</b>`;
+    resultsEl.innerHTML = html;
+
+    // ✅ Вешаем обработчики через addEventListener — без XSS
+    resultsEl.querySelectorAll('.vks-add-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const userId = this.dataset.userId;
+            const dateVal = this.dataset.date;
+            const catVal = this.dataset.cat;
+            const commentVal = this.dataset.comment;
+            const rowIdx = this.dataset.rowIdx;
+
+            if (!userVks[userId]) userVks[userId] = {};
+            userVks[userId][dateVal] = { category: catVal, comment: commentVal };
+            persistAll();
+            showToast('ВКС добавлена');
+
+            const row = document.getElementById('vksMatchRow-' + rowIdx);
+            if (row) row.style.opacity = '0.5';
+            this.disabled = true;
+            this.textContent = '✓ добавлено';
+        });
+    });
 }
 
 function importVksXlsx(ev) {
@@ -2648,7 +2700,7 @@ function importVksXlsx(ev) {
     alert('функция импорта .xlsx для ВКС будет доступна в следующей версии');
 }
 
-/* ===== КАЧЕСТВО ===== */
+// --- КАЧЕСТВО ---
 let qResultRows = []; let qAllRows = []; 
 let qCurrentMode = 'trainer';
 let qSortKey = 'avg'; let qSortDir = 'desc';
@@ -2724,7 +2776,7 @@ function calcQuality() {
             const monday = new Date(d); monday.setDate(d.getDate() - day + 1);
             const sunday = new Date(monday); sunday.setDate(monday.getDate() + 6);
             const wKey = monday.toISOString().slice(0,10) + '_' + sunday.toISOString().slice(0,10);
-            const wLabel = `${monday.getDate().toString().padStart(2,'0')}.${(monday.getMonth()+1).toString().padStart(2,'0')} - ${sunday.getDate().toString().padStart(2,'0')}.${(sunday.getMonth()+1).toString().padStart(2,'0')}`;
+            const wLabel = `${pad2(monday.getDate())}.${pad2(monday.getMonth()+1)} - ${pad2(sunday.getDate())}.${pad2(sunday.getMonth()+1)}`;
             weeks[wKey] = wLabel;
             const empKey = r.id.toLowerCase().trim();
             if (!empWeeks[empKey]) empWeeks[empKey] = { id: r.id, name: names[r.id] || '', weeksData: {} };
@@ -2925,7 +2977,8 @@ function copyQualityResult() {
             if (qCurrentMode !== 'trainer') row.push(r.date);
             if (qCurrentMode !== 'day') row.push(r.id);
             if (qCurrentMode === 'trainer' || qCurrentMode === 'dayTrainer') row.push(r.name);
-            row.push(r.avg.toFixed(4), r.count);
+            // ✅ Защита от undefined
+            row.push(r.avg !== undefined ? r.avg.toFixed(4) : '', r.count !== undefined ? r.count : '');
         }
         lines.push(row.join('\t'));
     });
@@ -2952,12 +3005,12 @@ function clearQuality() {
     const infoEl = document.getElementById('qSyncInfo');
     if (infoEl) infoEl.textContent = '';
 }
-
-/* ===== ОБЩИЙ ПРОГРЕСС ===== */
+</script>
+<script>
+// --- ОБЩИЙ ПРОГРЕСС ---
 let progChart = null;
 
-function pad2p(n) { return n < 10 ? '0' + n : '' + n; }
-function isoDateP(d) { return d.getFullYear() + '-' + pad2p(d.getMonth()+1) + '-' + pad2p(d.getDate()); }
+function isoDateP(d) { return d.getFullYear() + '-' + pad2(d.getMonth()+1) + '-' + pad2(d.getDate()); }
 
 function applyProgQuick(val) {
     const fromEl = document.getElementById('progFrom');
@@ -2991,7 +3044,7 @@ function progBucketLabel(key, step) {
     const [y,m,dd] = key.split('-');
     const d = new Date(key + 'T00:00:00');
     const sun = new Date(d); sun.setDate(d.getDate() + 6);
-    return `${dd}.${m}–${pad2p(sun.getDate())}.${pad2p(sun.getMonth()+1)}`;
+    return `${dd}.${m}–${pad2(sun.getDate())}.${pad2(sun.getMonth()+1)}`;
 }
 
 function renderProgress() {
@@ -3014,6 +3067,7 @@ function renderProgress() {
 
     filteredUsers.forEach(u => {
         (u.tasks || []).forEach(t => {
+            if (currentProjectId !== 'default' && t.projectId !== currentProjectId) return;
             const d = t.startDate || t.endDate;
             if (!d) return;
             if (fromStr && d < fromStr) return;
@@ -3137,6 +3191,7 @@ function exportProgress() {
     const buckets = {};
     filteredUsers.forEach(u => {
         (u.tasks || []).forEach(t => {
+            if (currentProjectId !== 'default' && t.projectId !== currentProjectId) return;
             const d = t.startDate || t.endDate;
             if (!d) return;
             if (fromStr && d < fromStr) return;
@@ -3160,12 +3215,9 @@ function exportProgress() {
     showToast('экспортировано');
 }
 
-/* ===== ДИНАМИКА ТРЕНЕРА ===== */
+// --- ДИНАМИКА ТРЕНЕРА ---
 let dynChartQuality = null;
 let dynChartCats = null;
-
-function pad2dyn(n) { return n < 10 ? '0' + n : '' + n; }
-function isoDate(d) { return d.getFullYear() + '-' + pad2dyn(d.getMonth()+1) + '-' + pad2dyn(d.getDate()); }
 
 function getDynTrainerId() { return document.getElementById('dynTrainerSelect').value || null; }
 
@@ -3233,6 +3285,7 @@ function renderDynProfile() {
     const toStr = document.getElementById('dynTo').value || null;
 
     const tasks = user.tasks.filter(t => {
+        if (currentProjectId !== 'default' && t.projectId !== currentProjectId) return false;
         const d = t.startDate || t.endDate;
         if (!d) return false;
         if (fromStr && d < fromStr) return false;
@@ -3254,7 +3307,7 @@ function renderDynHeader(user, tasks) {
     const mark = userMarks[user.id];
     let badge = '';
     if (mark === 'newbie') badge = '<span style="display:inline-block; padding:3px 10px; border-radius:12px; font-size:11px; font-weight:700; text-transform:uppercase; margin-left:8px; letter-spacing:0.4px; background:var(--c-orange-soft); color:var(--c-orange-text);">новичок</span>';
-    else if (mark === 'experienced') badge = '<span style="display:inline-block; padding:3px 10px; border-radius:12px; font-size:11px; font-weight:700; text-transform:uppercase; margin-left:8px; letter-spacing:0.4px; background:var(--c-primary-soft); color:var(--c-primary-hover);">опытный</span>';
+    else if (mark === 'experienced') badge = '<span style="display:inline-block; padding:3px 10px; border-radius:12px; font-size:11px; font-weight:700; text-transform:uppercase; margin-left:8px; letter-spacing:0.4px; background:var(--c-primary-soft); color:var(--c-primary);">опытный</span>';
     const metaParts = [];
     metaParts.push('marker_id: ' + user.id);
     if (card.hireDate) metaParts.push('дата выхода: ' + card.hireDate);
@@ -3326,6 +3379,7 @@ function renderDynQualityChart(user, tasks, step) {
     globalReport.forEach(u => {
         if (userCards[u.id]?.archived) return;
         (u.tasks || []).forEach(t => {
+            if (currentProjectId !== 'default' && t.projectId !== currentProjectId) return;
             const d = t.startDate || t.endDate;
             if (!d) return;
             if (fromStr && d < fromStr) return;
@@ -3531,6 +3585,7 @@ function exportDynProfile() {
     const fromStr = document.getElementById('dynFrom').value || null;
     const toStr = document.getElementById('dynTo').value || null;
     const tasks = user.tasks.filter(t => {
+        if (currentProjectId !== 'default' && t.projectId !== currentProjectId) return false;
         const d = t.startDate || t.endDate;
         if (!d) return false;
         if (fromStr && d < fromStr) return false;
@@ -3574,7 +3629,7 @@ function exportDynProfile() {
     showToast('профиль экспортирован');
 }
 
-/* ===== ОБЩИЙ ЭКСПОРТ ===== */
+// --- ОБЩИЙ ЭКСПОРТ ---
 function exportToExcel() {
     if (globalReport.length === 0) { alert('нет данных'); return; }
     const wb = XLSX.utils.book_new();
@@ -3641,7 +3696,7 @@ function exportToExcel() {
                 if (qCurrentMode !== 'trainer') row.push(r.date);
                 if (qCurrentMode !== 'day') row.push(r.id);
                 if (qCurrentMode === 'trainer' || qCurrentMode === 'dayTrainer') row.push(r.name);
-                row.push(r.avg.toFixed(4), r.count);
+                row.push(r.avg !== undefined ? r.avg.toFixed(4) : '', r.count !== undefined ? r.count : '');
             }
             qRows.push(row);
         });
@@ -3754,7 +3809,7 @@ function importPreviousXlsx(ev) {
     ev.target.value = '';
 }
 
-/* ===== ПРОГРЕСС ПО ПЕРИОДАМ (Сводка) ===== */
+// --- ПРОГРЕСС ПО ПЕРИОДАМ (Сводка) ---
 let wpChart = null;
 
 function wpBucketKey(dateStr, step) {
@@ -3775,12 +3830,15 @@ function wpBucketLabel(key, step) {
     const [y,m,dd] = key.split('-');
     const d = new Date(key + 'T00:00:00');
     const sun = new Date(d); sun.setDate(d.getDate() + 6);
-    return `${dd}.${m}–${pad2p(sun.getDate())}.${pad2p(sun.getMonth()+1)}`;
+    return `${dd}.${m}–${pad2(sun.getDate())}.${pad2(sun.getMonth()+1)}`;
 }
 
 function renderWeekProgress() {
     const block = document.getElementById('weekProgressBlock');
     if (!block) return;
+    // ✅ Не рендерим в скрытом контейнере — Chart.js неверно считает размеры
+    if (block.offsetParent === null) return;
+
     const mode = document.getElementById('wpMode').value;
     const step = document.getElementById('wpStep').value;
     const metric = document.getElementById('wpMetric').value;
@@ -3804,6 +3862,7 @@ function renderWeekProgress() {
     usersList.forEach(u => {
         userBuckets[u.id] = { name: u.name, buckets: {} };
         (u.tasks || []).forEach(t => {
+            if (currentProjectId !== 'default' && t.projectId !== currentProjectId) return;
             const d = t.startDate || t.endDate;
             if (!d) return;
             if (fDateFrom && d < fDateFrom) return;
@@ -3934,6 +3993,7 @@ function exportWeekProgress() {
     usersList.forEach(u => {
         userBuckets[u.id] = { name: u.name, buckets: {} };
         (u.tasks || []).forEach(t => {
+            if (currentProjectId !== 'default' && t.projectId !== currentProjectId) return;
             const d = t.startDate || t.endDate;
             if (!d) return;
             if (fDateFrom && d < fDateFrom) return;
@@ -3977,7 +4037,7 @@ function exportWeekProgress() {
     showToast('экспортировано');
 }
 
-/* ===== ВКЛАДКА СРАВНЕНИЯ (ОБЩИЙ ВИД) ===== */
+// --- СРАВНЕНИЕ (ОБЩИЙ ВИД) ---
 function populateCompareTargets() {
     const sel = document.getElementById('cmpTarget');
     if (!sel) return;
@@ -4027,6 +4087,7 @@ function renderCompareGeneral() {
         
         usersToCalc.forEach(u => {
             (u.tasks || []).forEach(t => {
+                if (currentProjectId !== 'default' && t.projectId !== currentProjectId) return;
                 const d = t.startDate || t.endDate;
                 if (!d) return;
                 if (d < from || d > to) return;
@@ -4105,7 +4166,8 @@ function renderCompareGeneral() {
         badge.innerHTML = '⚠️ динамика отрицательная';
     }
 }
-/* ===== ВКЛАДКА СРАВНЕНИЯ (ТАБЛИЦА) ===== */
+
+// --- СРАВНЕНИЕ (ТАБЛИЦА) ---
 function getWeekRange(dateStr) {
     const d = new Date(dateStr + 'T00:00:00');
     const day = d.getDay() || 7;
@@ -4141,6 +4203,7 @@ function renderCompareTable() {
     const periods = {};
     usersList.forEach(u => {
         (u.tasks || []).forEach(t => {
+            if (currentProjectId !== 'default' && t.projectId !== currentProjectId) return;
             const d = t.startDate || t.endDate;
             if (!d || d < from || d > to) return;
             
@@ -4191,6 +4254,7 @@ function renderCompareTable() {
 
     let totalTasksAll = 0, totalErrorsAll = 0, sumQAll = 0;
     usersList.forEach(u => (u.tasks || []).forEach(t => {
+        if (currentProjectId !== 'default' && t.projectId !== currentProjectId) return;
         const d = t.startDate || t.endDate;
         if (d >= from && d <= to) {
             totalTasksAll++;
@@ -4274,7 +4338,7 @@ function renderCompareTable() {
     document.getElementById('cmpTableContainer').innerHTML = html;
 }
 
-/* ===== ВКЛАДКА AI АНАЛИЗ ===== */
+// --- AI АНАЛИЗ ---
 function populateAiTargets() {
     const sel = document.getElementById('aiTarget');
     if (!sel) return;
@@ -4316,12 +4380,14 @@ function renderAiAnalysis() {
     if (targetId === 'all') {
         globalReport.forEach(u => {
             (u.tasks || []).forEach(t => {
+                if (currentProjectId !== 'default' && t.projectId !== currentProjectId) return;
                 const d = t.startDate || t.endDate;
                 if (d >= from && d <= to) tasks.push({ ...t, userName: u.name });
             });
         });
     } else {
         (targetUser.tasks || []).forEach(t => {
+            if (currentProjectId !== 'default' && t.projectId !== currentProjectId) return;
             const d = t.startDate || t.endDate;
             if (d >= from && d <= to) tasks.push({ ...t, userName: targetUser.name });
         });
@@ -4454,7 +4520,7 @@ document.addEventListener('keydown', e => {
     if (e.key === 'Escape') { closeModal(); closeVksModal(); }
 });
 </script>
-    <script>
+<script>
 (function() {
     // ==========================================
     // 1. ВКЛАДКА "ИТОГОВЫЙ ОТЧЁТ"
@@ -4599,7 +4665,7 @@ document.addEventListener('keydown', e => {
             body.innerHTML = `
                 <div style="text-align:center; padding:40px;">
                     <p style="color:var(--c-text-2); margin-bottom:16px;">Данные ещё не загружены в память.</p>
-                    <button class="btn-load" onclick="processData(); setTimeout(renderManagerReport, 500);" style="padding:10px 24px;">🔄 Загрузить данные из Сводки и построить отчёт</button>
+                    <button class="btn-load" onclick="processData(); renderManagerReport();" style="padding:10px 24px;">🔄 Загрузить данные из Сводки и построить отчёт</button>
                 </div>
             `;
             return;
@@ -4651,6 +4717,7 @@ document.addEventListener('keydown', e => {
             (window.categoriesList||[]).forEach(c => byUser[u.id].cats[c] = 0);
             
             (u.tasks || []).forEach(t => {
+                if (window.currentProjectId !== 'default' && t.projectId !== window.currentProjectId) return;
                 const d = t.startDate || t.endDate;
                 if (!d || d < from || d > to) return;
                 
@@ -4855,6 +4922,7 @@ document.addEventListener('keydown', e => {
         let max = 0;
         
         users.forEach(u => (u.tasks || []).forEach(t => {
+            if (window.currentProjectId !== 'default' && t.projectId !== window.currentProjectId) return;
             const raw = t.startTime || t.startDate;
             if (!raw) return;
             const dStr = raw.slice(0,10);
@@ -4995,16 +5063,17 @@ document.addEventListener('keydown', e => {
         const container = document.getElementById('projectsListContainer');
         if (!container) return;
         
+        // ✅ Используем window.currentProjectId — корректно
         let html = `
-            <div style="padding:16px; border:2px solid ${currentProjectId === 'default' ? 'var(--c-primary)' : 'var(--c-border)'}; border-radius:12px; min-width:200px; cursor:pointer; background:var(--c-surface);" onclick="switchProject('default')">
+            <div style="padding:16px; border:2px solid ${window.currentProjectId === 'default' ? 'var(--c-primary)' : 'var(--c-border)'}; border-radius:12px; min-width:200px; cursor:pointer; background:var(--c-surface);" onclick="switchProject('default')">
                 <h4 style="margin:0 0 8px 0; font-size:16px;">Общий проект</h4>
                 <div style="font-size:12px; color:var(--c-text-2);">По умолчанию</div>
-                ${currentProjectId === 'default' ? '<div style="margin-top:10px; color:var(--c-primary); font-weight:bold; font-size:12px;">✓ Активен</div>' : ''}
+                ${window.currentProjectId === 'default' ? '<div style="margin-top:10px; color:var(--c-primary); font-weight:bold; font-size:12px;">✓ Активен</div>' : ''}
             </div>
         `;
 
         (window.myProjects || []).forEach(p => {
-            const isActive = currentProjectId === p.id;
+            const isActive = window.currentProjectId === p.id;
             html += `
                 <div style="padding:16px; border:2px solid ${isActive ? 'var(--c-primary)' : 'var(--c-border)'}; border-radius:12px; min-width:200px; cursor:pointer; background:var(--c-surface); position:relative;" onclick="switchProject('${p.id}')">
                     <h4 style="margin:0 0 8px 0; font-size:16px;">${p.name}</h4>
@@ -5045,8 +5114,10 @@ document.addEventListener('keydown', e => {
         if (!confirm('Удалить проект? Данные останутся в базе, но пропадут из вида.')) return;
         
         window.myProjects = (window.myProjects || []).filter(p => p.id !== id);
-        if (currentProjectId === id) {
-            currentProjectId = 'default';
+        if (window.currentProjectId === id) {
+            window.currentProjectId = 'default';
+            // Синхронизируем с глобальной переменной
+            try { currentProjectId = 'default'; } catch(e) {}
         }
         
         if (typeof saveToCloud === 'function') saveToCloud();
@@ -5057,7 +5128,10 @@ document.addEventListener('keydown', e => {
     };
 
     window.switchProject = function(id) {
-        currentProjectId = id;
+        window.currentProjectId = id;
+        // ✅ Синхронизируем глобальную переменную
+        try { currentProjectId = id; } catch(e) {}
+        
         renderProjectsTab();
         renderProjectsDropdown();
         
@@ -5082,7 +5156,7 @@ document.addEventListener('keydown', e => {
             opt.textContent = p.name;
             sel.appendChild(opt);
         });
-        sel.value = currentProjectId;
+        sel.value = window.currentProjectId;
     };
 
     window.openAccountSwitcher = function() {
@@ -5155,7 +5229,7 @@ document.addEventListener('keydown', e => {
         openAccountSwitcher();
     };
 
-      document.addEventListener('DOMContentLoaded', () => {
+    document.addEventListener('DOMContentLoaded', () => {
         setTimeout(() => {
             try {
                 const savedSessions = JSON.parse(localStorage.getItem('saved_supabase_sessions') || '[]');
