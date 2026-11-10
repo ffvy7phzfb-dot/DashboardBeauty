@@ -537,7 +537,6 @@ table.progress-table td.period-col { text-align: left; font-weight: 600; color: 
 .badge-warn { background: var(--c-orange-soft); color: var(--c-orange-text); }
 .badge-bad { background: var(--c-red-soft); color: var(--c-red-text); }
 
-/* ===== НОВЫЕ СТИЛИ ДЛЯ СРАВНЕНИЯ И AI ===== */
 .cmp-tabs { display: flex; gap: 8px; margin-bottom: 16px; }
 .cmp-tab-btn { padding: 8px 16px; border: 1px solid var(--c-border); background: var(--c-surface-2); border-radius: var(--r-pill); font-size: 13px; font-weight: 600; cursor: pointer; color: var(--c-text-2); transition: all 0.15s; }
 .cmp-tab-btn.active { background: var(--c-primary); color: #fff; border-color: var(--c-primary); }
@@ -625,11 +624,14 @@ table.progress-table td.period-col { text-align: left; font-weight: 600; color: 
 </div>
 
 <div id="appScreen">
+    <div class="app-header">
+        <h1>Дашборд</h1>
         <div class="header-actions">
             <a href="https://ffvy7phzfb-dot.github.io/Analytic-/" target="_blank" class="btn-header ghost">AI Аналитик</a>
             <button class="btn-header ghost" onclick="openAccountSwitcher()" style="display:none;" id="switchAccountBtn">🔄 Сменить аккаунт</button>
             <button class="btn-header danger" onclick="logoutUser()">Выйти</button>
         </div>
+    </div>
 
     <div class="main-tabs">
         <button class="main-tab-btn active" onclick="switchTab('main', this)">📊 Сводка</button>
@@ -1058,7 +1060,6 @@ table.progress-table td.period-col { text-align: left; font-weight: 600; color: 
         </div>
     </div>
 
-    <!-- ВКЛАДКА СРАВНЕНИЯ (ОБА ВАРИАНТА) -->
     <div class="tab-content" id="tab-compare">
         <div class="container">
             <div class="box" style="min-width:100%;">
@@ -1070,7 +1071,6 @@ table.progress-table td.period-col { text-align: left; font-weight: 600; color: 
                     </div>
                 </div>
 
-                <!-- ВАРИАНТ 1: ОБЩИЙ ВИД (ДО/ПОСЛЕ) -->
                 <div id="cmp-view-general" class="cmp-view active">
                     <div style="display:flex; gap:12px; flex-wrap:wrap; margin-bottom:20px; align-items:flex-end;">
                         <div class="field-group" style="margin:0; min-width:250px; flex-direction:row; align-items:center; gap:10px;">
@@ -1128,7 +1128,6 @@ table.progress-table td.period-col { text-align: left; font-weight: 600; color: 
                     </div>
                 </div>
 
-                <!-- ВАРИАНТ 2: ТАБЛИЦА ПО СОТРУДНИКАМ -->
                 <div id="cmp-view-by-emp" class="cmp-view">
                     <div class="cmp-controls" style="display:flex; gap:16px; flex-wrap:wrap; align-items:flex-end; margin-bottom:20px; background:var(--c-surface-2); padding:16px; border-radius:var(--r-md); border:1px solid var(--c-border-soft);">
                         <div class="field-group">
@@ -1162,7 +1161,6 @@ table.progress-table td.period-col { text-align: left; font-weight: 600; color: 
         </div>
     </div>
 
-    <!-- ВКЛАДКА AI АНАЛИЗ -->
     <div class="tab-content" id="tab-ai-analysis">
         <div class="container">
             <div class="box" style="min-width:100%;">
@@ -1251,6 +1249,11 @@ let userMarks = {}; let userPaints = {}; let userCards = {}; let userVks = {}; l
 let calYear, calMonth;
 const now = new Date(); calYear = now.getFullYear(); calMonth = now.getMonth();
 
+// --- ПЕРЕМЕННЫЕ ДЛЯ ПРОЕКТОВ ---
+let currentProjectId = 'default';
+window.myProjects = [];
+// -------------------------------
+
 function collectAllSettings() {
     const settings = {};
     const activeTab = document.querySelector('.main-tab-btn.active');
@@ -1323,7 +1326,6 @@ async function saveToCloud() {
         const namesText = document.getElementById('namesData') ? document.getElementById('namesData').value : '';
         const settings = collectAllSettings();
 
-        // Пробуем сохранить данные напрямую в таблицу
         const { error } = await supabaseClient
             .from('user_data')
             .upsert({
@@ -1335,6 +1337,7 @@ async function saveToCloud() {
                 user_cards: userCards,
                 user_vks: userVks,
                 settings: settings,
+                projects_data: window.myProjects,
                 updated_at: new Date().toISOString()
             });
 
@@ -1399,19 +1402,16 @@ async function doLogin() {
         }
         currentUser = data.user;
         
-        // --- СОХРАНЯЕМ СЕССИЮ ДЛЯ БЫСТРОГО ПЕРЕКЛЮЧЕНИЯ ---
         const { data: sessionData } = await supabaseClient.auth.getSession();
         if (sessionData.session) {
             let saved = JSON.parse(localStorage.getItem('saved_supabase_sessions') || '[]');
-            saved = saved.filter(s => s.user.email !== currentUser.email); // Убираем старую копию
+            saved = saved.filter(s => s.user.email !== currentUser.email); 
             saved.push({ user: currentUser, session: sessionData.session, lastUsed: Date.now() });
             localStorage.setItem('saved_supabase_sessions', JSON.stringify(saved));
             
-            // Показываем кнопку "Сменить аккаунт"
             const btn = document.getElementById('switchAccountBtn');
             if (btn) btn.style.display = 'inline-block';
         }
-        // --------------------------------------------------
 
         document.getElementById('authScreen').style.display = 'none';
         document.getElementById('appScreen').style.display = 'block';
@@ -1425,11 +1425,10 @@ async function doLogin() {
 async function logoutUser() {
     const isSure = confirm('Выйти из текущего аккаунта? (Данные входа сохранятся для быстрого переключения)');
     if (!isSure) return;
-    
-    // Сессия уже сохранена при входе, поэтому просто выходим
     await supabaseClient.auth.signOut();
     location.reload();
 }
+
 function applyAllSettings(settings) {
     if (!settings) return;
     if (settings.filters) {
@@ -1517,6 +1516,7 @@ async function loadUserData() {
         userPaints = data.user_paints || {};
         userCards = data.user_cards || {};
         userVks = data.user_vks || {};
+        window.myProjects = data.projects_data || [];
         if (data.main_data) document.getElementById('mainData').value = data.main_data;
         if (data.names_data) document.getElementById('namesData').value = data.names_data;
         
@@ -1534,12 +1534,13 @@ async function loadUserData() {
                     }
                     if (data.settings.ai) { populateAiTargets(); renderAiAnalysis(); }
                     if (data.settings.filters) applyFilters();
+                    if (typeof renderProjectsTab === 'function') renderProjectsTab();
                 }, 150);
             }
         }
         syncQualityFromMain();
     } else {
-        userMarks = {}; userPaints = {}; userCards = {}; userVks = {};
+        userMarks = {}; userPaints = {}; userCards = {}; userVks = {}; window.myProjects = [];
         await saveToCloud();
     }
     showToast('Данные загружены');
@@ -1587,7 +1588,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     document.querySelectorAll('input[name="qMode"]').forEach(r => r.addEventListener('change', debouncedSaveSettings));
 
-    // Дефолтные даты для новых вкладок
     const today = new Date();
     const past = new Date(today); past.setDate(past.getDate() - 90);
     const pFrom = past.toISOString().slice(0,10);
@@ -1792,7 +1792,8 @@ function processData() {
 
         user.tasks.push({
             startDate: startDateOnly, endDate: endDateOnly,
-            hasErrors: taskHasErrors, cats: taskCats, quality: qNum
+            hasErrors: taskHasErrors, cats: taskCats, quality: qNum,
+            projectId: currentProjectId
         });
     });
 
@@ -1843,6 +1844,7 @@ function applyFilters() {
         .filter(u => !(userCards[u.id] && userCards[u.id].archived))
         .map(user => {
             const tasksInPeriod = user.tasks.filter(t => {
+                if (currentProjectId !== 'default' && t.projectId !== currentProjectId) return false;
                 if (fDateFrom && t.endDate && t.endDate < fDateFrom) return false;
                 if (fDateTo   && t.startDate && t.startDate > fDateTo) return false;
                 return true;
@@ -1973,7 +1975,6 @@ function renderTabs() {
     list.innerHTML = html;
 }
 
-/* ===== АНАЛИЗ И РЕКОМЕНДАЦИИ ===== */
 const CATEGORY_TIPS = {
     'маркдаун': { topic: 'Разметка и форматирование', checklist: ['Проверить заголовки (H1/H2) в последних задачах','Пройти чек-лист по маркдауну перед сдачей','Разобрать 2–3 примера с ошибками из комментариев'] },
     'ошибки РП': { topic: 'Работа с речевыми ошибками', checklist: ['Перечитать критерии качества по РП','Разобрать примеры неудачных формулировок','Проверять текст на речевые ошибки перед отправкой'] },
@@ -4058,7 +4059,6 @@ function renderCompareGeneral() {
     resBox.style.display = 'block';
     emptyBox.style.display = 'none';
 
-    // Считаем разницу в процентах ошибок, а не в абсолютных числах
     const pctDiff = statsB.errPct - statsA.errPct;
     const isGood = pctDiff <= 0;
 
@@ -4071,11 +4071,9 @@ function renderCompareGeneral() {
     else if (pctDiff > 2) titleText = 'Ошибок стало больше ↑';
     document.getElementById('cmpTitle').textContent = titleText;
 
-    // В карточки выводим и абсолютное число ошибок, и процент
     document.getElementById('cmpValA').innerHTML = `${statsA.errors} <span style="font-size:16px; color:var(--c-text-3); font-weight:500;">(${statsA.errPct.toFixed(1)}%)</span>`;
     document.getElementById('cmpValB').innerHTML = `${statsB.errors} <span style="font-size:16px; color:var(--c-text-3); font-weight:500;">(${statsB.errPct.toFixed(1)}%)</span>`;
     
-    // Добавляем качество в подписи под датами
     document.getElementById('cmpDateA').innerHTML = `${formatDateShort(aFrom)}–${formatDateShort(aTo)}<br><small style="color:var(--c-text-3);">Q: ${statsA.avgQ.toFixed(1)}%</small>`;
     document.getElementById('cmpDateB').innerHTML = `${formatDateShort(bFrom)}–${formatDateShort(bTo)}<br><small style="color:var(--c-text-3);">Q: ${statsB.avgQ.toFixed(1)}%</small>`;
 
@@ -4086,7 +4084,6 @@ function renderCompareGeneral() {
         const b = statsB.cats[cat];
         if (a === 0 && b === 0) return;
         
-        // Считаем разницу в процентах внутри категории
         let diffPct = 0;
         if (a > 0) diffPct = Math.round(((b - a) / a) * 100);
         else if (b > 0) diffPct = 100;
@@ -4315,7 +4312,6 @@ function renderAiAnalysis() {
         return;
     }
 
-    // Сбор задач за период
     const tasks = [];
     if (targetId === 'all') {
         globalReport.forEach(u => {
@@ -4364,12 +4360,10 @@ function renderAiAnalysis() {
 
     let insightsHtml = '';
     
-    // Базовые показатели
     insightsHtml += `<div class="ai-insight"><span style="font-size:16px;">📊</span><span><b>Всего задач:</b> ${total} (с ошибками: ${errCount})</span></div>`;
     insightsHtml += `<div class="ai-insight"><span style="font-size:16px;">🎯</span><span><b>% ошибок:</b> ${errPct.toFixed(1)}%</span></div>`;
     insightsHtml += `<div class="ai-insight"><span style="font-size:16px;">⭐</span><span><b>Среднее качество:</b> ${avgQ.toFixed(1)}%</span></div>`;
 
-    // Тренд
     if (trendDelta < -3) {
         insightsHtml += `<div class="ai-insight good"><span style="font-size:16px;">📈</span><span><b>Тренд:</b> Качество растёт. Во второй половине периода ошибок стало меньше на ${Math.abs(trendDelta).toFixed(1)} п.п.</span></div>`;
     } else if (trendDelta > 3) {
@@ -4378,7 +4372,6 @@ function renderAiAnalysis() {
         insightsHtml += `<div class="ai-insight warn"><span style="font-size:16px;">➡️</span><span><b>Тренд:</b> Стабильно. Уровень ошибок держится примерно на одном уровне.</span></div>`;
     }
 
-    // Проблемные категории
     const problemCats = categoriesList.filter(c => catCounts[c] > 0).sort((a,b) => catPct[b] - catPct[a]).slice(0, 3);
     if (problemCats.length > 0) {
         insightsHtml += `<div class="ai-insight bad"><span style="font-size:16px;">⚠️</span><span><b>Топ ошибок:</b> ${problemCats.map(c => `${CAT_SHORT_LABELS[c] || c} (${catCounts[c]})`).join(', ')}</span></div>`;
@@ -4400,7 +4393,6 @@ function renderAiAnalysis() {
     });
     categoriesHtml += `</tbody></table></div>`;
 
-    // Если все сотрудники, добавим разбивку по людям
     let perUserHtml = '';
     if (targetId === 'all') {
         perUserHtml = `<div class="ai-section">
@@ -4419,10 +4411,6 @@ function renderAiAnalysis() {
         Object.entries(byUser).sort((a,b) => b[1].err - a[1].err).forEach(([name, st]) => {
             const pct = (st.err / st.total * 100).toFixed(1);
             const q = (st.qSum / st.total * 100).toFixed(1);
-            let badge = '';
-            if (st.err / st.total <= 0.05) badge = '<span class="badge badge-good">Отлично</span>';
-            else if (st.err / st.total <= 0.15) badge = '<span class="badge badge-warn">Средне</span>';
-            else badge = '<span class="badge badge-bad">Плохо</span>';
             perUserHtml += `<tr>
                 <td class="period-col">${name}</td>
                 <td>${st.total}</td>
@@ -4452,9 +4440,7 @@ function renderAiAnalysis() {
     `;
 }
 
-// Инициализация при загрузке
 window.onload = () => {
-    // Даты по умолчанию
     const today = new Date();
     const past = new Date(today); past.setDate(past.getDate() - 90);
     const pFrom = past.toISOString().slice(0,10);
@@ -4468,7 +4454,7 @@ document.addEventListener('keydown', e => {
     if (e.key === 'Escape') { closeModal(); closeVksModal(); }
 });
 </script>
-<script>
+    <script>
 (function() {
     // ==========================================
     // 1. ВКЛАДКА "ИТОГОВЫЙ ОТЧЁТ"
@@ -4491,7 +4477,6 @@ document.addEventListener('keydown', e => {
         tabDiv.innerHTML = `
             <div class="container">
                 <div class="box" style="min-width:100%;">
-                    <!-- ПЛАШКА "В РАЗРАБОТКЕ" -->
                     <div style="display:flex; align-items:center; gap:12px; background:linear-gradient(135deg,#FFF3CD 0%,#FFE8CC 100%); border:1px solid #FFD8A8; border-left:4px solid var(--c-orange); border-radius:var(--r-md); padding:14px 18px; margin-bottom:20px; color:var(--c-orange-text); font-size:14px; font-weight:600; line-height:1.5; box-shadow:0 2px 8px rgba(255,149,0,0.12);">
                         <span style="font-size:22px; flex-shrink:0;">🚧</span>
                         <div>
@@ -4499,7 +4484,6 @@ document.addEventListener('keydown', e => {
                             <div style="font-size:13px; font-weight:500; opacity:0.85;">Отчёт формируется в тестовом режиме — данные могут быть неполными, а расчёты ещё уточняются.</div>
                         </div>
                     </div>
-                    <!-- /ПЛАШКА -->
 
                     <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:20px;">
                         <div style="display:flex; align-items:center; gap:12px;">
@@ -5006,9 +4990,7 @@ document.addEventListener('keydown', e => {
     // ==========================================
     // 2. ПРОЕКТЫ И АККАУНТЫ
     // ==========================================
-    window.myProjects = [];
-    let currentProjectId = 'default';
-
+    
     window.renderProjectsTab = function() {
         const container = document.getElementById('projectsListContainer');
         if (!container) return;
@@ -5078,8 +5060,15 @@ document.addEventListener('keydown', e => {
         currentProjectId = id;
         renderProjectsTab();
         renderProjectsDropdown();
-        applyFilters();
+        
+        applyFilters(); 
+        if (typeof renderWeekProgress === 'function') renderWeekProgress();
+        if (typeof renderCompareGeneral === 'function') renderCompareGeneral();
+        if (typeof renderCompareTable === 'function') renderCompareTable();
+        if (typeof renderProgress === 'function') renderProgress();
+        if (typeof renderDynProfile === 'function') renderDynProfile();
         if (typeof renderManagerReport === 'function') renderManagerReport();
+        
         showToast('Проект переключен');
     };
 
@@ -5166,12 +5155,16 @@ document.addEventListener('keydown', e => {
         openAccountSwitcher();
     };
 
-    document.addEventListener('DOMContentLoaded', () => {
+      document.addEventListener('DOMContentLoaded', () => {
         setTimeout(() => {
-            const savedSessions = JSON.parse(localStorage.getItem('saved_supabase_sessions') || '[]');
-            if (savedSessions.length > 0) {
-                const btn = document.getElementById('switchAccountBtn');
-                if (btn) btn.style.display = 'inline-block';
+            try {
+                const savedSessions = JSON.parse(localStorage.getItem('saved_supabase_sessions') || '[]');
+                if (savedSessions.length > 0) {
+                    const btn = document.getElementById('switchAccountBtn');
+                    if (btn) btn.style.display = 'inline-block';
+                }
+            } catch (e) {
+                console.warn('Ошибка проверки аккаунтов', e);
             }
         }, 1000);
     });
