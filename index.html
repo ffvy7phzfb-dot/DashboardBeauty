@@ -430,10 +430,10 @@ table.progress-table td.period-col { text-align: left; font-weight: 600; color: 
             <button class="btn-export" id="exportBtn" onclick="exportToExcel()">скачать всё в Excel</button>
         </div>
         <div class="btn-group" style="margin-top: -10px; background: var(--c-surface-2); padding: 12px; border-radius: var(--r-md); border: 1px solid var(--c-border);">
-    <span style="font-size: 13px; font-weight: 600; color: var(--c-text-2); align-self: center; margin-right: 10px;">📋 Отчёт</span>
-    <button class="btn-copy" onclick="openManagerReport('current')" style="padding: 8px 16px; font-size: 13px; background: var(--c-surface);">📁 По текущему пулу</button>
-    <button class="btn-copy" onclick="openManagerReport('all')" style="padding: 8px 16px; font-size: 13px; background: var(--c-surface);">🌐 По всем пулам</button>
-</div>
+            <span style="font-size: 13px; font-weight: 600; color: var(--c-text-2); align-self: center; margin-right: 10px;">📋 Отчёт</span>
+            <button class="btn-copy" onclick="openManagerReportNewWindow('current')">📁 По текущему пулу</button>
+            <button class="btn-copy" onclick="openManagerReportNewWindow('all')">🌐 По всем пулам</button>
+        </div>
 
         <div class="filters-panel" id="filtersPanel">
             <h3>Фильтры</h3>
@@ -1278,6 +1278,12 @@ async function logoutUser() {
 }
 
 function applyAllSettings(settings) {
+    // В режиме «отчёт в новом окне» не применяем сохранённые настройки отчёта —
+    // они проставятся из URL-параметров (см. setupReportMode ниже).
+    const __isReportMode = new URLSearchParams(location.search).get('report') === '1';
+    if (__isReportMode && settings && settings.managerReport) {
+        settings = { ...settings, managerReport: undefined };
+    }
     if (!settings) return;
     if (settings.filters) {
         const f = settings.filters;
@@ -1512,41 +1518,6 @@ function syncQualityFromMain() {
     qDataEl.value = mainText;
     qNameEl.value = namesText;
     if (infoEl) infoEl.textContent = '✓ данные подставлены из сводки';
-}
-function openManagerReport(projectMode) {
-    if (!globalReport || globalReport.length === 0) {
-        alert('Сначала загрузи данные в сводку (нажми «загрузить и обработать»).');
-        return;
-    }
-    
-    window._reportProjectMode = projectMode;
-    
-    // Вставляем HTML отчёта в модалку
-    const modalContent = document.getElementById('modalContent');
-    const reportBody = document.getElementById('tab-manager-report').innerHTML;
-    modalContent.innerHTML = `
-        <button class="modal-close" onclick="closeModal()">×</button>
-        <div style="padding: 10px;">${reportBody}</div>
-    `;
-    
-    // Привязываем кнопку "Обновить"
-    const modalRenderBtn = modalContent.querySelector('button[onclick="renderManagerReport()"]');
-    if (modalRenderBtn) {
-        modalRenderBtn.onclick = (e) => { e.preventDefault(); renderManagerReport(); };
-    }
-
-    // ✅ Вешаем слушатели на ВСЕ поля ВНУТРИ модалки
-    ['repProject', 'repGroup', 'repDateFrom', 'repDateTo', 'repPreset', 'repCompare'].forEach(id => {
-        const el = modalContent.querySelector('#' + id);
-        if (el) {
-            el.addEventListener('change', () => setTimeout(renderManagerReport, 20));
-            el.addEventListener('input', () => setTimeout(renderManagerReport, 20));
-        }
-    });
-
-    // Первичная отрисовка
-    renderManagerReport();
-    document.getElementById('modalOverlay').classList.add('open');
 }
 </script>
 <script>
@@ -2642,7 +2613,6 @@ function calcQuality() {
     qAllRows.forEach(r => { if (r.id) uniqueIds.set(r.id, r.name || ''); });
     qAllEmployeeIds = Array.from(uniqueIds.keys());
     
-    // ✅ НЕ СБРАСЫВАЕМ ВЫБОР, ЕСЛИ ОН УЖЕ БЫЛ
     if (!qSelectedEmployees || qSelectedEmployees.size === 0) {
         qSelectedEmployees = new Set(qAllEmployeeIds);
     } else {
@@ -3033,7 +3003,6 @@ function exportProgress() {
     const group = document.getElementById('progGroup').value;
     const fromStr = document.getElementById('progFrom').value || null;
     const toStr = document.getElementById('progTo').value || null;
-    // Берем тех, кто выбран в Сводке. Если там выбрано "все", берем всех
     const selectedUserId = document.getElementById('filterUser').value;
     let baseUsers = globalReport;
     if (selectedUserId && selectedUserId !== 'all') {
@@ -3798,7 +3767,6 @@ function renderAiAnalysis() {
     if (targetId !== 'all' && !targetUser) { outBox.style.display = 'none'; emptyBox.style.display = 'block'; return; }
 
     const tasks = [];
-    // Берем список сотрудников из фильтра Сводки (если он пуст — берем всех)
     const usersForAi = (currentFilteredUsers && currentFilteredUsers.length > 0)
         ? currentFilteredUsers.map(cu => globalReport.find(gu => gu.id === cu.id)).filter(Boolean)
         : globalReport;
@@ -4260,9 +4228,7 @@ function renderManagerReport() {
         return;
     }
 
-    // ✅ Ищем поля ВНУТРИ модального окна (modalContent), а не во всём document
-    const scope = document.getElementById('modalContent');
-    const findEl = (id) => scope ? scope.querySelector('#' + id) : document.getElementById(id);
+    const findEl = (id) => document.getElementById(id);
 
     const projectMode = (findEl('repProject')?.value) || 'current';
     const group = (findEl('repGroup')?.value) || 'all';
@@ -4413,7 +4379,6 @@ async function exportManagerReportExcel() {
             return { fill: C.bad, font: C.redTxt };
         }
 
-        // Лист 1: Сводка
         const ws1 = wb.addWorksheet('Сводка');
         ws1.columns = [{ width: 30 }, { width: 20 }, { width: 20 }];
         ws1.mergeCells('A1:C1');
@@ -4442,7 +4407,6 @@ async function exportManagerReportExcel() {
         const note = document.getElementById('repManagerNote')?.value;
         if (note) { ws1.addRow([]); const nh = ws1.addRow(['Комментарий менеджера']); styleHeaderRow(nh); ws1.addRow([note]); }
 
-        // Лист 2: Ошибки
         const ws2 = wb.addWorksheet('Ошибки');
         ws2.columns = [{ width: 35 }, { width: 12 }, { width: 15 }, { width: 12 }, { width: 12 }];
         styleHeaderRow(ws2.addRow(['Категория', 'Кол-во', 'Доля от задач', 'Было', 'Δ']));
@@ -4461,7 +4425,6 @@ async function exportManagerReportExcel() {
             row.getCell(1).font = { bold: true };
         });
 
-        // Лист 3: Сотрудники
         const ws3 = wb.addWorksheet('Сотрудники');
         ws3.columns = [{ width: 30 }, { width: 10 }, { width: 10 }, { width: 12 }, { width: 15 }, { width: 25 }, { width: 12 }];
         styleHeaderRow(ws3.addRow(['Сотрудник', 'Задач', 'С ошиб.', '% ошибок', 'Δ к пред.', 'Топ-ошибка', 'Статус']));
@@ -4488,7 +4451,6 @@ async function exportManagerReportExcel() {
             row.getCell(7).font = { bold: true, color: { argb: bf.font } };
         });
 
-        // Лист 4: Динамика
         const ws4 = wb.addWorksheet('Динамика');
         ws4.columns = [{ width: 20 }, { width: 12 }, { width: 12 }, { width: 15 }, { width: 15 }];
         styleHeaderRow(ws4.addRow(['Неделя', 'Задач', 'С ошиб.', '% ошибок', 'Качество']));
@@ -4584,11 +4546,9 @@ function deleteProject(id) {
     applyFilters();
 }
 
-// ✅ ИСПРАВЛЕНО: сохраняем перед переключением
 function switchProject(id) {
     if (id === window.currentProjectId) return;
 
-    // 1) Сохраняем данные текущего проекта в память
     const curMain = document.getElementById('mainData').value;
     const curNames = document.getElementById('namesData').value;
     if (window.currentProjectId === 'default') {
@@ -4598,14 +4558,11 @@ function switchProject(id) {
         const oldProj = (window.myProjects || []).find(p => p.id === window.currentProjectId);
         if (oldProj) { oldProj.mainData = curMain; oldProj.namesData = curNames; }
     }
-    // 2) Отправляем в облако (фоном)
     try { saveToCloud(); } catch(e) { console.warn('saveToCloud failed', e); }
 
-    // 3) Переключаем активный проект
     window.currentProjectId = id;
     try { currentProjectId = id; } catch(e) {}
 
-    // 4) Подставляем данные нового проекта в поля
     let newMain = '', newNames = '';
     if (id === 'default') {
         newMain = window._defaultMainData || '';
@@ -4617,7 +4574,6 @@ function switchProject(id) {
     document.getElementById('mainData').value = newMain;
     document.getElementById('namesData').value = newNames;
 
-    // 5) Сбрасываем состояние
     globalReport = [];
     currentFilteredUsers = [];
     document.getElementById('filtersPanel').style.display = 'none';
@@ -4631,7 +4587,6 @@ function switchProject(id) {
     document.getElementById('tabsList').innerHTML = '';
     document.getElementById('qEmpChips').innerHTML = '<span style="font-size:12px; color:var(--c-text-3);">сначала нажми «посчитать», чтобы появился список сотрудников.</span>';
 
-    // 6) Заглушка
     const out = document.getElementById('output');
     if (newMain.trim()) {
         out.innerHTML = '<h3 style="text-align:center; color:var(--c-text-3); font-size:14px;">данные проекта загружены — нажми «загрузить и обработать»</h3>';
@@ -4639,7 +4594,6 @@ function switchProject(id) {
         out.innerHTML = '<h3 style="text-align:center; color:var(--c-text-3); font-size:14px;">проект пуст — вставь данные и нажми «загрузить и обработать»</h3>';
     }
 
-    // 7) Обновляем UI
     renderProjectsTab();
     renderProjectsDropdown();
     showToast(id === 'default' ? 'Общий проект' : 'Проект переключен');
@@ -5092,6 +5046,113 @@ window.onload = () => {
         if (typeof renderProjectsDropdown === 'function') renderProjectsDropdown();
     }, 200);
 };
+
+// ============================================================
+// ОТЧЁТ В НОВОМ ОКНЕ
+// ============================================================
+window.openManagerReportNewWindow = function(projectMode) {
+    if (!globalReport || globalReport.length === 0) {
+        alert('Сначала загрузи данные в сводку (нажми «загрузить и обработать»).');
+        return;
+    }
+    const fromEl = document.getElementById('repDateFrom');
+    const toEl   = document.getElementById('repDateTo');
+    const groupEl = document.getElementById('repGroup');
+    const cmpEl   = document.getElementById('repCompare');
+
+    let fromVal = fromEl ? fromEl.value : '';
+    let toVal   = toEl   ? toEl.value   : '';
+    if (!fromVal || !toVal) {
+        const today = new Date();
+        const d30 = new Date(today); d30.setDate(d30.getDate() - 30);
+        fromVal = fromVal || d30.toISOString().slice(0, 10);
+        toVal   = toVal   || today.toISOString().slice(0, 10);
+    }
+
+    const params = new URLSearchParams({
+        report:    '1',
+        project:   projectMode || 'current',
+        projectId: window.currentProjectId || 'default',
+        group:     (groupEl && groupEl.value) || 'all',
+        from:      fromVal,
+        to:        toVal,
+        compare:   (cmpEl && cmpEl.checked) ? '1' : '0'
+    });
+
+    window.open(location.pathname + '?' + params.toString(), '_blank');
+};
+
+// ============================================================
+// РЕЖИМ «ОТЧЁТ В НОВОМ ОКНЕ» (?report=1)
+// ============================================================
+(function setupReportMode() {
+    const q = new URLSearchParams(location.search);
+    if (q.get('report') !== '1') return;
+
+    const style = document.createElement('style');
+    style.textContent = `
+        .app-header, .main-tabs, #authScreen, .save-toast { display: none !important; }
+        .tab-content { display: none !important; }
+        #tab-manager-report { display: block !important; }
+        body { background: #fff !important; padding: 20px !important; }
+        #modalOverlay, #vksModalOverlay { display: none !important; }
+    `;
+    document.head.appendChild(style);
+
+    const setVal = (id, v) => {
+        if (v === null || v === undefined) return;
+        const el = document.getElementById(id);
+        if (el) el.value = v;
+    };
+
+    const tryRender = (attempt = 0) => {
+        const app = document.getElementById('appScreen');
+        if (app) app.style.display = 'block';
+
+        const hasData = window.globalReport && window.globalReport.length > 0;
+
+        if (!hasData) {
+            if (attempt < 60) {
+                setTimeout(() => tryRender(attempt + 1), 100);
+                return;
+            }
+            const body = document.getElementById('repBody');
+            if (body) body.innerHTML = `
+                <div style="text-align:center; padding:40px; color:var(--c-text-2);">
+                    <p style="font-size:16px; margin-bottom:8px;">Не удалось загрузить данные.</p>
+                    <p style="font-size:13px;">Войдите в аккаунт в основном окне и загрузите отчёт в сводке.</p>
+                </div>`;
+            return;
+        }
+
+        const targetPid = q.get('projectId');
+        if (targetPid && typeof switchProject === 'function' && window.currentProjectId !== targetPid) {
+            try { switchProject(targetPid); } catch (e) { console.warn('switchProject failed', e); }
+        }
+
+        setVal('repProject',  q.get('project') || 'current');
+        setVal('repGroup',    q.get('group')   || 'all');
+        setVal('repDateFrom', q.get('from')    || '');
+        setVal('repDateTo',   q.get('to')      || '');
+
+        const cmpEl = document.getElementById('repCompare');
+        if (cmpEl) cmpEl.checked = q.get('compare') === '1';
+
+        try {
+            if (typeof renderManagerReport === 'function') {
+                renderManagerReport();
+            } else {
+                console.error('renderManagerReport не найдена');
+            }
+        } catch (e) {
+            console.error('Ошибка отрисовки отчёта:', e);
+            const body = document.getElementById('repBody');
+            if (body) body.innerHTML = `<p style="color:#C0392B; text-align:center; padding:20px;">Ошибка отрисовки: ${e.message}</p>`;
+        }
+    };
+
+    setTimeout(() => tryRender(), 200);
+})();
 </script>
 </body>
 </html>
