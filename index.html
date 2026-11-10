@@ -411,7 +411,7 @@ table.progress-table td.period-col { text-align: left; font-weight: 600; color: 
             </div>
             <div class="box">
                 <h3>2. Тренеры</h3>
-                <p>вставь ФИО и UUID. форматы: <b>Фамилия</b> — через Tab с ID.</p>
+                <p>вставь фамилию и UUID. форматы: <b>Фамилия</b> — через Tab с ID.</p>
                 <textarea id="namesData" placeholder="Иванов 81977398-70..."></textarea>
             </div>
             <div class="box">
@@ -500,7 +500,7 @@ table.progress-table td.period-col { text-align: left; font-weight: 600; color: 
 
         <div class="tabs-section" id="tabsSection">
             <h3>Карточки сотрудников</h3>
-            <input type="text" class="tabs-search" id="tabsSearch" placeholder="поиск по ФИО или marker_id..." oninput="renderTabs()">
+            <input type="text" class="tabs-search" id="tabsSearch" placeholder="поиск по фамилии или marker_id..." oninput="renderTabs()">
             <div class="tabs-list" id="tabsList"></div>
         </div>
 
@@ -628,7 +628,7 @@ table.progress-table td.period-col { text-align: left; font-weight: 600; color: 
             <div class="box" style="min-width:100%;">
                 <h3>Загрузка ВКС из отчёта</h3>
                 <p>вставь колонку «Отчёт по ВКС и НФ» из Excel. скрипт найдёт в тексте фамилии из справочника.</p>
-                <div class="import-info">⚠️ фамилии ищутся по первому слову из справочника ФИО.</div>
+                <div class="import-info">⚠️ фамилии ищутся по первому слову из справочника.</div>
                 <div style="display:flex; gap:15px; flex-wrap:wrap; margin-bottom:15px;">
                     <div style="flex:1; min-width:250px;">
                         <label style="font-size:13px; font-weight:600; display:block; margin-bottom:6px; color:var(--c-text-2);">дата ВКС:</label>
@@ -671,7 +671,7 @@ table.progress-table td.period-col { text-align: left; font-weight: 600; color: 
                         <textarea id="qDataInput" placeholder="скопируй из Excel столбцы marker_id, start_date, end_date, quality..."></textarea>
                     </div>
                     <div style="flex:1; min-width:300px;">
-                        <label style="font-size:13px; font-weight:600; display:block; margin-bottom:6px; color:var(--c-text-2);">2. справочник ФИО</label>
+                        <label style="font-size:13px; font-weight:600; display:block; margin-bottom:6px; color:var(--c-text-2);">2. справочник</label>
                         <textarea id="qNameInput" placeholder="Фамилия&#9;ID"></textarea>
                     </div>
                 </div>
@@ -1648,7 +1648,7 @@ function processData() {
         const qNum = parseFloat(quality.replace(',', '.'));
         if (isNaN(qNum)) return;
 
-        const name = employees[markerId] || 'ФИО не указано';
+        const name = employees[markerId] || 'фамилия не указана';
         if (!report[markerId]) {
             report[markerId] = { id: markerId, name: name, tasks: [] };
             taskComments[markerId] = [];
