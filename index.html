@@ -1513,7 +1513,7 @@ function syncQualityFromMain() {
     qNameEl.value = namesText;
     if (infoEl) infoEl.textContent = '✓ данные подставлены из сводки';
 }
-function openManagerReport(projectMode) {
+    function openManagerReport(projectMode) {
     if (!globalReport || globalReport.length === 0) {
         alert('Сначала загрузи данные в сводку (нажми «загрузить и обработать»).');
         return;
@@ -1528,23 +1528,22 @@ function openManagerReport(projectMode) {
         <div style="padding: 10px;">${reportBody}</div>
     `;
     
-    // ✅ Привязываем кнопку "Обновить"
+    // Кнопка "Обновить"
     const modalRenderBtn = modalContent.querySelector('button[onclick="renderManagerReport()"]');
     if (modalRenderBtn) {
         modalRenderBtn.onclick = (e) => { e.preventDefault(); renderManagerReport(); };
     }
 
-    // ✅ Главное: при изменении любого поля — пересчитываем
+    // Когда меняешь ЛЮБОЕ поле в модалке — отчёт пересчитывается
     ['repProject', 'repGroup', 'repDateFrom', 'repDateTo', 'repPreset', 'repCompare'].forEach(id => {
         const el = modalContent.querySelector('#' + id);
         if (el) {
-            // change — для date и select
             el.addEventListener('change', () => setTimeout(renderManagerReport, 20));
-            // input — на всякий случай для быстрого ввода
             el.addEventListener('input', () => setTimeout(renderManagerReport, 20));
         }
     });
 
+    // Сразу показываем отчёт
     renderManagerReport();
     document.getElementById('modalOverlay').classList.add('open');
 }
@@ -4260,7 +4259,7 @@ function renderManagerReport() {
         return;
     }
 
-    // ✅ Ищем поля ВНУТРИ модалки, а если её нет — в основной вкладке
+    // ✅ Ищем поля ВНУТРИ модалки, а не в скрытой вкладке
     const scope = document.getElementById('modalContent');
     const findEl = (id) => scope ? scope.querySelector('#' + id) : document.getElementById(id);
 
@@ -4299,6 +4298,7 @@ function renderManagerReport() {
         renderReportDynamics(filteredUsers, from, to, projectMode) +
         renderReportHeatmap(filteredUsers, from, to, projectMode);
 }
+        
 function openDrillDown(category, from, to, projectMode) {
     const pid = window.currentProjectId;
     const items = [];
