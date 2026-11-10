@@ -957,7 +957,7 @@ table.progress-table td.period-col { text-align: left; font-weight: 600; color: 
         <div class="container">
             <div class="box" style="min-width:100%;">
                 <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:20px;">
-                    <h3 style="margin:0;">Итоговый отчё</h3>
+                    <h3 style="margin:0;">Итоговый отчёт</h3>
                     <div style="display:flex; gap:8px; flex-wrap:wrap;">
                         <button class="btn-copy" onclick="renderManagerReport()" style="padding:10px 16px;">🔄 Обновить</button>
                         <button class="btn-copy" onclick="exportManagerReportExcel()" style="padding:10px 16px;">📊 Excel</button>
@@ -1513,14 +1513,13 @@ function syncQualityFromMain() {
     qNameEl.value = namesText;
     if (infoEl) infoEl.textContent = '✓ данные подставлены из сводки';
 }
-    function openManagerReport(projectMode) {
+function openManagerReport(projectMode) {
     if (!globalReport || globalReport.length === 0) {
         alert('Сначала загрузи данные в сводку (нажми «загрузить и обработать»).');
         return;
     }
     
     window._reportProjectMode = projectMode;
-    renderManagerReport();
     
     // Переносим блок отчёта в модальное окно
     const modalContent = document.getElementById('modalContent');
@@ -1530,10 +1529,26 @@ function syncQualityFromMain() {
         <div style="padding: 10px;">${reportBody}</div>
     `;
     
-    // Перепривязываем кнопки внутри модального окна
+    // Привязываем кнопку "Обновить" и вешаем слушатели на даты
     const modalRenderBtn = modalContent.querySelector('button[onclick="renderManagerReport()"]');
-    if (modalRenderBtn) modalRenderBtn.onclick = () => renderManagerReport();
-    
+    if (modalRenderBtn) {
+        modalRenderBtn.onclick = () => {
+            // Принудительно читаем новые значения из полей
+            renderManagerReport();
+        };
+    }
+
+    // Вешаем слушатели на изменение дат, чтобы отчёт перерисовывался сам
+    ['repDateFrom', 'repDateTo', 'repPreset', 'repGroup', 'repCompare'].forEach(id => {
+        const el = modalContent.querySelector('#' + id);
+        if (el) {
+            el.addEventListener('change', renderManagerReport);
+            el.addEventListener('input', renderManagerReport);
+        }
+    });
+
+    // Первичная отрисовка
+    renderManagerReport();
     document.getElementById('modalOverlay').classList.add('open');
 }
 </script>
@@ -2883,8 +2898,8 @@ function renderProgress() {
     const fromStr = document.getElementById('progFrom').value || null;
     const toStr = document.getElementById('progTo').value || null;
 
-    const filteredUsers = globalReport.filter(u => {
-        if (userCards[u.id]?.archived) return false;
+const filteredUsers = currentFilteredUsers.map(cu => globalReport.find(gu => gu.id === cu.id)).filter(Boolean).filter(u => {
+    if (userCards[u.id]?.archived) return false;
         const m = userMarks[u.id];
         if (group === 'newbie' && m !== 'newbie') return false;
         if (group === 'experienced' && m !== 'experienced') return false;
@@ -3602,7 +3617,7 @@ function renderCompareTable() {
     const from = document.getElementById('cmpDateFrom').value || '2000-01-01';
     const to = document.getElementById('cmpDateTo').value || '2099-12-31';
 
-    const usersList = globalReport.filter(u => !(userCards[u.id]?.archived));
+    const usersList = (currentFilteredUsers.length > 0 ? currentFilteredUsers.map(cu => globalReport.find(gu => gu.id === cu.id)).filter(Boolean) : globalReport).filter(u => !(userCards[u.id]?.archived));
     if (usersList.length === 0) {
         document.getElementById('cmpTableContainer').innerHTML = '<p style="padding:20px; text-align:center; color:var(--c-text-3);">Нет данных. Загрузите отчёт в Сводке.</p>';
         document.getElementById('cmpKpi').innerHTML = '';
@@ -3767,8 +3782,13 @@ function renderAiAnalysis() {
     if (targetId !== 'all' && !targetUser) { outBox.style.display = 'none'; emptyBox.style.display = 'block'; return; }
 
     const tasks = [];
+    // Берем список сотрудников из фильтра Сводки (если он пуст — берем всех)
+    const usersForAi = (currentFilteredUsers && currentFilteredUsers.length > 0)
+        ? currentFilteredUsers.map(cu => globalReport.find(gu => gu.id === cu.id)).filter(Boolean)
+        : globalReport;
+
     if (targetId === 'all') {
-        globalReport.forEach(u => {
+        usersForAi.forEach(u => {
             (u.tasks || []).forEach(t => {
                 if (currentProjectId !== 'default' && t.projectId !== currentProjectId) return;
                 const d = t.startDate || t.endDate;
@@ -3990,23 +4010,34 @@ function deltaSpan(cur, old, invert) {
 }
 
 function renderReportKpi(cur, old, prev) {
-    const cmp = old ? `<div class="sub" style="font-size:11px; color:var(--c-text-3);">vs ${formatDateShort(prev.from)}–${formatDateShort(prev.to)}</div>` : '';
+    let cmpText = '';
+    if (old) {
+        const diff = cur.errPct - old.errPct;
+        if (diff < -0.5) cmpText = `<div class="sub" style="font-size:11px; color:var(--c-green); font-weight:600;">Улучшение на ${Math.abs(diff).toFixed(1)} п.п. к прошлому периоду</div>`;
+        else if (diff > 0.5) cmpText = `<div class="sub" style="font-size:11px; color:var(--c-red); font-weight:600;">Ухудшение на ${diff.toFixed(1)} п.п. к прошлому периоду</div>`;
+        else cmpText = `<div class="sub" style="font-size:11px; color:var(--c-text-3);">Без изменений к прошлому периоду</div>`;
+    }
+
     return `<div class="progress-kpi-grid" style="margin-bottom:24px;">
         <div class="progress-kpi" style="border-left-color:var(--c-primary);">
             <div class="lbl">Всего задач</div>
-            <div class="val">${cur.total}${old ? deltaSpan(cur.total, old.total, false) : ''}</div>${cmp}
+            <div class="val">${cur.total}${old ? deltaSpan(cur.total, old.total, false) : ''}</div>
+            <div class="sub" style="font-size:11px; color:var(--c-text-3);">за выбранный период</div>
         </div>
         <div class="progress-kpi" style="border-left-color:var(--c-red);">
             <div class="lbl">С ошибками</div>
-            <div class="val">${cur.errors}${old ? deltaSpan(cur.errors, old.errors, true) : ''}</div>${cmp}
+            <div class="val">${cur.errors}${old ? deltaSpan(cur.errors, old.errors, true) : ''}</div>
+            <div class="sub" style="font-size:11px; color:var(--c-text-3);">задач с замечаниями</div>
         </div>
         <div class="progress-kpi" style="border-left-color:var(--c-orange);">
             <div class="lbl">% ошибок</div>
-            <div class="val">${cur.errPct.toFixed(1)}%${old ? deltaSpan(cur.errPct, old.errPct, true) : ''}</div>${cmp}
+            <div class="val">${cur.errPct.toFixed(1)}%${old ? deltaSpan(cur.errPct, old.errPct, true) : ''}</div>
+            ${cmpText || '<div class="sub" style="font-size:11px; color:var(--c-text-3);">доля брака</div>'}
         </div>
         <div class="progress-kpi" style="border-left-color:var(--c-green);">
             <div class="lbl">Среднее качество</div>
-            <div class="val">${cur.avgQ.toFixed(1)}%${old ? deltaSpan(cur.avgQ, old.avgQ, false) : ''}</div>${cmp}
+            <div class="val">${cur.avgQ.toFixed(1)}%${old ? deltaSpan(cur.avgQ, old.avgQ, false) : ''}</div>
+            <div class="sub" style="font-size:11px; color:var(--c-text-3);">оценка качества</div>
         </div>
     </div>`;
 }
