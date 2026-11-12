@@ -959,9 +959,10 @@ table.progress-table td.period-col { text-align: left; font-weight: 600; color: 
                 <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:20px;">
                     <h3 style="margin:0;">Итоговый отчёт</h3>
                     <div style="display:flex; gap:8px; flex-wrap:wrap;">
-                        <button class="btn-copy" onclick="renderManagerReport()" style="padding:10px 16px;">🔄 Обновить</button>
-                        <button class="btn-copy" onclick="exportManagerReportExcel()" style="padding:10px 16px;">📊 Excel</button>
-                        <button class="btn-copy" onclick="window.print()" style="padding:10px 16px;">🖨 PDF / Печать</button>
+<button class="btn-copy" onclick="renderManagerReport()" style="padding:10px 16px;">🔄 Обновить</button>
+<button class="btn-copy" onclick="exportManagerReport()" style="padding:10px 16px; background:var(--c-primary); color:#fff;">📋 Отчёт</button>
+<button class="btn-copy" onclick="exportManagerReportExcel()" style="padding:10px 16px;">📊 Excel (детально)</button>
+<button class="btn-copy" onclick="window.print()" style="padding:10px 16px;">🖨 PDF / Печать</button>
                     </div>
                 </div>
                 <div class="progress-controls" style="margin-bottom:20px;">
@@ -4493,7 +4494,554 @@ async function exportManagerReportExcel() {
         alert('Ошибка экспорта: ' + e.message);
     }
 }
+// ============================================================
+// ЭКСПОРТ ОТЧЁТА (ExcelJS) — 6 листов
+// Сводка · Ошибки квартал · Ошибки неделя ·
+// Динамика неделя · Динамика по сотрудникам · Рейтинг
+// ============================================================
+async function exportManagerReport() {
+    if (!window.globalReport || !window.globalReport.length) {
+        alert('Нет данных. Сначала загрузите отчёт в сводке.');
+        return;
+    }
+    try {
+        showToast('Готовим отчёт…');
+        const ExcelJS = await loadExcelJS();
 
+        // ---------- ИСХОДНЫЕ ----------
+        const group = document.getElementById('repGroup').value;
+        const projectMode = document.getElementById('repProject').value;
+
+        const usersAll = globalReport.filter(u => {
+            if (userCards[u.id]?.archived) return false;
+            const m = userMarks[u.id];
+            if (group === 'newbie' && m !== 'newbie') return false;
+            if (group === 'experienced' && m !== 'experienced') return false;
+            return true;
+        });
+
+        const allTasks = getReportTasks(usersAll, null, null, projectMode);
+        if (!allTasks.length) { alert('Нет задач для выбранных пользователей'); return; }
+
+        const today = new Date();
+        const isoT = today.toISOString().slice(0, 10);
+
+        // Текущий квартал
+        const qStart = new Date(today.getFullYear(), Math.floor(today.getMonth() / 3) * 3, 1);
+        const qFrom = qStart.toISOString().slice(0, 10);
+        const qTo = isoT;
+
+        // Прошлый квартал
+        const prevQEnd = new Date(qStart); prevQEnd.setDate(prevQEnd.getDate() - 1);
+        const prevQStart = new Date(prevQEnd.getFullYear(), Math.floor(prevQEnd.getMonth() / 3) * 3, 1);
+        const pQFrom = prevQStart.toISOString().slice(0, 10);
+        const pQTo = prevQEnd.toISOString().slice(0, 10);
+
+        // Последняя неделя
+        const weekFrom = new Date(today); weekFrom.setDate(weekFrom.getDate() - 6);
+        const wFrom = weekFrom.toISOString().slice(0, 10);
+        const wTo = isoT;
+
+        // Прошлая неделя
+        const prevWEnd = new Date(weekFrom); prevWEnd.setDate(prevWEnd.getDate() - 1);
+        const prevWFrom = new Date(prevWEnd); prevWFrom.setDate(prevWFrom.getDate() - 6);
+        const pwFrom = prevWFrom.toISOString().slice(0, 10);
+        const pwTo = prevWEnd.toISOString().slice(0, 10);
+
+        // ---------- АГРЕГАТОРЫ ----------
+        const agg = (from, to) => {
+            let total = 0, errors = 0, qSum = 0;
+            const cats = {}; categoriesList.forEach(c => cats[c] = 0);
+            allTasks.forEach(t => {
+                const d = t.startDate || t.endDate;
+                if (!d || d < from || d > to) return;
+                total++;
+                if (t.hasErrors) errors++;
+                qSum += (t.quality || 0);
+                categoriesList.forEach(c => { if (t.cats[c]) cats[c]++; });
+            });
+            return {
+                total, errors, cats,
+                errPct: total ? errors / total * 100 : 0,
+                avgQ: total ? qSum / total * 100 : 0
+            };
+        };
+
+        const aggByUser = (from, to) => {
+            const byU = {};
+            usersAll.forEach(u => {
+                byU[u.id] = { name: u.name, total: 0, errors: 0, qSum: 0, cats: {} };
+                categoriesList.forEach(c => byU[u.id].cats[c] = 0);
+            });
+            allTasks.forEach(t => {
+                const d = t.startDate || t.endDate;
+                if (!d || d < from || d > to) return;
+                const u = byU[t.userId];
+                if (!u) return;
+                u.total++;
+                if (t.hasErrors) u.errors++;
+                u.qSum += (t.quality || 0);
+                categoriesList.forEach(c => { if (t.cats[c]) u.cats[c]++; });
+            });
+            return byU;
+        };
+
+        const getWeekBuckets = (from, to) => {
+            const buckets = {};
+            allTasks.forEach(t => {
+                const d = t.startDate || t.endDate;
+                if (!d || d < from || d > to) return;
+                const dt = new Date(d + 'T00:00:00');
+                const dow = dt.getDay() || 7;
+                const mon = new Date(dt); mon.setDate(dt.getDate() - dow + 1);
+                const sun = new Date(mon); sun.setDate(mon.getDate() + 6);
+                const key = mon.toISOString().slice(0, 10);
+                if (!buckets[key]) {
+                    buckets[key] = {
+                        total: 0, errors: 0, qSum: 0, byUser: {},
+                        label: `${pad2(mon.getDate())}.${pad2(mon.getMonth()+1)}–${pad2(sun.getDate())}.${pad2(sun.getMonth()+1)}`
+                    };
+                }
+                const b = buckets[key];
+                b.total++;
+                if (t.hasErrors) b.errors++;
+                b.qSum += (t.quality || 0);
+                if (!b.byUser[t.userId]) b.byUser[t.userId] = { total: 0, errors: 0 };
+                b.byUser[t.userId].total++;
+                if (t.hasErrors) b.byUser[t.userId].errors++;
+            });
+            return buckets;
+        };
+
+        // ---------- ДАННЫЕ ----------
+        const curQ = agg(qFrom, qTo);
+        const oldQ = agg(pQFrom, pQTo);
+        const curW = agg(wFrom, wTo);
+        const oldW = agg(pwFrom, pwTo);
+        const quarterWeeks = getWeekBuckets(qFrom, qTo);
+        const weekKeys = Object.keys(quarterWeeks).sort();
+        const userQ = aggByUser(qFrom, qTo);
+
+        // ---------- СТИЛИ ----------
+        const C = {
+            header:    'FF34495E',
+            primary:   'FF5B9DF9',
+            primaryBg: 'FFEEF4FF',
+            green:     'FFD4EDDA', greenTxt: 'FF155724',
+            warn:      'FFFFF3CD', warnTxt:  'FF856404',
+            bad:       'FFF8D7DA', badTxt:   'FF721C24',
+            gray:      'FFF5F5F7',
+            border:    'FFDDDDDD'
+        };
+        const thinBorder = {
+            top:    { style: 'thin', color: { argb: C.border } },
+            left:   { style: 'thin', color: { argb: C.border } },
+            bottom: { style: 'thin', color: { argb: C.border } },
+            right:  { style: 'thin', color: { argb: C.border } }
+        };
+        const styleTitle = (cell) => {
+            cell.font = { bold: true, size: 18, color: { argb: C.primary } };
+            cell.alignment = { horizontal: 'center', vertical: 'middle' };
+        };
+        const styleSubtitle = (cell) => {
+            cell.font = { size: 11, color: { argb: 'FF6E6E73' }, italic: true };
+            cell.alignment = { horizontal: 'center' };
+        };
+        const styleHeaderRow = (row, bg = C.header) => {
+            row.eachCell(c => {
+                c.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 11 };
+                c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bg } };
+                c.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+                c.border = thinBorder;
+            });
+            row.height = 26;
+        };
+        const styleDataRow = (row) => {
+            row.eachCell(c => {
+                c.border = thinBorder;
+                c.alignment = { vertical: 'middle', wrapText: true };
+            });
+        };
+        const fillBadge = (cell, pct) => {
+            let fill, txt;
+            if (pct <= 5)      { fill = C.green; txt = C.greenTxt; }
+            else if (pct <= 15){ fill = C.warn;  txt = C.warnTxt;  }
+            else               { fill = C.bad;   txt = C.badTxt;   }
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: fill } };
+            cell.font = { bold: true, color: { argb: txt } };
+            cell.alignment = { horizontal: 'center', vertical: 'middle' };
+        };
+        const deltaText = (cur, old, invert = true) => {
+            if (old === null || old === undefined || old === 0) return '—';
+            const d = cur - old;
+            if (Math.abs(d) < 0.01) return '0';
+            const good = invert ? d < 0 : d > 0;
+            return (d > 0 ? '+' : '') + d.toFixed(1) + (good ? ' ✅' : ' ⚠️');
+        };
+
+        const projLabel = projectMode === 'all'
+            ? 'Все проекты'
+            : (window.currentProjectId === 'default'
+                ? 'Общий проект'
+                : ((window.myProjects || []).find(p => p.id === window.currentProjectId)?.name || 'Проект'));
+        const groupLabel = group === 'all' ? 'все' : group === 'newbie' ? 'новички' : 'опытные';
+        const periodQ = `${formatDateShort(qFrom)} – ${formatDateShort(qTo)}`;
+        const periodW = `${formatDateShort(wFrom)} – ${formatDateShort(wTo)}`;
+
+        // ============================================================
+        // ЛИСТ 1. СВОДКА
+        // ============================================================
+        const ws1 = wb.addWorksheet('Сводка', { properties: { tabColor: { argb: C.primary } } });
+        ws1.columns = [{ width: 32 }, { width: 20 }, { width: 20 }, { width: 20 }];
+
+        ws1.mergeCells('A1:D1');
+        styleTitle(ws1.getCell('A1'));
+        ws1.getCell('A1').value = 'Отчёт о качестве работы команды';
+        ws1.getRow(1).height = 32;
+
+        ws1.mergeCells('A2:D2');
+        styleSubtitle(ws1.getCell('A2'));
+        ws1.getCell('A2').value = `${projLabel} · группа: ${groupLabel} · сформирован: ${today.toLocaleDateString('ru-RU')}`;
+        ws1.getRow(2).height = 20;
+
+        ws1.addRow([]);
+
+        // KPI-таблица
+        styleHeaderRow(ws1.addRow(['Показатель', 'Квартал', 'Прошлый квартал', 'Δ']));
+        const kpiRows = [
+            ['Задач за квартал',       curQ.total,   oldQ.total,   deltaText(curQ.total, oldQ.total, false)],
+            ['С ошибками',             curQ.errors,  oldQ.errors,  deltaText(curQ.errors, oldQ.errors, true)],
+            ['% ошибок',               curQ.errPct.toFixed(1) + '%', oldQ.errPct.toFixed(1) + '%', deltaText(curQ.errPct, oldQ.errPct, true)],
+            ['Среднее качество',       curQ.avgQ.toFixed(1) + '%',  oldQ.avgQ.toFixed(1) + '%',  deltaText(curQ.avgQ, oldQ.avgQ, false)]
+        ];
+        kpiRows.forEach(r => {
+            const row = ws1.addRow(r);
+            styleDataRow(row);
+            row.getCell(1).font = { bold: true };
+        });
+
+        ws1.addRow([]);
+        styleHeaderRow(ws1.addRow(['Показатель', 'Неделя', 'Прошлая неделя', 'Δ']));
+        const kpiRowsW = [
+            ['Задач за неделю',        curW.total,   oldW.total,   deltaText(curW.total, oldW.total, false)],
+            ['С ошибками',             curW.errors,  oldW.errors,  deltaText(curW.errors, oldW.errors, true)],
+            ['% ошибок',               curW.errPct.toFixed(1) + '%', oldW.errPct.toFixed(1) + '%', deltaText(curW.errPct, oldW.errPct, true)],
+            ['Среднее качество',       curW.avgQ.toFixed(1) + '%',  oldW.avgQ.toFixed(1) + '%',  deltaText(curW.avgQ, oldW.avgQ, false)]
+        ];
+        kpiRowsW.forEach(r => {
+            const row = ws1.addRow(r);
+            styleDataRow(row);
+            row.getCell(1).font = { bold: true };
+        });
+
+        // Комментарий менеджера
+        const note = document.getElementById('repManagerNote')?.value;
+        if (note && note.trim()) {
+            ws1.addRow([]);
+            const h = ws1.addRow(['Комментарий менеджера']);
+            ws1.mergeCells(`A${h.number}:D${h.number}`);
+            styleHeaderRow(h, C.primary);
+            const nr = ws1.addRow([note]);
+            ws1.mergeCells(`A${nr.number}:D${nr.number}`);
+            styleDataRow(nr);
+            nr.height = 60;
+            nr.getCell(1).alignment = { wrapText: true, vertical: 'top' };
+        }
+
+        // ============================================================
+        // ЛИСТ 2. ТИПИЧНЫЕ ОШИБКИ — КВАРТАЛ
+        // ============================================================
+        const ws2 = wb.addWorksheet('Ошибки квартал', { properties: { tabColor: { argb: 'FFEF4444' } } });
+        ws2.columns = [{ width: 32 }, { width: 12 }, { width: 14 }, { width: 14 }, { width: 16 }];
+
+        ws2.mergeCells('A1:E1');
+        styleTitle(ws2.getCell('A1'));
+        ws2.getCell('A1').value = `Типичные ошибки за квартал (${periodQ})`;
+        ws2.getRow(1).height = 28;
+
+        ws2.mergeCells('A2:E2');
+        styleSubtitle(ws2.getCell('A2'));
+        ws2.getCell('A2').value = `Всего задач: ${curQ.total} · с ошибками: ${curQ.errors} (${curQ.errPct.toFixed(1)}%)`;
+        ws2.getRow(2).height = 18;
+
+        ws2.addRow([]);
+        styleHeaderRow(ws2.addRow(['Категория', 'Кол-во', 'Доля от задач', 'Прошлый квартал', 'Δ']));
+
+        categoriesList.forEach(cat => {
+            const cv = curQ.cats[cat] || 0;
+            const ov = oldQ.cats[cat] || 0;
+            if (cv === 0 && ov === 0) return;
+            const pct = curQ.total ? (cv / curQ.total * 100) : 0;
+            const delta = deltaText(cv, ov, true);
+            const row = ws2.addRow([
+                CAT_SHORT_LABELS[cat] || cat,
+                cv,
+                pct.toFixed(1) + '%',
+                ov,
+                delta
+            ]);
+            styleDataRow(row);
+            row.getCell(1).font = { bold: true };
+            if (pct >= 5) {
+                row.getCell(3).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: C.bad } };
+                row.getCell(3).font = { bold: true, color: { argb: C.badTxt } };
+            }
+        });
+
+        // Итог
+        const totRow = ws2.addRow(['ИТОГО', curQ.errors, curQ.errPct.toFixed(1) + '%', oldQ.errors, deltaText(curQ.errors, oldQ.errors, true)]);
+        styleDataRow(totRow);
+        totRow.eachCell(c => {
+            c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: C.primaryBg } };
+            c.font = { bold: true };
+        });
+
+        // ============================================================
+        // ЛИСТ 3. ТИПИЧНЫЕ ОШИБКИ — НЕДЕЛЯ
+        // ============================================================
+        const ws3 = wb.addWorksheet('Ошибки неделя', { properties: { tabColor: { argb: 'FFEF4444' } } });
+        ws3.columns = [{ width: 32 }, { width: 12 }, { width: 14 }, { width: 14 }, { width: 16 }];
+
+        ws3.mergeCells('A1:E1');
+        styleTitle(ws3.getCell('A1'));
+        ws3.getCell('A1').value = `Типичные ошибки за неделю (${periodW})`;
+        ws3.getRow(1).height = 28;
+
+        ws3.mergeCells('A2:E2');
+        styleSubtitle(ws3.getCell('A2'));
+        ws3.getCell('A2').value = `Всего задач: ${curW.total} · с ошибками: ${curW.errors} (${curW.errPct.toFixed(1)}%)`;
+        ws3.getRow(2).height = 18;
+
+        ws3.addRow([]);
+        styleHeaderRow(ws3.addRow(['Категория', 'Кол-во', 'Доля от задач', 'Прошлая неделя', 'Δ']));
+
+        categoriesList.forEach(cat => {
+            const cv = curW.cats[cat] || 0;
+            const ov = oldW.cats[cat] || 0;
+            if (cv === 0 && ov === 0) return;
+            const pct = curW.total ? (cv / curW.total * 100) : 0;
+            const delta = deltaText(cv, ov, true);
+            const row = ws3.addRow([
+                CAT_SHORT_LABELS[cat] || cat,
+                cv,
+                pct.toFixed(1) + '%',
+                ov,
+                delta
+            ]);
+            styleDataRow(row);
+            row.getCell(1).font = { bold: true };
+            if (pct >= 5) {
+                row.getCell(3).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: C.bad } };
+                row.getCell(3).font = { bold: true, color: { argb: C.badTxt } };
+            }
+        });
+
+        const totRowW = ws3.addRow(['ИТОГО', curW.errors, curW.errPct.toFixed(1) + '%', oldW.errors, deltaText(curW.errors, oldW.errors, true)]);
+        styleDataRow(totRowW);
+        totRowW.eachCell(c => {
+            c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: C.primaryBg } };
+            c.font = { bold: true };
+        });
+
+        // ============================================================
+        // ЛИСТ 4. ДИНАМИКА ЗА НЕДЕЛЮ (по неделям квартала)
+        // ============================================================
+        const ws4 = wb.addWorksheet('Динамика неделя', { properties: { tabColor: { argb: 'FF34C759' } } });
+        ws4.columns = [
+            { width: 18 }, { width: 12 }, { width: 12 },
+            { width: 14 }, { width: 14 }, { width: 22 }
+        ];
+
+        ws4.mergeCells('A1:F1');
+        styleTitle(ws4.getCell('A1'));
+        ws4.getCell('A1').value = `Динамика по неделям (${periodQ})`;
+        ws4.getRow(1).height = 28;
+
+        ws4.mergeCells('A2:F2');
+        styleSubtitle(ws4.getCell('A2'));
+        ws4.getCell('A2').value = `Недель в периоде: ${weekKeys.length}`;
+        ws4.getRow(2).height = 18;
+
+        ws4.addRow([]);
+        styleHeaderRow(ws4.addRow(['Неделя', 'Задач', 'С ошиб.', '% ошибок', 'Качество', 'Визуально (% ошибок)']));
+
+        let maxErrW = 1;
+        weekKeys.forEach(k => { if (quarterWeeks[k].total) maxErrW = Math.max(maxErrW, quarterWeeks[k].errors / quarterWeeks[k].total * 100); });
+
+        weekKeys.forEach(k => {
+            const b = quarterWeeks[k];
+            const errPct = b.total ? (b.errors / b.total * 100) : 0;
+            const q = b.total ? (b.qSum / b.total * 100) : 0;
+            const barLen = Math.round((errPct / maxErrW) * 20);
+            const bar = '█'.repeat(barLen);
+            const row = ws4.addRow([b.label, b.total, b.errors, errPct.toFixed(1) + '%', q.toFixed(1) + '%', bar]);
+            styleDataRow(row);
+            row.getCell(1).font = { bold: true };
+            fillBadge(row.getCell(4), errPct);
+            row.getCell(6).font = { color: { argb: 'FFEF4444' }, name: 'Consolas' };
+        });
+
+        // ============================================================
+        // ЛИСТ 5. ДИНАМИКА ПО СОТРУДНИКАМ (матрица сотрудник × неделя)
+        // ============================================================
+        const ws5 = wb.addWorksheet('Динамика по сотрудникам', { properties: { tabColor: { argb: 'FF7B6FE8' } } });
+        const cols5 = [{ width: 30 }, { width: 10 }]; // сотрудник + итог
+        weekKeys.forEach(() => cols5.push({ width: 11 }));
+        cols5.push({ width: 12 }); // тренд
+        ws5.columns = cols5;
+
+        const lastColLetter = ws5.getColumn(2 + weekKeys.length + 1).letter;
+        ws5.mergeCells(`A1:${lastColLetter}1`);
+        styleTitle(ws5.getCell('A1'));
+        ws5.getCell('A1').value = `Динамика по сотрудникам: % ошибок по неделям (${periodQ})`;
+        ws5.getRow(1).height = 28;
+
+        ws5.mergeCells(`A2:${lastColLetter}2`);
+        styleSubtitle(ws5.getCell('A2'));
+        ws5.getCell('A2').value = `Строк: ${Object.keys(userQ).length} · недель: ${weekKeys.length}. Цвет: зелёный ≤5%, жёлтый ≤15%, красный >15%`;
+        ws5.getRow(2).height = 18;
+
+        ws5.addRow([]);
+        const head5 = ['Сотрудник', '% ошибок (квартал)'];
+        weekKeys.forEach(k => head5.push(quarterWeeks[k].label));
+        head5.push('Тренд');
+        styleHeaderRow(ws5.addRow(head5));
+
+        const usersSorted = Object.values(userQ)
+            .filter(u => u.total > 0)
+            .sort((a, b) => {
+                const aP = a.total ? a.errors / a.total : 0;
+                const bP = b.total ? b.errors / b.total : 0;
+                return bP - aP;
+            });
+
+        usersSorted.forEach(u => {
+            const qPct = u.total ? (u.errors / u.total * 100) : 0;
+            const row = ws5.addRow([u.name, qPct.toFixed(1) + '%']);
+
+            let first = null, last = null;
+            weekKeys.forEach(k => {
+                const b = quarterWeeks[k];
+                const bu = b.byUser[u.id];
+                if (!bu || !bu.total) {
+                    row.addCell('—');
+                    return;
+                }
+                const pct = bu.total ? (bu.errors / bu.total * 100) : 0;
+                row.addCell(pct.toFixed(1) + '%');
+                if (first === null) first = pct;
+                last = pct;
+            });
+
+            // Тренд
+            let trend = '—';
+            if (first !== null && last !== null) {
+                const d = last - first;
+                trend = (d > 0.5 ? '↑ +' : d < -0.5 ? '↓ ' : '→ ') + d.toFixed(1) + ' п.п.';
+            }
+            row.addCell(trend);
+
+            styleDataRow(row);
+            row.getCell(1).font = { bold: true };
+            fillBadge(row.getCell(2), qPct);
+
+            weekKeys.forEach((k, idx) => {
+                const cell = row.getCell(3 + idx);
+                const txt = cell.value;
+                if (typeof txt === 'string' && txt.endsWith('%')) {
+                    const v = parseFloat(txt);
+                    fillBadge(cell, v);
+                } else {
+                    cell.alignment = { horizontal: 'center', vertical: 'middle' };
+                }
+            });
+            const trendCell = row.getCell(3 + weekKeys.length);
+            trendCell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+            if (trend.startsWith('↓')) trendCell.font = { color: { argb: C.greenTxt }, bold: true };
+            else if (trend.startsWith('↑')) trendCell.font = { color: { argb: C.badTxt }, bold: true };
+        });
+
+        // ============================================================
+        // ЛИСТ 6. РЕЙТИНГ СОТРУДНИКОВ
+        // ============================================================
+        const ws6 = wb.addWorksheet('Рейтинг сотрудников', { properties: { tabColor: { argb: 'FFFF9500' } } });
+        ws6.columns = [
+            { width: 8 },   // место
+            { width: 30 },  // имя
+            { width: 10 },  // задач
+            { width: 10 },  // ошибок
+            { width: 12 },  // % ошибок
+            { width: 12 },  // качество
+            { width: 26 }   // топ-ошибка
+        ];
+
+        ws6.mergeCells('A1:G1');
+        styleTitle(ws6.getCell('A1'));
+        ws6.getCell('A1').value = `Рейтинг сотрудников (${periodQ})`;
+        ws6.getRow(1).height = 28;
+
+        ws6.mergeCells('A2:G2');
+        styleSubtitle(ws6.getCell('A2'));
+        ws6.getCell('A2').value = `Сортировка: сначала лучшие (по % ошибок), затем худшие`;
+        ws6.getRow(2).height = 18;
+
+        ws6.addRow([]);
+        styleHeaderRow(ws6.addRow(['№', 'Сотрудник', 'Задач', 'С ошибками', '% ошибок', 'Качество', 'Топ-ошибка']));
+
+        const rankSorted = Object.values(userQ)
+            .filter(u => u.total > 0)
+            .sort((a, b) => {
+                const aP = a.total ? a.errors / a.total : 0;
+                const bP = b.total ? b.errors / b.total : 0;
+                return aP - bP;
+            });
+
+        rankSorted.forEach((u, idx) => {
+            const errPct = u.total ? (u.errors / u.total * 100) : 0;
+            const q = u.total ? (u.qSum / u.total * 100) : 0;
+            const topCat = categoriesList
+                .map(c => ({ c, v: u.cats[c] || 0 }))
+                .sort((a, b) => b.v - a.v)[0];
+            const topCatText = topCat && topCat.v > 0
+                ? `${CAT_SHORT_LABELS[topCat.c] || topCat.c} (${topCat.v})`
+                : '—';
+
+            const row = ws6.addRow([
+                idx + 1,
+                u.name,
+                u.total,
+                u.errors,
+                errPct.toFixed(1) + '%',
+                q.toFixed(1) + '%',
+                topCatText
+            ]);
+            styleDataRow(row);
+            row.getCell(1).alignment = { horizontal: 'center', vertical: 'middle' };
+            row.getCell(2).font = { bold: true };
+            fillBadge(row.getCell(5), errPct);
+
+            // Медальки для топ-3 и антитопа
+            if (idx === 0) row.getCell(1).value = '🥇';
+            else if (idx === 1) row.getCell(1).value = '🥈';
+            else if (idx === 2) row.getCell(1).value = '🥉';
+            else if (idx === rankSorted.length - 1 && rankSorted.length > 3) row.getCell(1).value = '⚠️';
+        });
+
+        // ---------- СОХРАНЕНИЕ ----------
+        const buffer = await wb.xlsx.writeBuffer();
+        const blob = new Blob([buffer], { type: 'application/octet-stream' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `отчёт_${qFrom}_${qTo}.xlsx`;
+        a.click();
+        URL.revokeObjectURL(url);
+        showToast('Отчёт готов ✓');
+    } catch (e) {
+        console.error(e);
+        alert('Ошибка экспорта: ' + e.message);
+    }
+}
 // --- ПРОЕКТЫ ---
 function renderProjectsTab() {
     const container = document.getElementById('projectsListContainer');
