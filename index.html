@@ -4542,7 +4542,7 @@ async function exportManagerReport() {
 
         // Прошлая неделя
         const prevWEnd = new Date(weekFrom); prevWEnd.setDate(prevWEnd.getDate() - 1);
-        const prevWFrom = new Date(prevWEnd); prevWFrom.setDate(prevWFrom.getDate() - 6);
+        const prevWFrom = new Date(prevWEnd); prevWFrom.setDate(prevWEnd.getDate() - 6);
         const pwFrom = prevWFrom.toISOString().slice(0, 10);
         const pwTo = prevWEnd.toISOString().slice(0, 10);
 
@@ -4632,13 +4632,9 @@ async function exportManagerReport() {
             border:    'FFDDDDDD'
         };
 
-        // ============================================================
-        // СОЗДАНИЕ КНИГИ (ТЕ САМЫЕ ПРОПУЩЕННЫЕ СТРОКИ)
-        // ============================================================
         const wb = new ExcelJS.Workbook();
         wb.creator = 'Дашборд качества';
         wb.created = new Date();
-        // ============================================================
 
         const thinBorder = {
             top:    { style: 'thin', color: { argb: C.border } },
@@ -4892,9 +4888,9 @@ async function exportManagerReport() {
         // ЛИСТ 5. ДИНАМИКА ПО СОТРУДНИКАМ (матрица сотрудник × неделя)
         // ============================================================
         const ws5 = wb.addWorksheet('Динамика по сотрудникам', { properties: { tabColor: { argb: 'FF7B6FE8' } } });
-        const cols5 = [{ width: 30 }, { width: 10 }];
+        const cols5 = [{ width: 30 }, { width: 10 }]; // сотрудник + итог
         weekKeys.forEach(() => cols5.push({ width: 11 }));
-        cols5.push({ width: 12 });
+        cols5.push({ width: 12 }); // тренд
         ws5.columns = cols5;
 
         const lastColLetter = ws5.getColumn(2 + weekKeys.length + 1).letter;
@@ -4924,33 +4920,39 @@ async function exportManagerReport() {
 
         usersSorted.forEach(u => {
             const qPct = u.total ? (u.errors / u.total * 100) : 0;
+            // Создаём строку с первыми двумя значениями
             const row = ws5.addRow([u.name, qPct.toFixed(1) + '%']);
 
             let first = null, last = null;
-            weekKeys.forEach(k => {
+            // Записываем данные по неделям через getCell
+            weekKeys.forEach((k, idx) => {
                 const b = quarterWeeks[k];
                 const bu = b.byUser[u.id];
+                const cell = row.getCell(3 + idx); // 3-я колонка и далее
                 if (!bu || !bu.total) {
-                    row.addCell('—');
-                    return;
+                    cell.value = '—';
+                } else {
+                    const pct = bu.total ? (bu.errors / bu.total * 100) : 0;
+                    cell.value = pct.toFixed(1) + '%';
+                    if (first === null) first = pct;
+                    last = pct;
                 }
-                const pct = bu.total ? (bu.errors / bu.total * 100) : 0;
-                row.addCell(pct.toFixed(1) + '%');
-                if (first === null) first = pct;
-                last = pct;
             });
 
+            // Тренд
             let trend = '—';
             if (first !== null && last !== null) {
                 const d = last - first;
                 trend = (d > 0.5 ? '↑ +' : d < -0.5 ? '↓ ' : '→ ') + d.toFixed(1) + ' п.п.';
             }
-            row.addCell(trend);
+            const trendCell = row.getCell(3 + weekKeys.length);
+            trendCell.value = trend;
 
             styleDataRow(row);
             row.getCell(1).font = { bold: true };
             fillBadge(row.getCell(2), qPct);
 
+            // Заливка для недельных ячеек
             weekKeys.forEach((k, idx) => {
                 const cell = row.getCell(3 + idx);
                 const txt = cell.value;
@@ -4961,7 +4963,8 @@ async function exportManagerReport() {
                     cell.alignment = { horizontal: 'center', vertical: 'middle' };
                 }
             });
-            const trendCell = row.getCell(3 + weekKeys.length);
+
+            // Стиль для тренда
             trendCell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
             if (trend.startsWith('↓')) trendCell.font = { color: { argb: C.greenTxt }, bold: true };
             else if (trend.startsWith('↑')) trendCell.font = { color: { argb: C.badTxt }, bold: true };
@@ -4972,13 +4975,13 @@ async function exportManagerReport() {
         // ============================================================
         const ws6 = wb.addWorksheet('Рейтинг сотрудников', { properties: { tabColor: { argb: 'FFFF9500' } } });
         ws6.columns = [
-            { width: 8 },
-            { width: 30 },
-            { width: 10 },
-            { width: 10 },
-            { width: 12 },
-            { width: 12 },
-            { width: 26 }
+            { width: 8 },   // место
+            { width: 30 },  // имя
+            { width: 10 },  // задач
+            { width: 10 },  // ошибок
+            { width: 12 },  // % ошибок
+            { width: 12 },  // качество
+            { width: 26 }   // топ-ошибка
         ];
 
         ws6.mergeCells('A1:G1');
@@ -5026,6 +5029,7 @@ async function exportManagerReport() {
             row.getCell(2).font = { bold: true };
             fillBadge(row.getCell(5), errPct);
 
+            // Медальки для топ-3 и антитопа
             if (idx === 0) row.getCell(1).value = '🥇';
             else if (idx === 1) row.getCell(1).value = '🥈';
             else if (idx === 2) row.getCell(1).value = '🥉';
