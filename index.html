@@ -4496,8 +4496,6 @@ async function exportManagerReportExcel() {
 }
 // ============================================================
 // ЭКСПОРТ ОТЧЁТА (ExcelJS) — 6 листов
-// Сводка · Ошибки квартал · Ошибки неделя ·
-// Динамика неделя · Динамика по сотрудникам · Рейтинг
 // ============================================================
 async function exportManagerReport() {
     if (!window.globalReport || !window.globalReport.length) {
@@ -4633,6 +4631,15 @@ async function exportManagerReport() {
             gray:      'FFF5F5F7',
             border:    'FFDDDDDD'
         };
+
+        // ============================================================
+        // СОЗДАНИЕ КНИГИ (ТЕ САМЫЕ ПРОПУЩЕННЫЕ СТРОКИ)
+        // ============================================================
+        const wb = new ExcelJS.Workbook();
+        wb.creator = 'Дашборд качества';
+        wb.created = new Date();
+        // ============================================================
+
         const thinBorder = {
             top:    { style: 'thin', color: { argb: C.border } },
             left:   { style: 'thin', color: { argb: C.border } },
@@ -4885,9 +4892,9 @@ async function exportManagerReport() {
         // ЛИСТ 5. ДИНАМИКА ПО СОТРУДНИКАМ (матрица сотрудник × неделя)
         // ============================================================
         const ws5 = wb.addWorksheet('Динамика по сотрудникам', { properties: { tabColor: { argb: 'FF7B6FE8' } } });
-        const cols5 = [{ width: 30 }, { width: 10 }]; // сотрудник + итог
+        const cols5 = [{ width: 30 }, { width: 10 }];
         weekKeys.forEach(() => cols5.push({ width: 11 }));
-        cols5.push({ width: 12 }); // тренд
+        cols5.push({ width: 12 });
         ws5.columns = cols5;
 
         const lastColLetter = ws5.getColumn(2 + weekKeys.length + 1).letter;
@@ -4933,7 +4940,6 @@ async function exportManagerReport() {
                 last = pct;
             });
 
-            // Тренд
             let trend = '—';
             if (first !== null && last !== null) {
                 const d = last - first;
@@ -4966,13 +4972,13 @@ async function exportManagerReport() {
         // ============================================================
         const ws6 = wb.addWorksheet('Рейтинг сотрудников', { properties: { tabColor: { argb: 'FFFF9500' } } });
         ws6.columns = [
-            { width: 8 },   // место
-            { width: 30 },  // имя
-            { width: 10 },  // задач
-            { width: 10 },  // ошибок
-            { width: 12 },  // % ошибок
-            { width: 12 },  // качество
-            { width: 26 }   // топ-ошибка
+            { width: 8 },
+            { width: 30 },
+            { width: 10 },
+            { width: 10 },
+            { width: 12 },
+            { width: 12 },
+            { width: 26 }
         ];
 
         ws6.mergeCells('A1:G1');
@@ -5020,7 +5026,6 @@ async function exportManagerReport() {
             row.getCell(2).font = { bold: true };
             fillBadge(row.getCell(5), errPct);
 
-            // Медальки для топ-3 и антитопа
             if (idx === 0) row.getCell(1).value = '🥇';
             else if (idx === 1) row.getCell(1).value = '🥈';
             else if (idx === 2) row.getCell(1).value = '🥉';
