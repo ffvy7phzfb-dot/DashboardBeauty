@@ -490,13 +490,6 @@ body.dark-theme tr.paint-gray { background-color: #2E2E2E !important; color: #A0
             <button class="btn-cloud" onclick="manualSaveToCloud()">☁️ сохранить в облако</button>
             <button class="btn-export" id="exportBtn" onclick="exportToExcel()">скачать всё в Excel</button>
         </div>
-        
-        <div class="btn-group" style="margin-top: -10px; background: var(--c-surface-2); padding: 12px; border-radius: var(--r-md); border: 1px solid var(--c-border);">
-            <span style="font-size: 13px; font-weight: 600; color: var(--c-text-2); align-self: center; margin-right: 10px;">📋 Отчёт</span>
-            <button class="btn-copy" onclick="openManagerReportNewWindow('current')">📁 По текущему пулу</button>
-            <button class="btn-copy" onclick="openManagerReportNewWindow('all')">🌐 По всем пулам</button>
-        </div>
-
         <div class="filters-panel" id="filtersPanel">
             <h3>Фильтры</h3>
             <div class="filter-grid">
@@ -3116,6 +3109,7 @@ function renderManagerReport() {
     const from = document.getElementById('repDateFrom')?.value || null;
     const to = document.getElementById('repDateTo')?.value || null;
 
+    // Фильтруем пользователей
     const filteredUsers = globalReport.filter(u => {
         if (userCards[u.id]?.archived) return false;
         const m = userMarks[u.id];
@@ -3124,29 +3118,117 @@ function renderManagerReport() {
         return true;
     });
 
-    const cur = aggregateReportPeriod(filteredUsers, from, to, projectMode);
+    // Собираем данные по каждому пользователю за период
+    const userRows = [];
+    let totals = { total: 0, errors: 0, cats: {} };
+    categoriesList.forEach(c => totals.cats[c] = 0);
 
+    filteredUsers.forEach(user => {
+        const userTasks = user.tasks.filter(t => {
+            if (projectMode === 'current' && currentProjectId !== 'default' && t.projectId !== currentProjectId) return false;
+            const d = t.startDate || t.endDate;
+            if (!d) return false;
+            if (from && d < from) return false;
+            if (to && d > to) return false;
+            return true;
+        });
+
+        if (userTasks.length === 0) return;
+
+        const catCounts = {};
+        categoriesList.forEach(c => catCounts[c] = 0);
+        let errors = 0;
+
+        userTasks.forEach(t => {
+            if (t.hasErrors) errors++;
+            categoriesList.forEach(c => { if (t.cats[c]) catCounts[c]++; });
+        });
+
+        const mark = userMarks[user.id];
+        const markText = mark === 'newbie' ? 'новичок' : mark === 'experienced' ? 'опытный' : '—';
+
+        userRows.push({
+            id: user.id,
+            name: user.name,
+            mark: markText,
+            total: userTasks.length,
+            errors: errors,
+            cats: catCounts
+        });
+
+        totals.total += userTasks.length;
+        totals.errors += errors;
+        categoriesList.forEach(c => totals.cats[c] += catCounts[c]);
+    });
+
+    // Сортируем по алфавиту
+    userRows.sort((a, b) => a.name.localeCompare(b.name));
+
+    // Строим таблицу
+    let tableHtml = `<table class="summary-table" style="margin-top:20px;"><thead><tr>
+        <th style="text-align:left; min-width:150px;">сотрудник</th>
+        <th>пометка</th>
+        <th>всего</th>
+        <th>с ошибками</th>`;
+    
+    categoriesList.forEach(cat => {
+        tableHtml += `<th title="${cat}">${CAT_SHORT_LABELS[cat] || cat}</th>`;
+    });
+    tableHtml += `<th>marker_id</th></tr></thead><tbody>`;
+
+    // Итоговая строка
+    tableHtml += `<tr class="total-row">
+        <td style="text-align:right;">ИТОГО:</td><td></td>
+        <td>${totals.total}</td><td>${totals.errors}</td>`;
+    categoriesList.forEach(cat => { tableHtml += `<td>${totals.cats[cat]}</td>`; });
+    tableHtml += `<td></td></tr>`;
+
+    // Строки с сотрудниками
+    userRows.forEach(r => {
+        tableHtml += `<tr>
+            <td class="name-col" onclick="openCard('${r.id}')">${r.name}</td>
+            <td>${r.mark}</td>
+            <td><b>${r.total}</b></td>
+            <td><b>${r.errors}</b></td>`;
+        categoriesList.forEach(cat => {
+            const v = r.cats[cat];
+            tableHtml += `<td class="${v === 0 ? 'zero-cell' : ''}">${v}</td>`;
+        });
+        tableHtml += `<td class="id-col" title="${r.id}">${r.id}</td></tr>`;
+    });
+
+    tableHtml += `</tbody></table>`;
+
+    // Вставляем на страницу
     body.innerHTML = `
-        ${renderReportHeader(from, to, projectMode, group, filteredUsers.length)}
+        ${renderReportHeader(from, to, projectMode, group, userRows.length)}
+        
         <div class="progress-kpi-grid" style="margin-bottom:24px;">
             <div class="progress-kpi" style="border-left-color:var(--c-primary);">
                 <div class="lbl">Всего задач</div>
-                <div class="val">${cur.total}</div>
+                <div class="val">${totals.total}</div>
             </div>
             <div class="progress-kpi" style="border-left-color:var(--c-red);">
                 <div class="lbl">С ошибками</div>
-                <div class="val">${cur.errors}</div>
+                <div class="val">${totals.errors}</div>
             </div>
             <div class="progress-kpi" style="border-left-color:var(--c-orange);">
                 <div class="lbl">% ошибок</div>
-                <div class="val">${cur.errPct.toFixed(1)}%</div>
+                <div class="val">${totals.total ? (totals.errors / totals.total * 100).toFixed(1) : 0}%</div>
             </div>
             <div class="progress-kpi" style="border-left-color:var(--c-green);">
-                <div class="lbl">Среднее качество</div>
-                <div class="val">${cur.avgQ.toFixed(1)}%</div>
+                <div class="lbl">Сотрудников</div>
+                <div class="val">${userRows.length}</div>
             </div>
         </div>
-        <p style="color:var(--c-text-3); text-align:center; padding:20px;">Нажмите "📋 Отчёт (Excel)" для выгрузки полного отчёта</p>
+
+        <div class="results" style="margin-top:20px; padding:0; box-shadow:none; background:transparent;">
+            ${tableHtml}
+        </div>
+
+        <p style="color:var(--c-text-3); text-align:center; padding:10px; font-size:12px;">
+            Нажмите "📋 Отчёт (Excel)", чтобы выгрузить эту таблицу в Excel.
+        </p>
     `;
 }
 
