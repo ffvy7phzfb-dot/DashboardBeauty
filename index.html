@@ -1600,6 +1600,324 @@ function syncQualityFromMain() {
     
     if (infoEl) infoEl.textContent = '✓ данные подставлены из сводки';
 }
+    // ============================================================
+// ЛОГИКА РАСЧЁТА КАЧЕСТВА
+// ============================================================
+let qResultRows = []; 
+let qAllRows = []; 
+let qCurrentMode = 'trainer';
+let qSortKey = 'avg'; 
+let qSortDir = 'desc';
+let qSelectedEmployees = new Set(); 
+let qAllEmployeeIds = [];
+
+function calcQuality() {
+    const coef = parseFloat(document.getElementById('qCoefInput').value.replace(',', '.')) || 1;
+    qCurrentMode = document.querySelector('input[name="qMode"]:checked').value;
+    const from = document.getElementById('qDateFrom').value || null;
+    const to   = document.getElementById('qDateTo').value   || null;
+    const dataRaw = document.getElementById('qDataInput').value;
+    const nameRaw = document.getElementById('qNameInput').value;
+    const lines = dataRaw.split(/\r?\n/);
+    const records = [];
+    let total = 0, skipped = 0;
+
+    for (const raw of lines) {
+        const line = raw.trim();
+        if (line === '') continue;
+        total++;
+        
+        // Игнорируем всё, что идет после 4-го столбца (комментарии из сводки)
+        const rawParts = line.includes('\t') ? line.split('\t').map(s => s.trim()) : line.split(';').map(s => s.trim());
+        const parts = rawParts.slice(0, 4); 
+
+        if (!parts || parts.length < 4) { skipped++; continue; }
+        const id = parts[0]; const startRaw = parts[1]; const qualRaw = parts[3];
+        const q = parseFloat(qualRaw.replace(',', '.').replace(/\s/g, ''));
+        const m = startRaw.match(/^(\d{4}-\d{2}-\d{2})/); const date = m ? m[1] : null;
+        if (!id || isNaN(q) || !date) { skipped++; continue; }
+        if (from && date < from) { skipped++; continue; }
+        if (to && date > to) { skipped++; continue; }
+        records.push({ id, real: q * coef, date, original: q });
+    }
+
+    if (!records.length) { alert('не нашлось подходящих строк. Проверь данные (ID, даты, качество).'); return; }
+    const names = parseNames(nameRaw);
+
+    if (qCurrentMode === 'trainer') {
+        const groups = {};
+        for (const r of records) {
+            const key = r.id.toLowerCase().trim();
+            if (!groups[key]) groups[key] = { id: r.id, sum: 0, count: 0, sumOriginal: 0 };
+            groups[key].sum += r.real; groups[key].count++; groups[key].sumOriginal += r.original;
+        }
+        qAllRows = Object.values(groups).map(g => ({ id: g.id, name: names[g.id] || '', avg: g.sum / g.count, avgOriginal: g.sumOriginal / g.count, count: g.count }));
+        document.getElementById('qResultTitle').textContent = 'среднее качество по тренерам';
+        qSortKey = 'avg'; qSortDir = 'desc';
+    } else if (qCurrentMode === 'day') {
+        const byDay = {};
+        for (const r of records) {
+            if (!byDay[r.date]) byDay[r.date] = { sum: 0, count: 0, sumOriginal: 0 };
+            byDay[r.date].sum += r.real; byDay[r.date].count++; byDay[r.date].sumOriginal += r.original;
+        }
+        qAllRows = Object.keys(byDay).map(d => ({ date: d, avg: byDay[d].sum / byDay[d].count, avgOriginal: byDay[d].sumOriginal / byDay[d].count, count: byDay[d].count }));
+        document.getElementById('qResultTitle').textContent = 'среднее качество по дням';
+        qSortKey = 'date'; qSortDir = 'asc';
+    } else if (qCurrentMode === 'dayTrainer') {
+        const groups = {};
+        for (const r of records) {
+            const key = r.date + '|' + r.id.toLowerCase().trim();
+            if (!groups[key]) groups[key] = { date: r.date, id: r.id, sum: 0, count: 0, sumOriginal: 0 };
+            groups[key].sum += r.real; groups[key].count++; groups[key].sumOriginal += r.original;
+        }
+        qAllRows = Object.values(groups).map(g => ({ date: g.date, id: g.id, name: names[g.id] || '', avg: g.sum / g.count, avgOriginal: g.sumOriginal / g.count, count: g.count }));
+        document.getElementById('qResultTitle').textContent = 'среднее качество по дням и тренерам';
+        qSortKey = 'date'; qSortDir = 'asc';
+    } else if (qCurrentMode === 'week') {
+        const weeks = {}; const empWeeks = {}; 
+        for (const r of records) {
+            const d = new Date(r.date);
+            const day = d.getDay() || 7; 
+            const monday = new Date(d); monday.setDate(d.getDate() - day + 1);
+            const sunday = new Date(monday); sunday.setDate(monday.getDate() + 6);
+            const wKey = monday.toISOString().slice(0,10) + '_' + sunday.toISOString().slice(0,10);
+            const wLabel = `${pad2(monday.getDate())}.${pad2(monday.getMonth()+1)} - ${pad2(sunday.getDate())}.${pad2(sunday.getMonth()+1)}`;
+            weeks[wKey] = wLabel;
+            const empKey = r.id.toLowerCase().trim();
+            if (!empWeeks[empKey]) empWeeks[empKey] = { id: r.id, name: names[r.id] || '', weeksData: {} };
+            if (!empWeeks[empKey].weeksData[wKey]) empWeeks[empKey].weeksData[wKey] = { sum: 0, count: 0 };
+            empWeeks[empKey].weeksData[wKey].sum += r.real;
+            empWeeks[empKey].weeksData[wKey].count++;
+        }
+        const sortedWeeks = Object.keys(weeks).sort();
+        qAllRows = Object.values(empWeeks).map(emp => {
+            const weekAvgs = {};
+            for (const [wKey, data] of Object.entries(emp.weeksData)) weekAvgs[wKey] = data.sum / data.count;
+            return { id: emp.id, name: emp.name, weekAvgs: weekAvgs };
+        });
+        document.getElementById('qResultTitle').textContent = 'сводная таблица по неделям';
+        qSortKey = 'name'; qSortDir = 'asc';
+        window._currentWeeksList = sortedWeeks.map(k => ({ key: k, label: weeks[k] }));
+    }
+
+    const uniqueIds = new Map();
+    qAllRows.forEach(r => { if (r.id) uniqueIds.set(r.id, r.name || ''); });
+    qAllEmployeeIds = Array.from(uniqueIds.keys());
+    
+    if (!qSelectedEmployees || qSelectedEmployees.size === 0) {
+        qSelectedEmployees = new Set(qAllEmployeeIds);
+    } else {
+        const newSet = new Set();
+        qSelectedEmployees.forEach(id => {
+            if (qAllEmployeeIds.includes(id)) newSet.add(id);
+        });
+        qSelectedEmployees = newSet;
+    }
+    
+    renderEmployeeChips();
+    applyEmployeeFilter();
+    document.getElementById('qCopyBtn').disabled = false;
+    document.getElementById('qResultBox').style.display = 'block';
+    updateThresholdHint();
+
+    const statsEl = document.getElementById('qStats');
+    statsEl.style.display = 'block';
+    statsEl.innerHTML = `строк: <b>${total}</b> · учтено: <b>${records.length}</b> · пропущено: <b>${skipped}</b>`;
+}
+
+function applyEmployeeFilter() {
+    if (!qSelectedEmployees || qSelectedEmployees.size === 0) qResultRows = [];
+    else qResultRows = qAllRows.filter(r => r.id ? qSelectedEmployees.has(r.id) : true);
+    buildQHeader();
+    applyQSort();
+}
+
+function renderEmployeeChips() {
+    const container = document.getElementById('qEmpChips');
+    if (!qAllEmployeeIds || qAllEmployeeIds.length === 0) return;
+    const query = document.getElementById('qEmpSearch').value.toLowerCase().trim();
+    const map = {}; qAllRows.forEach(r => { if (r.id) map[r.id] = r.name || ''; });
+    let html = '';
+    qAllEmployeeIds.slice().sort((a,b) => (map[a]||'').localeCompare(map[b]||'')).forEach(id => {
+        const name = map[id] || id;
+        if (query && !name.toLowerCase().includes(query) && !id.toLowerCase().includes(query)) return;
+        const checked = qSelectedEmployees.has(id);
+        html += `<label class="q-emp-chip ${checked ? 'checked' : ''}">
+            <input type="checkbox" ${checked ? 'checked' : ''} onchange="toggleEmployee('${id.replace(/'/g,"\\'")}', this.checked)">
+            ${name}
+        </label>`;
+    });
+    if (!html) html = '<span style="font-size:12px; color:var(--c-text-3);">ничего не найдено.</span>';
+    container.innerHTML = html;
+}
+
+function toggleEmployee(id, checked) {
+    if (checked) qSelectedEmployees.add(id); else qSelectedEmployees.delete(id);
+    renderEmployeeChips(); applyEmployeeFilter();
+}
+
+function selectAllEmployees(select) {
+    if (select) qSelectedEmployees = new Set(qAllEmployeeIds); else qSelectedEmployees = new Set();
+    renderEmployeeChips(); applyEmployeeFilter();
+}
+
+function updateThresholdHint() {
+    const orangeStart = document.getElementById('thrOrange').value;
+    const green = document.getElementById('thrGreen').value;
+    document.getElementById('qThresholdHint').innerHTML =
+        `🎨 цвета: <span style="color:#EF4444; font-weight:bold;">меньше ${orangeStart}</span> — красный, ` +
+        `<span style="color:#F97316; font-weight:bold;">от ${orangeStart} до ${green}</span> — оранжевый, ` +
+        `<span style="color:#22C55E; font-weight:bold;">от ${green} и выше</span> — зелёный.`;
+}
+
+function getQualityClass(avg) {
+    const oStartVal = parseFloat(document.getElementById('thrOrange').value);
+    const orangeStart = isNaN(oStartVal) ? 0.86 : oStartVal;
+    const greenVal = parseFloat(document.getElementById('thrGreen').value);
+    const green = isNaN(greenVal) ? 0.97 : greenVal;
+    const val = Math.round(avg * 10000) / 10000;
+    if (val < orangeStart) return 'q-red'; 
+    if (val >= orangeStart && val < green) return 'q-orange'; 
+    if (val >= green) return 'q-green'; 
+    return ''; 
+}
+
+function buildQHeader() {
+    let html = '<tr>';
+    if (qCurrentMode === 'week') {
+        html += `<th data-key="name">сотрудник <span class="arrow"></span></th>`;
+        if (window._currentWeeksList) {
+            window._currentWeeksList.forEach(w => { html += `<th style="text-align:center; font-size:12px;">${w.label}</th>`; });
+        }
+    } else {
+        if (qCurrentMode !== 'trainer') html += `<th data-key="date">дата <span class="arrow"></span></th>`;
+        if (qCurrentMode !== 'day')     html += `<th data-key="id">ID <span class="arrow"></span></th>`;
+        if (qCurrentMode === 'trainer' || qCurrentMode === 'dayTrainer') html += `<th data-key="name">фамилия <span class="arrow"></span></th>`;
+        html += `<th data-key="avg">среднее качество <span class="arrow"></span></th>`;
+        html += `<th data-key="count">кол-во <span class="arrow"></span></th>`;
+    }
+    html += '</tr>';
+    const head = document.getElementById('qResultHead');
+    head.innerHTML = html;
+    head.querySelectorAll('th').forEach(th => {
+        th.addEventListener('click', () => {
+            const key = th.dataset.key;
+            if (!key || !qResultRows.length) return;
+            if (qSortKey === key) qSortDir = qSortDir === 'asc' ? 'desc' : 'asc';
+            else { qSortKey = key; qSortDir = (key === 'avg' || key === 'count') ? 'desc' : 'asc'; }
+            applyQSort();
+        });
+    });
+}
+
+function applyQSort() {
+    const sorted = [...qResultRows].sort((a, b) => {
+        let va = a[qSortKey], vb = b[qSortKey];
+        if (qSortKey === 'name') { va = va || 'яяя'; vb = vb || 'яяя'; }
+        let cmp;
+        if (typeof va === 'number' && typeof vb === 'number') cmp = va - vb;
+        else cmp = String(va).localeCompare(String(vb), 'ru');
+        return qSortDir === 'asc' ? cmp : -cmp;
+    });
+    renderQTable(sorted);
+    document.querySelectorAll('#qResultHead th').forEach(th => {
+        const arrow = th.querySelector('.arrow');
+        if (arrow) arrow.textContent = (th.dataset.key === qSortKey) ? (qSortDir === 'asc' ? '▲' : '▼') : '';
+    });
+}
+
+function renderQTable(rows) {
+    const tbody = document.querySelector('#qResultTable tbody');
+    tbody.innerHTML = '';
+    if (qCurrentMode === 'week') {
+        rows.forEach(r => {
+            const tr = document.createElement('tr');
+            let cells = `<td><b>${r.name || '— нет —'}</b></td>`;
+            if (window._currentWeeksList) {
+                window._currentWeeksList.forEach(w => {
+                    const val = r.weekAvgs[w.key];
+                    if (val !== undefined) {
+                        const qClass = getQualityClass(val);
+                        cells += `<td class="${qClass}" style="text-align:center;">${val.toFixed(3)}</td>`;
+                    } else {
+                        cells += `<td style="text-align:center; color:#CCC;">—</td>`;
+                    }
+                });
+            }
+            tr.innerHTML = cells;
+            tbody.appendChild(tr);
+        });
+        return;
+    }
+    rows.forEach(r => {
+        const tr = document.createElement('tr');
+        let cells = '';
+        if (qCurrentMode !== 'trainer') cells += `<td>${r.date}</td>`;
+        if (qCurrentMode !== 'day')     cells += `<td>${r.id}</td>`;
+        if (qCurrentMode === 'trainer' || qCurrentMode === 'dayTrainer') {
+            cells += r.name ? `<td>${r.name}</td>` : `<td class="no-name">— нет —</td>`;
+        }
+        const qClass = getQualityClass(r.avg);
+        const originalAvg = r.avgOriginal ? r.avgOriginal.toFixed(4) : '';
+        const origSpan = originalAvg ? ` <span style="font-size:11px; color:var(--c-text-3); font-weight:normal;">(из ${originalAvg})</span>` : '';
+        cells += `<td class="${qClass}" title="системная оценка: ${originalAvg}">${r.avg.toFixed(4)}${origSpan}</td><td>${r.count}</td>`;
+        tr.innerHTML = cells;
+        tbody.appendChild(tr);
+    });
+}
+
+function copyQualityResult() {
+    if (!qResultRows.length) return;
+    let header = [];
+    if (qCurrentMode !== 'trainer') header.push('дата');
+    if (qCurrentMode !== 'day') header.push('ID');
+    if (qCurrentMode === 'trainer' || qCurrentMode === 'dayTrainer') header.push('фамилия');
+    if (qCurrentMode === 'week') {
+        header.push('сотрудник');
+        window._currentWeeksList.forEach(w => header.push(w.label));
+    } else {
+        header.push('среднее_качество', 'кол-во');
+    }
+    const lines = [header.join('\t')];
+    qResultRows.forEach(r => {
+        const row = [];
+        if (qCurrentMode === 'week') {
+            row.push(r.name || '');
+            window._currentWeeksList.forEach(w => {
+                const val = r.weekAvgs[w.key];
+                row.push(val !== undefined ? val.toFixed(4) : '');
+            });
+        } else {
+            if (qCurrentMode !== 'trainer') row.push(r.date);
+            if (qCurrentMode !== 'day') row.push(r.id);
+            if (qCurrentMode === 'trainer' || qCurrentMode === 'dayTrainer') row.push(r.name);
+            row.push(r.avg !== undefined ? r.avg.toFixed(4) : '', r.count !== undefined ? r.count : '');
+        }
+        lines.push(row.join('\t'));
+    });
+    navigator.clipboard.writeText(lines.join('\n')).then(() => {
+        showToast('скопировано');
+        const btn = document.getElementById('qCopyBtn');
+        btn.textContent = 'скопировано ✓';
+        setTimeout(() => btn.textContent = 'скопировать', 1500);
+    });
+}
+
+function clearQuality() {
+    document.getElementById('qDataInput').value = '';
+    document.getElementById('qNameInput').value = '';
+    document.getElementById('qDateFrom').value = '';
+    document.getElementById('qDateTo').value = '';
+    qResultRows = []; qAllRows = [];
+    document.querySelector('#qResultTable tbody').innerHTML = '';
+    document.getElementById('qResultHead').innerHTML = '';
+    document.getElementById('qResultBox').style.display = 'none';
+    document.getElementById('qStats').style.display = 'none';
+    document.getElementById('qCopyBtn').disabled = true;
+    document.getElementById('qEmpChips').innerHTML = '<span style="font-size:12px; color:var(--c-text-3);">сначала нажми «посчитать».</span>';
+    const infoEl = document.getElementById('qSyncInfo');
+    if (infoEl) infoEl.textContent = '';
+}
 
 function switchTab(tabId, btn) {
     document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
