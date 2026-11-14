@@ -11,6 +11,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
 <style>
 :root {
     --c-bg: #F5F5F7;
@@ -343,6 +344,60 @@ table.progress-table td.period-col { text-align: left; font-weight: 600; color: 
     .app-header h1 { font-size: 20px; }
     .progress-kpi .val { font-size: 24px; }
 }
+    /* ==== ТЕМНАЯ ТЕМА ==== */
+body.dark-theme {
+    --c-bg: #121212;
+    --c-bg-grad: linear-gradient(135deg, #1E1E2E 0%, #1A1A2E 40%, #201E30 70%, #2A1E30 100%);
+    --c-surface: #1E1E1E;
+    --c-surface-2: #2C2C2C;
+    --c-border: #3A3A3A;
+    --c-border-soft: #333333;
+    --c-text: #E5E5E5;
+    --c-text-2: #A0A0A5;
+    --c-text-3: #707075;
+    --c-primary: #7BAAF9;
+    --c-primary-soft: rgba(123,170,249,0.15);
+    --c-green-soft: #1A3B24;
+    --c-green-text: #7DDB8E;
+    --c-red-soft: #3D1D1F;
+    --c-red-text: #FF8A8A;
+    --c-orange-soft: #3B2C10;
+    --c-orange-text: #FFC06A;
+    --c-purple: #9A8CF9;
+}
+body.dark-theme .box, body.dark-theme .results, body.dark-theme .progress-kpi, 
+body.dark-theme .progress-chart-block, body.dark-theme .progress-table-wrap, 
+body.dark-theme .tabs-section, body.dark-theme .filters-panel, body.dark-theme .marks-panel,
+body.dark-theme .modal, body.dark-theme .vks-modal {
+    box-shadow: 0 1px 3px rgba(0,0,0,0.3), 0 1px 2px rgba(0,0,0,0.2);
+}
+body.dark-theme table.summary-table th, 
+body.dark-theme table.progress-table th,
+body.dark-theme table.q-table th {
+    background: var(--c-surface-2);
+}
+body.dark-theme table.summary-table tr.total-row td {
+    background: var(--c-primary-soft);
+}
+body.dark-theme .auth-card {
+    background: rgba(30, 30, 30, 0.75);
+    border-color: rgba(255,255,255,0.1);
+}
+body.dark-theme .auth-field input {
+    background: rgba(0,0,0,0.3);
+    border-color: rgba(255,255,255,0.1);
+    color: var(--c-text);
+}
+body.dark-theme .auth-field input:focus {
+    background: rgba(0,0,0,0.5);
+}
+body.dark-theme tr.paint-red { background-color: #3D1D1F !important; color: #FF8A8A !important; }
+body.dark-theme tr.paint-orange { background-color: #3B2C10 !important; color: #FFC06A !important; }
+body.dark-theme tr.paint-yellow { background-color: #3A3A10 !important; color: #FFE56A !important; }
+body.dark-theme tr.paint-green { background-color: #1A3B24 !important; color: #7DDB8E !important; }
+body.dark-theme tr.paint-blue { background-color: #102A3B !important; color: #7AC8FF !important; }
+body.dark-theme tr.paint-purple { background-color: #2A1A3B !important; color: #C7A1FF !important; }
+body.dark-theme tr.paint-gray { background-color: #2E2E2E !important; color: #A0A0A5 !important; }
 </style>
 </head>
 <body>
@@ -391,6 +446,7 @@ table.progress-table td.period-col { text-align: left; font-weight: 600; color: 
         <div class="header-actions">
             <a href="https://ffvy7phzfb-dot.github.io/Analytic-/" target="_blank" class="btn-header ghost">AI Аналитик</a>
             <button class="btn-header ghost" onclick="openAccountSwitcher()" style="display:none;" id="switchAccountBtn">🔄 Сменить аккаунт</button>
+            <button class="btn-header ghost" id="themeToggleBtn" onclick="toggleTheme()">🌙 Тёмная тема</button>
             <button class="btn-header danger" onclick="logoutUser()">Выйти</button>
         </div>
     </div>
@@ -3437,6 +3493,27 @@ function importPreviousXlsx(ev) {
     alert('Функция импорта будет доработана.');
     ev.target.value = '';
 }
+    // ==== ТЕМНАЯ ТЕМА ====
+function toggleTheme() {
+    const isDark = document.body.classList.toggle('dark-theme');
+    localStorage.setItem('dashboard_theme', isDark ? 'dark' : 'light');
+    updateThemeBtn(isDark);
+}
+
+function updateThemeBtn(isDark) {
+    const btn = document.getElementById('themeToggleBtn');
+    if (!btn) return;
+    btn.textContent = isDark ? '☀️ Светлая тема' : '🌙 Тёмная тема';
+}
+
+// При загрузке страницы проверяем, какая тема была сохранена
+document.addEventListener('DOMContentLoaded', () => {
+    const savedTheme = localStorage.getItem('dashboard_theme');
+    if (savedTheme === 'dark') {
+        document.body.classList.add('dark-theme');
+        updateThemeBtn(true);
+    }
+});
 </script>
 </body>
 </html>
