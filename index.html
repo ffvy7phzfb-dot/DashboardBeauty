@@ -366,9 +366,7 @@ table.progress-table td.period-col { text-align: left; font-weight: 600; color: 
             </div>
 
             <button class="auth-btn" id="authSubmit" onclick="doLogin()">Войти</button>
-
             <div class="auth-error" id="authError"></div>
-
             <div class="auth-footer">Отчёты, ВКС и качество</div>
         </div>
     </div>
@@ -379,11 +377,13 @@ table.progress-table td.period-col { text-align: left; font-weight: 600; color: 
         <div style="display:flex; align-items:center; gap:12px; flex:1; min-width:220px; flex-wrap:wrap;">
             <h1 style="margin:0; text-align:left; font-size:24px;">Дашборд</h1>
             
+            <!-- Выбор пула (проекта) -->
             <select id="projectSelector" onchange="switchProject(this.value)"
                     style="padding:8px 14px; border:1px solid var(--c-border); border-radius:10px; font-family:inherit; font-size:14px; font-weight:600; background:var(--c-surface); color:var(--c-text); cursor:pointer; box-shadow:var(--sh-1); outline:none; min-width:180px;">
                 <option value="default">📁 Общий проект</option>
             </select>
 
+            <!-- Выбор шаблона -->
             <select id="templateSelector" onchange="switchTemplate(this.value)" 
                     style="padding:8px 14px; border:1px solid var(--c-primary); border-radius:10px; font-family:inherit; font-size:14px; font-weight:600; background:var(--c-primary-soft); color:var(--c-primary); cursor:pointer; box-shadow:var(--sh-1); outline:none; min-width:180px;">
                 <option value="beautiful_answers">📋 Beautiful Answers</option>
@@ -397,9 +397,14 @@ table.progress-table td.period-col { text-align: left; font-weight: 600; color: 
         </div>
     </div>
 
+    <!-- Все ваши вкладки возвращены + Настройки -->
     <div class="main-tabs">
         <button class="main-tab-btn active" onclick="switchTab('main', this)">📊 Сводка</button>
-        <button class="main-tab-btn" onclick="switchTab('progress', this)">📈 Аналитика</button>
+        <button class="main-tab-btn" onclick="switchTab('projects', this)">🏗 Проекты</button>
+        <button class="main-tab-btn" onclick="switchTab('vks-import', this)">📥 ВКС из отчёта</button>
+        <button class="main-tab-btn" onclick="switchTab('quality', this)">🌟 Качество</button>
+        <button class="main-tab-btn" onclick="switchTab('dynamics', this)">📈 Динамика</button>
+        <button class="main-tab-btn" onclick="switchTab('progress', this)">📈 Общий прогресс</button>
         <button class="main-tab-btn" onclick="switchTab('compare', this)">⚖️ Сравнение</button>
         <button class="main-tab-btn" onclick="switchTab('manager-report', this)">📋 Итоговый отчёт</button>
         <button class="main-tab-btn" onclick="switchTab('settings', this)">⚙️ Настройки</button>
@@ -548,7 +553,225 @@ table.progress-table td.period-col { text-align: left; font-weight: 600; color: 
         </div>
     </div>
 
-    <!-- ================== АНАЛИТИКА ================== -->
+    <!-- ================== ПРОЕКТЫ ================== -->
+    <div class="tab-content" id="tab-projects">
+        <div class="container">
+            <div class="box" style="min-width:100%;">
+                <h3>Управление проектами</h3>
+                <p>Создавай отдельные пулы, чтобы не смешивать статистику. Выбери проект, чтобы работать с ним.</p>
+                <div style="display:flex; gap:10px; margin-bottom:20px; background:var(--c-surface-2); padding:16px; border-radius:var(--r-md); border:1px solid var(--c-border-soft);">
+                    <input type="text" id="newProjectName" placeholder="Название нового проекта..." style="flex:1; padding:10px 14px; border:1px solid var(--c-border); border-radius:8px; font-family:inherit; font-size:14px; background:var(--c-surface); color:var(--c-text); outline:none;">
+                    <button class="btn-load" onclick="createProjectFromTab()" style="padding:10px 20px;">➕ Создать</button>
+                </div>
+                <div id="projectsListContainer" style="display:flex; flex-wrap:wrap; gap:12px;"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ================== ВКС ИЗ ОТЧЁТА ================== -->
+    <div class="tab-content" id="tab-vks-import">
+        <div class="container">
+            <div class="box" style="min-width:100%;">
+                <h3>Загрузка ВКС из отчёта</h3>
+                <p>вставь колонку «Отчёт по ВКС и НФ» из Excel. скрипт найдёт в тексте фамилии из справочника.</p>
+                <div class="import-info">⚠️ фамилии ищутся по первому слову из справочника.</div>
+                <div style="display:flex; gap:15px; flex-wrap:wrap; margin-bottom:15px;">
+                    <div style="flex:1; min-width:250px;">
+                        <label style="font-size:13px; font-weight:600; display:block; margin-bottom:6px; color:var(--c-text-2);">дата ВКС:</label>
+                        <input type="date" id="vksImportDate" style="padding:10px 12px; border:1px solid var(--c-border); border-radius:var(--r-md); width:100%; font-family:inherit; font-size:14px; background:var(--c-surface); color:var(--c-text); outline:none;">
+                    </div>
+                    <div style="flex:1; min-width:250px;">
+                        <label style="font-size:13px; font-weight:600; display:block; margin-bottom:6px; color:var(--c-text-2);">категория:</label>
+                        <select id="vksImportCategory" style="padding:10px 12px; border:1px solid var(--c-border); border-radius:var(--r-md); width:100%; font-family:inherit; font-size:14px; background:var(--c-surface); color:var(--c-text); outline:none;">
+                            <option value="individual">индивидуальная</option>
+                            <option value="general">общая</option>
+                            <option value="master">мастер-класс</option>
+                        </select>
+                    </div>
+                </div>
+                <textarea id="vksReportData" placeholder="вставь сюда колонку 'Отчёт по ВКС и НФ'..." style="height:180px;"></textarea>
+                <div class="btn-group" style="margin-top:15px; margin-bottom:0;">
+                    <button class="btn-load" onclick="parseVksReport()">🔍 найти фамилии в тексте</button>
+                    <button class="btn-import-xlsx" onclick="document.getElementById('vksXlsxFile').click()">📥 загрузить .xlsx</button>
+                    <input type="file" id="vksXlsxFile" accept=".xlsx,.xls" style="display:none" onchange="importVksXlsx(event)">
+                </div>
+                <div id="vksImportStatus" style="margin-top:15px; font-size:13px;"></div>
+                <div id="vksImportResults" style="margin-top:15px;"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ================== КАЧЕСТВО ================== -->
+    <div class="tab-content" id="tab-quality">
+        <div class="container">
+            <div class="box" style="min-width:100%;">
+                <h3>Расчёт качества</h3>
+                <p>данные автоматически подтягиваются из вкладки «Сводка». можно отредактировать вручную.</p>
+                <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:15px;">
+                    <button class="btn-copy" onclick="syncQualityFromMain()" style="padding:10px 16px;">🔄 обновить из сводки</button>
+                    <span id="qSyncInfo" style="font-size:12px; color:var(--c-text-3); align-self:center;"></span>
+                </div>
+                <div style="display:flex; gap:16px; flex-wrap:wrap; margin-bottom:15px;">
+                    <div style="flex:1; min-width:300px;">
+                        <label style="font-size:13px; font-weight:600; display:block; margin-bottom:6px; color:var(--c-text-2);">1. данные: ID, начало, конец, качество</label>
+                        <textarea id="qDataInput" placeholder="скопируй из Excel столбцы marker_id, start_date, end_date, quality..."></textarea>
+                    </div>
+                    <div style="flex:1; min-width:300px;">
+                        <label style="font-size:13px; font-weight:600; display:block; margin-bottom:6px; color:var(--c-text-2);">2. справочник</label>
+                        <textarea id="qNameInput" placeholder="Фамилия&#9;ID"></textarea>
+                    </div>
+                </div>
+                <div class="quality-controls">
+                    <div class="field-group" style="flex:0 0 150px;">
+                        <label>коэффициент:</label>
+                        <input type="number" id="qCoefInput" value="1.03" step="0.0001" min="0">
+                    </div>
+                    <div class="field-group">
+                        <label>период (от):</label>
+                        <input type="date" id="qDateFrom">
+                    </div>
+                    <div class="field-group">
+                        <label>период (до):</label>
+                        <input type="date" id="qDateTo">
+                    </div>
+                    <div class="field-group" style="flex:1; min-width:250px;">
+                        <label>режим:</label>
+                        <div class="mode-box">
+                            <label><input type="radio" name="qMode" value="trainer" checked> по тренерам</label>
+                            <label><input type="radio" name="qMode" value="day"> по дням</label>
+                            <label><input type="radio" name="qMode" value="dayTrainer"> день+тренер</label>
+                            <label><input type="radio" name="qMode" value="week">динамика</label>
+                        </div>
+                    </div>
+                </div>
+                <div class="thresholds-box">
+                    <span style="font-weight:600; font-size:13px;">пороги:</span>
+                    <div class="threshold-item">
+                        <span class="color-dot" style="background:#EF4444;"></span>
+                        <span>красный:</span>
+                        <input type="number" id="thrRed" value="0.85" step="0.01" disabled>
+                        <span>и меньше</span>
+                    </div>
+                    <div class="threshold-item">
+                        <span class="color-dot" style="background:#F97316;"></span>
+                        <span>оранжевый:</span>
+                        <input type="number" id="thrOrange" value="0.86" step="0.01">
+                        <span>до</span>
+                        <input type="number" id="thrOrangeEnd" value="0.96" step="0.01">
+                    </div>
+                    <div class="threshold-item">
+                        <span class="color-dot" style="background:#22C55E;"></span>
+                        <span>зелёный:</span>
+                        <input type="number" id="thrGreen" value="0.97" step="0.01">
+                        <span>и выше</span>
+                    </div>
+                </div>
+                <div style="background:var(--c-primary-soft); border-left:3px solid var(--c-primary); padding:14px 18px; border-radius:var(--r-md); margin-bottom:15px;">
+                    <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:10px;">
+                        <b style="font-size:13px;">👥 фильтр по сотрудникам:</b>
+                        <input type="text" id="qEmpSearch" placeholder="поиск по фамилии..." style="padding:8px 12px; border:1px solid var(--c-border); border-radius:8px; font-size:13px; flex:1; min-width:200px; font-family:inherit; background:var(--c-surface); color:var(--c-text); outline:none;" oninput="renderEmployeeChips()">
+                        <button onclick="selectAllEmployees(true)" style="padding:8px 14px; font-size:12px; background:var(--c-primary); color:#fff; border-radius:8px; border:none; cursor:pointer; font-family:inherit; font-weight:600;">выбрать всех</button>
+                        <button onclick="selectAllEmployees(false)" style="padding:8px 14px; font-size:12px; background:var(--c-surface-2); color:var(--c-text); border-radius:8px; border:1px solid var(--c-border); cursor:pointer; font-family:inherit; font-weight:600;">снять всех</button>
+                    </div>
+                    <div id="qEmpChips" style="display:flex; flex-wrap:wrap; gap:6px; max-height:120px; overflow-y:auto;">
+                        <span style="font-size:12px; color:var(--c-text-3);">сначала нажми «посчитать», чтобы появился список сотрудников.</span>
+                    </div>
+                </div>
+                <div class="btn-group" style="margin-bottom:0;">
+                    <button class="btn-calc" onclick="calcQuality()">посчитать</button>
+                    <button class="btn-copy" id="qCopyBtn" onclick="copyQualityResult()" disabled>скопировать</button>
+                    <button class="btn-clear" onclick="clearQuality()">очистить</button>
+                </div>
+                <div id="qStats" class="stats" style="display:none;"></div>
+            </div>
+        </div>
+        <div class="results" id="qResultBox" style="display:none;">
+            <h3 id="qResultTitle" style="margin-top:0; font-size:16px;">результат</h3>
+            <div style="overflow-x:auto;">
+                <table class="q-table" id="qResultTable">
+                    <thead id="qResultHead"></thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+            <div id="qThresholdHint" style="margin-top:12px; font-size:12px; color:var(--c-text-2);"></div>
+        </div>
+    </div>
+
+    <!-- ================== ДИНАМИКА ================== -->
+    <div class="tab-content" id="tab-dynamics">
+        <div class="container">
+            <div class="box" style="min-width:100%;">
+                <h3>Профиль тренера во времени</h3>
+                <p>данные берутся из основной сводки (вкладка 1). если там пусто — вернись и загрузи отчёт.</p>
+                <div style="display:flex; gap:12px; flex-wrap:wrap; margin-bottom:20px; align-items:flex-end;">
+                    <div class="field-group" style="flex:1; min-width:220px;">
+                        <label>тренер</label>
+                        <input type="text" id="dynSearch" placeholder="поиск по фамилии..." oninput="renderDynTrainerList()" style="margin-bottom:6px;">
+                        <select id="dynTrainerSelect" onchange="renderDynProfile()" size="1"></select>
+                    </div>
+                    <div class="field-group" style="flex:0 0 150px;">
+                        <label>шаг</label>
+                        <select id="dynStep" onchange="renderDynProfile()">
+                            <option value="day">по дням</option>
+                            <option value="week" selected>по неделям</option>
+                            <option value="month">по месяцам</option>
+                        </select>
+                    </div>
+                    <div class="field-group" style="flex:0 0 160px;">
+                        <label>период от</label>
+                        <input type="date" id="dynFrom" onchange="renderDynProfile()">
+                    </div>
+                    <div class="field-group" style="flex:0 0 160px;">
+                        <label>период до</label>
+                        <input type="date" id="dynTo" onchange="renderDynProfile()">
+                    </div>
+                    <div class="field-group" style="flex:0 0 160px;">
+                        <label>быстрый выбор</label>
+                        <select id="dynQuick" onchange="applyDynQuick(this.value)">
+                            <option value="">—</option>
+                            <option value="4w">4 недели</option>
+                            <option value="8w">8 недель</option>
+                            <option value="12w">12 недель</option>
+                            <option value="all">всё время</option>
+                        </select>
+                    </div>
+                    <div class="field-group" style="flex:0 0 160px;">
+                        <label>&nbsp;</label>
+                        <button class="btn-copy" onclick="exportDynProfile()" style="padding:10px 14px;">📤 экспорт</button>
+                    </div>
+                </div>
+                <div id="dynEmpty" style="text-align:center; color:var(--c-text-3); padding:40px 0;">выбери тренера выше 👆</div>
+                <div id="dynProfile" style="display:none;">
+                    <div id="dynHeader" style="background:linear-gradient(135deg,#EEF4FF 0%,#F5F0FF 100%); border-left:4px solid var(--c-primary); border-radius:var(--r-md); padding:16px 20px; margin-bottom:18px;"></div>
+                    <div id="dynKpi" style="display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:12px; margin-bottom:20px;"></div>
+                    <div style="background:var(--c-surface); border:1px solid var(--c-border-soft); border-radius:var(--r-md); padding:16px; margin-bottom:16px;">
+                        <h4 style="margin:0 0 12px 0; color:var(--c-text); font-size:14px; font-weight:700;">📉 динамика % ошибок (тренер vs среднее)</h4>
+                        <div style="position:relative; height:320px;"><canvas id="dynChartQuality"></canvas></div>
+                    </div>
+                    <div style="background:var(--c-surface); border:1px solid var(--c-border-soft); border-radius:var(--r-md); padding:16px; margin-bottom:16px;">
+                        <h4 style="margin:0 0 12px 0; color:var(--c-text); font-size:14px; font-weight:700;">🧩 ошибки по категориям</h4>
+                        <div style="position:relative; height:340px;"><canvas id="dynChartCats"></canvas></div>
+                    </div>
+                    <div style="background:var(--c-surface); border:1px solid var(--c-border-soft); border-radius:var(--r-md); padding:16px; margin-bottom:16px;">
+                        <h4 style="margin:0 0 12px 0; color:var(--c-text); font-size:14px; font-weight:700;">⚖️ ошибки по категориям по периодам</h4>
+                        <div id="dynProgressTable" style="overflow-x:auto; max-height:480px; overflow-y:auto; border-radius:var(--r-md);"></div>
+                    </div>
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
+                        <div style="background:var(--c-surface); border:1px solid var(--c-border-soft); border-radius:var(--r-md); padding:16px;">
+                            <h4 style="margin:0 0 12px 0; color:var(--c-text); font-size:14px; font-weight:700;">🎥 лента ВКС</h4>
+                            <div id="dynVksList" class="comments-list"></div>
+                        </div>
+                        <div style="background:var(--c-surface); border:1px solid var(--c-border-soft); border-radius:var(--r-md); padding:16px;">
+                            <h4 style="margin:0 0 12px 0; color:var(--c-text); font-size:14px; font-weight:700;">💬 комментарии ревьюера</h4>
+                            <div id="dynCommentsList" class="comments-list"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ================== ОБЩИЙ ПРОГРЕСС ================== -->
     <div class="tab-content" id="tab-progress">
         <div class="container">
             <div class="box" style="min-width:100%;">
