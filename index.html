@@ -377,13 +377,11 @@ table.progress-table td.period-col { text-align: left; font-weight: 600; color: 
         <div style="display:flex; align-items:center; gap:12px; flex:1; min-width:220px; flex-wrap:wrap;">
             <h1 style="margin:0; text-align:left; font-size:24px;">Дашборд</h1>
             
-            <!-- Выбор пула (проекта) -->
             <select id="projectSelector" onchange="switchProject(this.value)"
                     style="padding:8px 14px; border:1px solid var(--c-border); border-radius:10px; font-family:inherit; font-size:14px; font-weight:600; background:var(--c-surface); color:var(--c-text); cursor:pointer; box-shadow:var(--sh-1); outline:none; min-width:180px;">
                 <option value="default">📁 Общий проект</option>
             </select>
 
-            <!-- Выбор шаблона -->
             <select id="templateSelector" onchange="switchTemplate(this.value)" 
                     style="padding:8px 14px; border:1px solid var(--c-primary); border-radius:10px; font-family:inherit; font-size:14px; font-weight:600; background:var(--c-primary-soft); color:var(--c-primary); cursor:pointer; box-shadow:var(--sh-1); outline:none; min-width:180px;">
                 <option value="beautiful_answers">📋 Beautiful Answers</option>
@@ -397,13 +395,11 @@ table.progress-table td.period-col { text-align: left; font-weight: 600; color: 
         </div>
     </div>
 
-    <!-- Все ваши вкладки возвращены + Настройки -->
     <div class="main-tabs">
         <button class="main-tab-btn active" onclick="switchTab('main', this)">📊 Сводка</button>
         <button class="main-tab-btn" onclick="switchTab('projects', this)">🏗 Проекты</button>
         <button class="main-tab-btn" onclick="switchTab('vks-import', this)">📥 ВКС из отчёта</button>
         <button class="main-tab-btn" onclick="switchTab('quality', this)">🌟 Качество</button>
-        <button class="main-tab-btn" onclick="switchTab('dynamics', this)">📈 Динамика</button>
         <button class="main-tab-btn" onclick="switchTab('progress', this)">📈 Общий прогресс</button>
         <button class="main-tab-btn" onclick="switchTab('compare', this)">⚖️ Сравнение</button>
         <button class="main-tab-btn" onclick="switchTab('manager-report', this)">📋 Итоговый отчёт</button>
@@ -1514,6 +1510,41 @@ document.addEventListener('DOMContentLoaded', () => {
         .forEach(id => setVal(id, id.endsWith('To') || id === 'repDateTo' ? pTo : pFrom));
 });
 
+function syncQualityFromMain() {
+    const mainEl = document.getElementById('mainData');
+    const namesEl = document.getElementById('namesData');
+    const qDataEl = document.getElementById('qDataInput');
+    const qNameEl = document.getElementById('qNameInput');
+    const infoEl = document.getElementById('qSyncInfo');
+    if (!mainEl || !qDataEl) return;
+    
+    const mainText = mainEl.value || '';
+    const namesText = (namesEl && namesEl.value) || '';
+    
+    if (!mainText.trim()) { 
+        if (infoEl) infoEl.textContent = 'в сводке пока нет данных'; 
+        return; 
+    }
+    
+    qDataEl.value = mainText;
+    qNameEl.value = namesText;
+    
+    const selectedUser = document.getElementById('filterUser').value;
+    if (selectedUser !== 'all') {
+        qSelectedEmployees = new Set([selectedUser]);
+        renderEmployeeChips();
+        applyEmployeeFilter();
+    } else {
+        if (qAllEmployeeIds.length > 0) {
+            qSelectedEmployees = new Set(qAllEmployeeIds);
+            renderEmployeeChips();
+            applyEmployeeFilter();
+        }
+    }
+    
+    if (infoEl) infoEl.textContent = '✓ данные подставлены из сводки';
+}
+
 function switchTab(tabId, btn) {
     document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
     document.querySelectorAll('.main-tab-btn').forEach(el => el.classList.remove('active'));
@@ -1522,14 +1553,20 @@ function switchTab(tabId, btn) {
     if (btn) btn.classList.add('active');
     
     if (tabId === 'progress') renderProgress();
+    if (tabId === 'dynamics') renderDynTrainerList();
     if (tabId === 'compare') {
         populateCompareTargets();
         renderCompareGeneral();
         renderCompareTable();
     }
     if (tabId === 'manager-report') renderManagerReport();
-    if (tabId === 'settings') {
-        loadTemplateToSettings(currentTemplateKey);
+    if (tabId === 'settings') loadTemplateToSettings(currentTemplateKey);
+    
+    if (tabId === 'quality') {
+        syncQualityFromMain();
+        if (document.getElementById('qDataInput').value.trim()) {
+            calcQuality();
+        }
     }
     
     if (currentUser) {
@@ -2740,7 +2777,7 @@ function renderManagerReport() {
 }
 
 function renderWeekProgress() {
-    // Заглушка, если функция вызывается
+    // Заглушка
 }
 
 function loadExcelJS() {
@@ -3397,11 +3434,9 @@ function exportToExcel() {
 }
 
 function importPreviousXlsx(ev) {
-    // Заглушка для импорта, чтобы не ломать верстку
     alert('Функция импорта будет доработана.');
     ev.target.value = '';
 }
-
 </script>
 </body>
 </html>
