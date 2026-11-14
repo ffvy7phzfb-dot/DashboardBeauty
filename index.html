@@ -3363,7 +3363,17 @@ function renderManagerReport() {
 
     body.innerHTML = html || '<p style="text-align:center; color:#999; padding:40px;">Выберите хотя бы один блок для отображения.</p>';
 }
-
+    
+function loadExcelJS() {
+    if (window.ExcelJS) return Promise.resolve(window.ExcelJS);
+    return new Promise((resolve, reject) => {
+        const s = document.createElement('script');
+        s.src = 'https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js';
+        s.onload = () => resolve(window.ExcelJS);
+        s.onerror = () => reject(new Error('Не удалось загрузить ExcelJS'));
+        document.head.appendChild(s);
+    });
+}
 async function exportManagerReport() {
     if (!window.globalReport || !window.globalReport.length) { alert('Нет данных'); return; }
     try {
