@@ -434,7 +434,7 @@ body.dark-theme tr.paint-gray { background-color: #2E2E2E !important; color: #A0
             
             <select id="projectSelector" onchange="switchProject(this.value)"
                     style="padding:8px 14px; border:1px solid var(--c-border); border-radius:10px; font-family:inherit; font-size:14px; font-weight:600; background:var(--c-surface); color:var(--c-text); cursor:pointer; box-shadow:var(--sh-1); outline:none; min-width:180px;">
-                <option value="default">📁 Общий проект</option>
+                <option value="default">📁 Стартовый пул</option>
             </select>
 
             <select id="templateSelector" onchange="switchTemplate(this.value)" 
@@ -446,14 +446,14 @@ body.dark-theme tr.paint-gray { background-color: #2E2E2E !important; color: #A0
         <div class="header-actions">
             <a href="https://ffvy7phzfb-dot.github.io/Analytic-/" target="_blank" class="btn-header ghost">AI Аналитик</a>
             <button class="btn-header ghost" onclick="openAccountSwitcher()" style="display:none;" id="switchAccountBtn">🔄 Сменить аккаунт</button>
-            <button class="btn-header ghost" id="themeToggleBtn" onclick="toggleTheme()">🌙 Тема</button>
+            <button class="btn-header ghost" id="themeToggleBtn" onclick="toggleTheme()">🌙</button>
             <button class="btn-header danger" onclick="logoutUser()">Выйти</button>
         </div>
     </div>
 
     <div class="main-tabs">
         <button class="main-tab-btn active" onclick="switchTab('main', this)">📊 Сводка</button>
-        <button class="main-tab-btn" onclick="switchTab('projects', this)">🏗 Проекты</button>
+        <button class="main-tab-btn" onclick="switchTab('projects', this)">🏗 Пулы</button>
         <button class="main-tab-btn" onclick="switchTab('vks-import', this)">📥 ВКС из отчёта</button>
         <button class="main-tab-btn" onclick="switchTab('quality', this)">🌟 Качество</button>
         <button class="main-tab-btn" onclick="switchTab('progress', this)">📈 Общий прогресс</button>
@@ -602,10 +602,10 @@ body.dark-theme tr.paint-gray { background-color: #2E2E2E !important; color: #A0
     <div class="tab-content" id="tab-projects">
         <div class="container">
             <div class="box" style="min-width:100%;">
-                <h3>Управление проектами</h3>
-                <p>Создавай отдельные пулы, чтобы не смешивать статистику. Выбери проект, чтобы работать с ним.</p>
+                <h3>Управление пулами</h3>
+                <p>Создавай отдельные пулы, чтобы не смешивать статистику. Выбери пул, чтобы работать с ним.</p>
                 <div style="display:flex; gap:10px; margin-bottom:20px; background:var(--c-surface-2); padding:16px; border-radius:var(--r-md); border:1px solid var(--c-border-soft);">
-                    <input type="text" id="newProjectName" placeholder="Название нового проекта..." style="flex:1; padding:10px 14px; border:1px solid var(--c-border); border-radius:8px; font-family:inherit; font-size:14px; background:var(--c-surface); color:var(--c-text); outline:none;">
+                    <input type="text" id="newProjectName" placeholder="Название нового пула..." style="flex:1; padding:10px 14px; border:1px solid var(--c-border); border-radius:8px; font-family:inherit; font-size:14px; background:var(--c-surface); color:var(--c-text); outline:none;">
                     <button class="btn-load" onclick="createProjectFromTab()" style="padding:10px 20px;">➕ Создать</button>
                 </div>
                 <div id="projectsListContainer" style="display:flex; flex-wrap:wrap; gap:12px;"></div>
@@ -1039,7 +1039,7 @@ body.dark-theme tr.paint-gray { background-color: #2E2E2E !important; color: #A0
         <div class="container">
             <div class="box" style="min-width:100%;">
                 <h3>Управление шаблонами</h3>
-                <p>Вы можете редактировать категории ошибок для каждого проекта. Изменения сохраняются в облако.</p>
+                <p>Вы можете редактировать категории ошибок для каждого пула. Изменения сохраняются в облако.</p>
                 <div class="progress-controls" style="margin-bottom:20px;">
                     <div class="field-group" style="flex:1; min-width:250px;">
                         <label>Выберите шаблон</label>
@@ -1051,7 +1051,7 @@ body.dark-theme tr.paint-gray { background-color: #2E2E2E !important; color: #A0
                 </div>
                 
                 <div class="field-group">
-                    <label>Название проекта</label>
+                    <label>Название пула</label>
                     <input type="text" id="settingsTemplateName" placeholder="Название...">
                 </div>
 
@@ -1197,7 +1197,7 @@ function saveTemplateSettings() {
     const key = document.getElementById('settingsTemplateSelect').value;
     const name = document.getElementById('settingsTemplateName').value.trim();
     const catsRaw = document.getElementById('settingsCategories').value;
-    if (!name) { alert('Введите название проекта'); return; }
+    if (!name) { alert('Введите название пула'); return; }
     
     const newCats = catsRaw.split('\n').map(s => s.trim()).filter(Boolean);
     if (newCats.length === 0) { alert('Добавьте хотя бы одну категорию'); return; }
@@ -3080,8 +3080,8 @@ function aggregateReportPeriod(users, from, to, projectMode) {
 
 function renderReportHeader(from, to, projectMode, group, usersCount) {
     const projLabel = projectMode === 'all'
-        ? '🌐 Все проекты'
-        : (window.currentProjectId === 'default' ? '📁 Общий проект' : '📁 ' + ((window.myProjects || []).find(p => p.id === window.currentProjectId)?.name || 'Проект'));
+        ? '🌐 Все пулы'
+        : (window.currentProjectId === 'default' ? '📁 Стартовый пул' : '📁 ' + ((window.myProjects || []).find(p => p.id === window.currentProjectId)?.name || 'Пул'));
     const groupLabel = group === 'all' ? 'все' : group === 'newbie' ? 'новички' : 'опытные';
     const periodLabel = from && to ? `${formatDateShort(from)} – ${formatDateShort(to)}` : 'всё время';
     const today = new Date().toLocaleDateString('ru-RU');
@@ -3597,19 +3597,19 @@ function switchProject(id) {
 
     const out = document.getElementById('output');
     if (newMain.trim()) {
-        out.innerHTML = '<h3 style="text-align:center; color:var(--c-text-3); font-size:14px;">данные проекта загружены — нажми «загрузить и обработать»</h3>';
+        out.innerHTML = '<h3 style="text-align:center; color:var(--c-text-3); font-size:14px;">данные пула загружены — нажми «загрузить и обработать»</h3>';
     } else {
-        out.innerHTML = '<h3 style="text-align:center; color:var(--c-text-3); font-size:14px;">проект пуст — вставь данные и нажми «загрузить и обработать»</h3>';
+        out.innerHTML = '<h3 style="text-align:center; color:var(--c-text-3); font-size:14px;">пул пуст — вставь данные и нажми «загрузить и обработать»</h3>';
     }
 
     renderProjectsDropdown();
-    showToast(id === 'default' ? 'Общий проект' : 'Проект переключен');
+    showToast(id === 'default' ? 'Стартовый пул' : 'Пул переключен');
 }
 
 function renderProjectsDropdown() {
     const sel = document.getElementById('projectSelector');
     if (!sel) return;
-    sel.innerHTML = '<option value="default">📁 Общий проект</option>';
+    sel.innerHTML = '<option value="default">📁 Стартовый пул</option>';
     (window.myProjects || []).forEach(p => {
         const opt = document.createElement('option');
         opt.value = p.id;
