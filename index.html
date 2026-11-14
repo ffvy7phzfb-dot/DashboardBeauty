@@ -973,66 +973,74 @@ body.dark-theme tr.paint-gray { background-color: #2E2E2E !important; color: #A0
     </div>
 
     <!-- ================== ИТОГОВЫЙ ОТЧЁТ ================== -->
-    <div class="tab-content" id="tab-manager-report">
-        <div class="container">
-            <div class="box" style="min-width:100%;">
-                <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:20px;">
-                    <h3 style="margin:0;">Итоговый отчёт</h3>
-                    <div style="display:flex; gap:8px; flex-wrap:wrap;">
-                        <button class="btn-copy" onclick="renderManagerReport()" style="padding:10px 16px;">🔄 Обновить</button>
-                        <button class="btn-copy" onclick="exportManagerReport()" style="padding:10px 16px; background:var(--c-primary); color:#fff;">📋 Отчёт (Excel)</button>
-                        <button class="btn-copy" onclick="window.print()" style="padding:10px 16px;">🖨 PDF / Печать</button>
-                    </div>
-                </div>
-                <div class="progress-controls" style="margin-bottom:20px;">
-                    <div class="field-group" style="flex:0 0 220px;">
-                        <label>Пул</label>
-                        <select id="repProject" onchange="renderManagerReport()">
-                            <option value="current">📁 Текущий пул</option>
-                            <option value="all">🌐 Все пулы</option>
-                        </select>
-                    </div>
-                    <div class="field-group" style="flex:0 0 150px;">
-                        <label>Группа</label>
-                        <select id="repGroup" onchange="renderManagerReport()">
-                            <option value="all">все</option>
-                            <option value="newbie">новички</option>
-                            <option value="experienced">опытные</option>
-                        </select>
-                    </div>
-                    <div class="field-group" style="flex:0 0 160px;">
-                        <label>Период от</label>
-                        <input type="date" id="repDateFrom" onchange="renderManagerReport()">
-                    </div>
-                    <div class="field-group" style="flex:0 0 160px;">
-                        <label>Период до</label>
-                        <input type="date" id="repDateTo" onchange="renderManagerReport()">
-                    </div>
-                    <div class="field-group" style="flex:0 0 160px;">
-                        <label>Быстрый выбор</label>
-                        <select id="repPreset" onchange="applyReportPreset(this.value)">
-                            <option value="">—</option>
-                            <option value="week">неделя</option>
-                            <option value="2weeks">2 недели</option>
-                            <option value="month" selected>месяц</option>
-                            <option value="quarter">квартал</option>
-                            <option value="all">всё время</option>
-                        </select>
-                    </div>
-                    <div class="field-group" style="flex:0 0 140px; justify-content:flex-end;">
-                        <label style="display:flex; align-items:center; gap:8px; cursor:pointer; margin-top:10px; font-weight:600;">
-                            <input type="checkbox" id="repCompare" onchange="renderManagerReport()" style="width:auto;"> Сравнить
-                        </label>
-                    </div>
-                </div>
-                <div id="repBody"></div>
-                <div class="field-group" style="margin-top:30px;">
-                    <label>Комментарий менеджера</label>
-                    <textarea id="repManagerNote" placeholder="выводы, решения, что взяли в работу..." onchange="saveManagerNote()"></textarea>
+<div class="tab-content" id="tab-manager-report">
+    <div class="container">
+        <div class="box" style="min-width:100%;">
+            
+            <!-- КОНСТРУКТОР ОТЧЁТА -->
+            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:20px;">
+                <h3 style="margin:0;">Итоговый отчёт</h3>
+                <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                    <button class="btn-copy" onclick="renderManagerReport()" style="padding:10px 16px;">🔄 Сформировать</button>
+                    <button class="btn-copy" onclick="exportManagerReport()" style="padding:10px 16px; background:var(--c-primary); color:#fff;">📋 Выгрузить в Excel</button>
+                    <button class="btn-copy" onclick="window.print()" style="padding:10px 16px;">🖨 PDF / Печать</button>
                 </div>
             </div>
+            
+            <div class="progress-controls" style="margin-bottom:20px; background:var(--c-surface-2); padding:16px; border-radius:var(--r-md); border:1px solid var(--c-border);">
+                <div class="field-group" style="flex:0 0 200px;">
+                    <label>Период от</label>
+                    <input type="date" id="repDateFrom" onchange="renderManagerReport()">
+                </div>
+                <div class="field-group" style="flex:0 0 200px;">
+                    <label>Период до</label>
+                    <input type="date" id="repDateTo" onchange="renderManagerReport()">
+                </div>
+                <div class="field-group" style="flex:0 0 200px;">
+                    <label>Быстрый выбор</label>
+                    <select id="repPreset" onchange="applyReportPreset(this.value)">
+                        <option value="">—</option>
+                        <option value="week">неделя</option>
+                        <option value="month" selected>месяц</option>
+                        <option value="quarter">квартал</option>
+                        <option value="all">всё время</option>
+                    </select>
+                </div>
+                <div class="field-group" style="flex:0 0 150px;">
+                    <label>Группа</label>
+                    <select id="repGroup" onchange="renderManagerReport()">
+                        <option value="all">все</option>
+                        <option value="newbie">новички</option>
+                        <option value="experienced">опытные</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- ГАЛОЧКИ (Что включать в отчёт) -->
+            <div style="background:var(--c-primary-soft); padding:16px; border-radius:var(--r-md); margin-bottom:20px; border:1px solid var(--c-primary);">
+                <div style="font-weight:700; margin-bottom:12px; color:var(--c-text);">Что включить в отчёт:</div>
+                <div style="display:flex; flex-wrap:wrap; gap:16px;">
+                    <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-size:14px;">
+                        <input type="checkbox" id="chk-report-summary" checked onchange="renderManagerReport()" style="width:18px; height:18px;"> Сводная таблица (как в Сводке)
+                    </label>
+                    <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-size:14px;">
+                        <input type="checkbox" id="chk-report-quality" checked onchange="renderManagerReport()" style="width:18px; height:18px;"> Текущее качество (рейтинг сотрудников)
+                    </label>
+                    <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-size:14px;">
+                        <input type="checkbox" id="chk-report-dynamics" checked onchange="renderManagerReport()" style="width:18px; height:18px;"> Динамика по сотрудникам (по неделям)
+                    </label>
+                    <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-size:14px;">
+                        <input type="checkbox" id="chk-report-cats" checked onchange="renderManagerReport()" style="width:18px; height:18px;"> Ошибки по категориям
+                    </label>
+                </div>
+            </div>
+
+            <!-- МЕСТО ДЛЯ ПРЕДПРОСМОТРА -->
+            <div id="repBody"></div>
+
         </div>
     </div>
+</div>
 
     <!-- ================== НАСТРОЙКИ ================== -->
     <div class="tab-content" id="tab-settings">
@@ -3097,10 +3105,7 @@ function renderManagerReport() {
     const body = document.getElementById('repBody');
     if (!body) return;
     if (!window.globalReport || window.globalReport.length === 0) {
-        body.innerHTML = `<div style="text-align:center; padding:40px;">
-            <p style="color:var(--c-text-2); margin-bottom:16px;">Данные ещё не загружены в память.</p>
-            <button class="btn-load" onclick="processData(); renderManagerReport();" style="padding:10px 24px;">🔄 Загрузить данные из Сводки</button>
-        </div>`;
+        body.innerHTML = `<div style="text-align:center; padding:40px;"><p>Данные не загружены. Загрузите их во вкладке «Сводка».</p></div>`;
         return;
     }
 
@@ -3109,7 +3114,12 @@ function renderManagerReport() {
     const from = document.getElementById('repDateFrom')?.value || null;
     const to = document.getElementById('repDateTo')?.value || null;
 
-    // Фильтруем пользователей
+    // Читаем галочки
+    const showSummary = document.getElementById('chk-report-summary')?.checked ?? true;
+    const showQuality = document.getElementById('chk-report-quality')?.checked ?? true;
+    const showDynamics = document.getElementById('chk-report-dynamics')?.checked ?? true;
+    const showCats = document.getElementById('chk-report-cats')?.checked ?? true;
+
     const filteredUsers = globalReport.filter(u => {
         if (userCards[u.id]?.archived) return false;
         const m = userMarks[u.id];
@@ -3118,11 +3128,11 @@ function renderManagerReport() {
         return true;
     });
 
-    // Собираем данные по каждому пользователю за период
-    const userRows = [];
-    let totals = { total: 0, errors: 0, cats: {} };
-    categoriesList.forEach(c => totals.cats[c] = 0);
-
+    // Собираем данные
+    let totalTasks = 0, totalErrors = 0, totalQSum = 0;
+    const catTotals = {}; categoriesList.forEach(c => catTotals[c] = 0);
+    
+    const userStats = [];
     filteredUsers.forEach(user => {
         const userTasks = user.tasks.filter(t => {
             if (projectMode === 'current' && currentProjectId !== 'default' && t.projectId !== currentProjectId) return false;
@@ -3132,104 +3142,171 @@ function renderManagerReport() {
             if (to && d > to) return false;
             return true;
         });
-
         if (userTasks.length === 0) return;
 
-        const catCounts = {};
-        categoriesList.forEach(c => catCounts[c] = 0);
-        let errors = 0;
-
+        let errs = 0, qSum = 0;
+        const uCats = {}; categoriesList.forEach(c => uCats[c] = 0);
         userTasks.forEach(t => {
-            if (t.hasErrors) errors++;
-            categoriesList.forEach(c => { if (t.cats[c]) catCounts[c]++; });
+            if (t.hasErrors) errs++;
+            qSum += (t.quality || 0);
+            categoriesList.forEach(c => { if (t.cats[c]) uCats[c]++; });
         });
 
-        const mark = userMarks[user.id];
-        const markText = mark === 'newbie' ? 'новичок' : mark === 'experienced' ? 'опытный' : '—';
+        totalTasks += userTasks.length;
+        totalErrors += errs;
+        totalQSum += qSum;
+        categoriesList.forEach(c => catTotals[c] += uCats[c]);
 
-        userRows.push({
-            id: user.id,
-            name: user.name,
-            mark: markText,
-            total: userTasks.length,
-            errors: errors,
-            cats: catCounts
+        userStats.push({
+            id: user.id, name: user.name, tasks: userTasks.length, errors: errs, cats: uCats, qSum: qSum
         });
-
-        totals.total += userTasks.length;
-        totals.errors += errors;
-        categoriesList.forEach(c => totals.cats[c] += catCounts[c]);
     });
 
-    // Сортируем по алфавиту
-    userRows.sort((a, b) => a.name.localeCompare(b.name));
+    const avgQ = totalTasks ? (totalQSum / totalTasks * 100) : 0;
+    const errPct = totalTasks ? (totalErrors / totalTasks * 100) : 0;
 
-    // Строим таблицу
-    let tableHtml = `<table class="summary-table" style="margin-top:20px;"><thead><tr>
-        <th style="text-align:left; min-width:150px;">сотрудник</th>
-        <th>пометка</th>
-        <th>всего</th>
-        <th>с ошибками</th>`;
-    
-    categoriesList.forEach(cat => {
-        tableHtml += `<th title="${cat}">${CAT_SHORT_LABELS[cat] || cat}</th>`;
-    });
-    tableHtml += `<th>marker_id</th></tr></thead><tbody>`;
+    let html = `
+        <div style="background:linear-gradient(135deg,#EEF4FF,#F5F0FF); border-left:4px solid var(--c-primary); border-radius:var(--r-md); padding:14px 20px; margin-bottom:20px;">
+            <div style="font-size:18px; font-weight:800; color:var(--c-text); margin-bottom:4px;">Отчёт о качестве работы</div>
+            <div style="font-size:13px; color:var(--c-text-2);">Период: <b>${from ? formatDateShort(from) : '—'} – ${to ? formatDateShort(to) : '—'}</b> · Группа: <b>${group === 'all' ? 'все' : group === 'newbie' ? 'новички' : 'опытные'}</b></div>
+        </div>
 
-    // Итоговая строка
-    tableHtml += `<tr class="total-row">
-        <td style="text-align:right;">ИТОГО:</td><td></td>
-        <td>${totals.total}</td><td>${totals.errors}</td>`;
-    categoriesList.forEach(cat => { tableHtml += `<td>${totals.cats[cat]}</td>`; });
-    tableHtml += `<td></td></tr>`;
-
-    // Строки с сотрудниками
-    userRows.forEach(r => {
-        tableHtml += `<tr>
-            <td class="name-col" onclick="openCard('${r.id}')">${r.name}</td>
-            <td>${r.mark}</td>
-            <td><b>${r.total}</b></td>
-            <td><b>${r.errors}</b></td>`;
-        categoriesList.forEach(cat => {
-            const v = r.cats[cat];
-            tableHtml += `<td class="${v === 0 ? 'zero-cell' : ''}">${v}</td>`;
-        });
-        tableHtml += `<td class="id-col" title="${r.id}">${r.id}</td></tr>`;
-    });
-
-    tableHtml += `</tbody></table>`;
-
-    // Вставляем на страницу
-    body.innerHTML = `
-        ${renderReportHeader(from, to, projectMode, group, userRows.length)}
-        
         <div class="progress-kpi-grid" style="margin-bottom:24px;">
-            <div class="progress-kpi" style="border-left-color:var(--c-primary);">
-                <div class="lbl">Всего задач</div>
-                <div class="val">${totals.total}</div>
-            </div>
-            <div class="progress-kpi" style="border-left-color:var(--c-red);">
-                <div class="lbl">С ошибками</div>
-                <div class="val">${totals.errors}</div>
-            </div>
-            <div class="progress-kpi" style="border-left-color:var(--c-orange);">
-                <div class="lbl">% ошибок</div>
-                <div class="val">${totals.total ? (totals.errors / totals.total * 100).toFixed(1) : 0}%</div>
-            </div>
-            <div class="progress-kpi" style="border-left-color:var(--c-green);">
-                <div class="lbl">Сотрудников</div>
-                <div class="val">${userRows.length}</div>
-            </div>
+            <div class="progress-kpi" style="border-left-color:var(--c-primary);"><div class="lbl">Всего задач</div><div class="val">${totalTasks}</div></div>
+            <div class="progress-kpi" style="border-left-color:var(--c-red);"><div class="lbl">С ошибками</div><div class="val">${totalErrors}</div></div>
+            <div class="progress-kpi" style="border-left-color:var(--c-orange);"><div class="lbl">% ошибок</div><div class="val">${errPct.toFixed(1)}%</div></div>
+            <div class="progress-kpi" style="border-left-color:var(--c-green);"><div class="lbl">Качество</div><div class="val">${avgQ.toFixed(1)}%</div></div>
         </div>
-
-        <div class="results" style="margin-top:20px; padding:0; box-shadow:none; background:transparent;">
-            ${tableHtml}
-        </div>
-
-        <p style="color:var(--c-text-3); text-align:center; padding:10px; font-size:12px;">
-            Нажмите "📋 Отчёт (Excel)", чтобы выгрузить эту таблицу в Excel.
-        </p>
     `;
+
+    // 1. СВОДНАЯ ТАБЛИЦА (как в Сводке)
+    if (showSummary) {
+        let table = `<div class="progress-table-wrap" style="margin-bottom:20px;"><h3>Сводная таблица</h3><table class="summary-table"><thead><tr>
+            <th style="text-align:left;">Сотрудник</th><th>Всего</th><th>С ошибками</th>`;
+        categoriesList.forEach(c => table += `<th>${CAT_SHORT_LABELS[c] || c}</th>`);
+        table += `<th>marker_id</th></tr></thead><tbody>`;
+        
+        userStats.sort((a,b) => a.name.localeCompare(b.name));
+        userStats.forEach(u => {
+            table += `<tr><td class="name-col">${u.name}</td><td><b>${u.tasks}</b></td><td><b>${u.errors}</b></td>`;
+            categoriesList.forEach(c => {
+                const v = u.cats[c];
+                table += `<td class="${v === 0 ? 'zero-cell' : ''}">${v}</td>`;
+            });
+            table += `<td class="id-col">${u.id}</td></tr>`;
+        });
+        table += `</tbody></table></div>`;
+        html += table;
+    }
+
+    // 2. ТЕКУЩЕЕ КАЧЕСТВО (Рейтинг)
+    if (showQuality) {
+        const ranked = [...userStats].sort((a, b) => {
+            const ap = a.tasks ? a.errors / a.tasks : 0;
+            const bp = b.tasks ? b.errors / b.tasks : 0;
+            return ap - bp; // Лучшие (меньше % ошибок) сверху
+        });
+
+        let table = `<div class="progress-table-wrap" style="margin-bottom:20px;"><h3>Текущее качество (рейтинг)</h3><table class="progress-table"><thead><tr>
+            <th>Место</th><th style="text-align:left;">Сотрудник</th><th>Задач</th><th>С ошибками</th><th>% ошибок</th><th>Качество</th></tr></thead><tbody>`;
+        
+        ranked.forEach((u, idx) => {
+            const pct = u.tasks ? (u.errors / u.tasks * 100) : 0;
+            const q = u.tasks ? (u.qSum / u.tasks * 100) : 0;
+            let medal = idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : (idx + 1);
+            let badge = pct <= 5 ? 'q-green' : pct <= 15 ? 'q-orange' : 'q-red';
+            
+            table += `<tr>
+                <td style="font-size:18px;">${medal}</td>
+                <td class="period-col">${u.name}</td>
+                <td>${u.tasks}</td>
+                <td>${u.errors}</td>
+                <td class="${badge}"><b>${pct.toFixed(1)}%</b></td>
+                <td>${q.toFixed(1)}%</td>
+            </tr>`;
+        });
+        table += `</tbody></table></div>`;
+        html += table;
+    }
+
+    // 3. ДИНАМИКА ПО СОТРУДНИКАМ (Матрица по неделям)
+    if (showDynamics) {
+        // Собираем уникальные недели
+        const weeks = new Set();
+        filteredUsers.forEach(u => {
+            u.tasks.forEach(t => {
+                if (projectMode === 'current' && currentProjectId !== 'default' && t.projectId !== currentProjectId) return;
+                const d = t.startDate || t.endDate;
+                if (!d || (from && d < from) || (to && d > to)) return;
+                const dt = new Date(d + 'T00:00:00');
+                const dow = dt.getDay() || 7;
+                const mon = new Date(dt); mon.setDate(dt.getDate() - dow + 1);
+                weeks.add(mon.toISOString().slice(0, 10));
+            });
+        });
+        const sortedWeeks = Array.from(weeks).sort();
+
+        let table = `<div class="progress-table-wrap" style="margin-bottom:20px; overflow-x:auto;"><h3>Динамика по сотрудникам (% ошибок по неделям)</h3>
+        <table class="progress-table" style="min-width:${300 + sortedWeeks.length * 80}px;"><thead><tr>
+            <th style="text-align:left;">Сотрудник</th>`;
+        sortedWeeks.forEach(w => {
+            const d = new Date(w + 'T00:00:00');
+            const sun = new Date(d); sun.setDate(d.getDate() + 6);
+            table += `<th>${pad2(d.getDate())}.${pad2(d.getMonth()+1)}–${pad2(sun.getDate())}.${pad2(sun.getMonth()+1)}</th>`;
+        });
+        table += `</tr></thead><tbody>`;
+
+        userStats.sort((a,b) => a.name.localeCompare(b.name));
+        userStats.forEach(u => {
+            const userObj = globalReport.find(gu => gu.id === u.id);
+            table += `<tr><td class="period-col">${u.name}</td>`;
+            sortedWeeks.forEach(w => {
+                const wTasks = userObj.tasks.filter(t => {
+                    if (projectMode === 'current' && currentProjectId !== 'default' && t.projectId !== currentProjectId) return false;
+                    const d = t.startDate || t.endDate;
+                    if (!d) return false;
+                    const dt = new Date(d + 'T00:00:00');
+                    const dow = dt.getDay() || 7;
+                    const mon = new Date(dt); mon.setDate(dt.getDate() - dow + 1);
+                    return mon.toISOString().slice(0, 10) === w;
+                });
+                if (wTasks.length === 0) {
+                    table += `<td style="color:#CCC;">—</td>`;
+                } else {
+                    const errs = wTasks.filter(t => t.hasErrors).length;
+                    const pct = errs / wTasks.length * 100;
+                    const cls = pct <= 5 ? 'q-green' : pct <= 15 ? 'q-orange' : 'q-red';
+                    table += `<td class="${cls}">${pct.toFixed(1)}%</td>`;
+                }
+            });
+            table += `</tr>`;
+        });
+        table += `</tbody></table></div>`;
+        html += table;
+    }
+
+    // 4. ОШИБКИ ПО КАТЕГОРИЯМ
+    if (showCats) {
+        let table = `<div class="progress-table-wrap" style="margin-bottom:20px;"><h3>Ошибки по категориям</h3><table class="progress-table"><thead><tr>
+            <th style="text-align:left;">Категория</th><th>Кол-во</th><th>Доля от задач</th><th>% от всех ошибок</th></tr></thead><tbody>`;
+        
+        categoriesList.forEach(c => {
+            const v = catTotals[c];
+            if (v === 0) return;
+            const pctTasks = totalTasks ? (v / totalTasks * 100) : 0;
+            const pctErrors = totalErrors ? (v / totalErrors * 100) : 0;
+            table += `<tr>
+                <td class="period-col">${CAT_SHORT_LABELS[c] || c}</td>
+                <td style="font-weight:700; color:var(--c-red);">${v}</td>
+                <td>${pctTasks.toFixed(1)}%</td>
+                <td>${pctErrors.toFixed(1)}%</td>
+            </tr>`;
+        });
+        table += `</tbody></table></div>`;
+        html += table;
+    }
+
+    body.innerHTML = html;
 }
 
 function renderWeekProgress() {
@@ -3248,18 +3325,22 @@ function loadExcelJS() {
 }
 
 async function exportManagerReport() {
-    if (!window.globalReport || !window.globalReport.length) {
-        alert('Нет данных. Сначала загрузите отчёт в сводке.');
-        return;
-    }
+    if (!window.globalReport || !window.globalReport.length) { alert('Нет данных'); return; }
     try {
-        showToast('Готовим отчёт…');
+        showToast('Готовим Excel…');
         const ExcelJS = await loadExcelJS();
 
-        const group = document.getElementById('repGroup').value;
-        const projectMode = document.getElementById('repProject').value;
+        const projectMode = document.getElementById('repProject')?.value || 'current';
+        const group = document.getElementById('repGroup')?.value || 'all';
+        const from = document.getElementById('repDateFrom')?.value || null;
+        const to = document.getElementById('repDateTo')?.value || null;
 
-        const usersAll = globalReport.filter(u => {
+        const showSummary = document.getElementById('chk-report-summary')?.checked ?? true;
+        const showQuality = document.getElementById('chk-report-quality')?.checked ?? true;
+        const showDynamics = document.getElementById('chk-report-dynamics')?.checked ?? true;
+        const showCats = document.getElementById('chk-report-cats')?.checked ?? true;
+
+        const filteredUsers = globalReport.filter(u => {
             if (userCards[u.id]?.archived) return false;
             const m = userMarks[u.id];
             if (group === 'newbie' && m !== 'newbie') return false;
@@ -3267,52 +3348,41 @@ async function exportManagerReport() {
             return true;
         });
 
-        const today = new Date();
-        const isoT = today.toISOString().slice(0, 10);
-        
-        // Квартал и неделя
-        const qStart = new Date(today.getFullYear(), Math.floor(today.getMonth() / 3) * 3, 1);
-        const qFrom = qStart.toISOString().slice(0, 10);
-        const qTo = isoT;
-        
-        const weekFrom = new Date(today); weekFrom.setDate(weekFrom.getDate() - 6);
-        const wFrom = weekFrom.toISOString().slice(0, 10);
-        const wTo = isoT;
+        const userStats = [];
+        filteredUsers.forEach(user => {
+            const uTasks = user.tasks.filter(t => {
+                if (projectMode === 'current' && currentProjectId !== 'default' && t.projectId !== currentProjectId) return false;
+                const d = t.startDate || t.endDate;
+                if (!d) return false;
+                if (from && d < from) return false;
+                if (to && d > to) return false;
+                return true;
+            });
+            if (uTasks.length === 0) return;
 
-        const C = {
-            header: 'FF34495E', primary: 'FF5B9DF9',
-            green: 'FFD4EDDA', greenTxt: 'FF155724',
-            warn: 'FFFFF3CD', warnTxt: 'FF856404',
-            bad: 'FFF8D7DA', badTxt: 'FF721C24',
-            border: 'FFDDDDDD', gray: 'FFF5F5F7'
-        };
+            let errs = 0, qSum = 0;
+            const uCats = {}; categoriesList.forEach(c => uCats[c] = 0);
+            uTasks.forEach(t => {
+                if (t.hasErrors) errs++;
+                qSum += (t.quality || 0);
+                categoriesList.forEach(c => { if (t.cats[c]) uCats[c]++; });
+            });
+            userStats.push({ id: user.id, name: user.name, total: uTasks.length, errors: errs, qSum, cats: uCats, tasksRaw: uTasks });
+        });
+
+        userStats.sort((a,b) => a.name.localeCompare(b.name));
 
         const wb = new ExcelJS.Workbook();
-        wb.creator = 'Дашборд';
-        wb.created = new Date();
-
-        const thinBorder = {
-            top: { style: 'thin', color: { argb: C.border } }, left: { style: 'thin', color: { argb: C.border } },
-            bottom: { style: 'thin', color: { argb: C.border } }, right: { style: 'thin', color: { argb: C.border } }
-        };
+        const C = { header: 'FF34495E', primary: 'FF5B9DF9', green: 'FFD4EDDA', greenTxt: 'FF155724', warn: 'FFFFF3CD', warnTxt: 'FF856404', bad: 'FFF8D7DA', badTxt: 'FF721C24', border: 'FFDDDDDD' };
+        const thinBorder = { top: { style: 'thin', color: { argb: C.border } }, left: { style: 'thin', color: { argb: C.border } }, bottom: { style: 'thin', color: { argb: C.border } }, right: { style: 'thin', color: { argb: C.border } } };
 
         const styleHeaderRow = (row) => {
-            row.eachCell(c => {
-                c.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 11 };
-                c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: C.header } };
-                c.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
-                c.border = thinBorder;
-            });
+            row.eachCell(c => { c.font = { bold: true, color: { argb: 'FFFFFFFF' } }; c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: C.header } }; c.alignment = { vertical: 'middle', horizontal: 'center' }; c.border = thinBorder; });
             row.height = 26;
         };
-
         const styleDataRow = (row) => {
-            row.eachCell(c => {
-                c.border = thinBorder;
-                c.alignment = { vertical: 'middle', wrapText: true };
-            });
+            row.eachCell(c => { c.border = thinBorder; c.alignment = { vertical: 'middle', wrapText: true }; });
         };
-
         const fillBadge = (cell, pct) => {
             let fill, txt;
             if (pct <= 5) { fill = C.green; txt = C.greenTxt; }
@@ -3320,238 +3390,142 @@ async function exportManagerReport() {
             else { fill = C.bad; txt = C.badTxt; }
             cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: fill } };
             cell.font = { bold: true, color: { argb: txt } };
-            cell.alignment = { horizontal: 'center', vertical: 'middle' };
+            cell.alignment = { horizontal: 'center' };
         };
 
-        // ============================================================
-        // ЛИСТ 1: ТАБЛИЦА "СВОДКА" (КАК НА ЭКРАНЕ)
-        // ============================================================
-        const ws1 = wb.addWorksheet('Сводка (как на экране)');
-        
-        // Заголовки колонок: Сотрудник, пометка, всего, с ошибками, [категории], marker_id
-        const head1 = ['Сотрудник', 'Пометка', 'Всего задач', 'С ошибками'];
-        categoriesList.forEach(c => head1.push(CAT_SHORT_LABELS[c] || c));
-        head1.push('marker_id');
-        
-        // Настраиваем ширину
-        ws1.columns = head1.map((h, i) => {
-            if (i === 0) return { width: 30 };
-            if (i === head1.length - 1) return { width: 40 };
-            return { width: 12 };
-        });
-
-        styleHeaderRow(ws1.addRow(head1));
-
-        const rowsData = [];
-        usersAll.forEach(user => {
-            const userTasks = user.tasks.filter(t => {
-                if (currentProjectId !== 'default' && t.projectId !== currentProjectId) return false;
-                const d = t.startDate || t.endDate;
-                if (!d) return false;
-                if (d < qFrom || d > qTo) return false;
-                return true;
-            });
-            if (!userTasks.length) return;
-
-            const catCounts = {};
-            categoriesList.forEach(c => catCounts[c] = 0);
-            let errors = 0;
-            
-            userTasks.forEach(t => {
-                if (t.hasErrors) errors++;
-                categoriesList.forEach(c => { if (t.cats[c]) catCounts[c]++; });
-            });
-
-            const mark = userMarks[user.id];
-            const markText = mark === 'newbie' ? 'новичок' : mark === 'experienced' ? 'опытный' : '—';
-            
-            const row = [user.name, markText, userTasks.length, errors];
-            categoriesList.forEach(c => row.push(catCounts[c]));
-            row.push(user.id);
-            
-            const added = ws1.addRow(row);
-            styleDataRow(added);
-            
-            // Красим колонку % ошибок (если бы она была) или просто "с ошибками" (4-я колонка)
-            const errPct = errors / userTasks.length * 100;
-            fillBadge(added.getCell(4), errPct);
-            
-            // Красим пометку
-            if (mark === 'newbie') added.getCell(2).font = { color: { argb: C.warnTxt }, bold: true };
-            if (mark === 'experienced') added.getCell(2).font = { color: { argb: C.primary }, bold: true };
-            
-            rowsData.push(added);
-        });
-
-        // Итоговая строка
-        const totalsRow = ['ИТОГО', '', 0, 0];
-        categoriesList.forEach(() => totalsRow.push(0));
-        totalsRow.push('');
-        
-        const totRow = ws1.addRow(totalsRow);
-        styleDataRow(totRow);
-        totRow.eachCell(c => {
-            c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: C.gray } };
-            c.font = { bold: true };
-        });
-        
-        // Заполняем ИТОГО
-        let sumTotal = 0, sumErrors = 0;
-        const sumCats = {}; categoriesList.forEach(c => sumCats[c] = 0);
-        
-        usersAll.forEach(user => {
-            const userTasks = user.tasks.filter(t => {
-                if (currentProjectId !== 'default' && t.projectId !== currentProjectId) return false;
-                const d = t.startDate || t.endDate;
-                if (!d) return false;
-                if (d < qFrom || d > qTo) return false;
-                return true;
-            });
-            if (!userTasks.length) return;
-            sumTotal += userTasks.length;
-            userTasks.forEach(t => {
-                if (t.hasErrors) sumErrors++;
-                categoriesList.forEach(c => { if (t.cats[c]) sumCats[c]++; });
-            });
-        });
-        
-        totRow.getCell(3).value = sumTotal;
-        totRow.getCell(4).value = sumErrors;
-        categoriesList.forEach((c, i) => {
-            totRow.getCell(5 + i).value = sumCats[c];
-        });
-
-        // ============================================================
-        // ЛИСТ 2: ТАБЛИЦА "ДИНАМИКА ПО СОТРУДНИКАМ" (КАК НА ЭКРАНЕ)
-        // ============================================================
-        const ws2 = wb.addWorksheet('Динамика по сотрудникам');
-        
-        // Собираем недели
-        const weeksSet = new Set();
-        usersAll.forEach(u => {
-            u.tasks.forEach(t => {
-                const d = t.startDate || t.endDate;
-                if (!d || d < qFrom || d > qTo) return;
-                const dt = new Date(d + 'T00:00:00');
-                const day = dt.getDay() || 7;
-                const mon = new Date(dt); mon.setDate(dt.getDate() - day + 1);
-                weeksSet.add(mon.toISOString().slice(0, 10));
-            });
-        });
-        const sortedWeeks = Array.from(weeksSet).sort();
-        
-        const head2 = ['Сотрудник'];
-        sortedWeeks.forEach(w => {
-            const d = new Date(w + 'T00:00:00');
-            const sun = new Date(d); sun.setDate(d.getDate() + 6);
-            head2.push(`${pad2(d.getDate())}.${pad2(d.getMonth()+1)}–${pad2(sun.getDate())}.${pad2(sun.getMonth()+1)}`);
-        });
-        
-        ws2.columns = head2.map((h, i) => ({ width: i === 0 ? 30 : 14 }));
-        styleHeaderRow(ws2.addRow(head2));
-        
-        usersAll.forEach(u => {
-            const row = [u.name];
-            let hasAny = false;
-            
-            sortedWeeks.forEach(w => {
-                const wTasks = u.tasks.filter(t => {
-                    if (currentProjectId !== 'default' && t.projectId !== currentProjectId) return false;
-                    const d = t.startDate || t.endDate;
-                    if (!d) return false;
-                    const dt = new Date(d + 'T00:00:00');
-                    const day = dt.getDay() || 7;
-                    const mon = new Date(dt); mon.setDate(dt.getDate() - day + 1);
-                    return mon.toISOString().slice(0, 10) === w;
-                });
-                
-                if (wTasks.length === 0) {
-                    row.push('—');
-                } else {
-                    hasAny = true;
-                    const errs = wTasks.filter(t => t.hasErrors).length;
-                    row.push(errs / wTasks.length * 100);
-                }
-            });
-            
-            if (!hasAny) return;
-            const added = ws2.addRow(row);
-            styleDataRow(added);
-            added.getCell(1).font = { bold: true };
-            
-            // Красим ячейки с процентами
-            for (let i = 1; i < row.length; i++) {
-                const val = row[i];
-                if (typeof val === 'number') {
-                    fillBadge(added.getCell(i + 1), val);
-                    added.getCell(i + 1).numFmt = '0.0"%"';
-                } else {
-                    added.getCell(i + 1).alignment = { horizontal: 'center' };
-                }
-            }
-        });
-
-        // ============================================================
-        // ЛИСТ 3: РЕЙТИНГ
-        // ============================================================
-        const ws3 = wb.addWorksheet('Рейтинг сотрудников');
-        ws3.columns = [{ width: 30 }, { width: 15 }, { width: 15 }, { width: 15 }];
-        
-        styleHeaderRow(ws3.addRow(['Сотрудник', 'Всего задач', 'С ошибками', '% ошибок']));
-        
-        const rankList = [];
-        usersAll.forEach(u => {
-            const uTasks = u.tasks.filter(t => {
-                if (currentProjectId !== 'default' && t.projectId !== currentProjectId) return false;
-                const d = t.startDate || t.endDate;
-                if (!d || d < qFrom || d > qTo) return false;
-                return true;
-            });
-            if (!uTasks.length) return;
-            const errs = uTasks.filter(t => t.hasErrors).length;
-            rankList.push({ name: u.name, total: uTasks.length, errors: errs, pct: errs / uTasks.length * 100 });
-        });
-        
-        rankList.sort((a, b) => a.pct - b.pct);
-        
-        rankList.forEach(r => {
-            const added = ws3.addRow([r.name, r.total, r.errors, r.pct / 100]);
-            styleDataRow(added);
-            fillBadge(added.getCell(4), r.pct);
-            added.getCell(4).numFmt = '0.0%';
-        });
-
-        // ============================================================
-        // ЛИСТ 4: СЫРЫЕ ДАННЫЕ (С КОММЕНТАРИЯМИ)
-        // ============================================================
-        const ws4 = wb.addWorksheet('Сырые данные (с комментариями)');
-        ws4.columns = [{ width: 30 }, { width: 15 }, { width: 15 }, { width: 15 }, { width: 80 }];
-        styleHeaderRow(ws4.addRow(['Сотрудник', 'Дата начала', 'Дата конца', 'Качество', 'Комментарий ревьюера']));
-        
-        usersAll.forEach(u => {
-            u.tasks.forEach(t => {
-                if (currentProjectId !== 'default' && t.projectId !== currentProjectId) return;
-                const d = t.startDate || t.endDate;
-                if (!d || d < qFrom || d > qTo) return;
-                
-                const commentText = (taskComments[u.id] || []).filter(c => c.taskStart === t.startTime).map(c => `${CAT_SHORT_LABELS[c.category] || c.category}: ${c.text}`).join('\n');
-                
-                const added = ws4.addRow([u.name, t.startDate, t.endDate, t.quality, commentText]);
+        // 1. СВОДНАЯ ТАБЛИЦА
+        if (showSummary) {
+            const ws = wb.addWorksheet('Сводка');
+            const head = ['Сотрудник', 'Всего задач', 'С ошибками'];
+            categoriesList.forEach(c => head.push(CAT_SHORT_LABELS[c] || c));
+            head.push('marker_id');
+            ws.columns = head.map((h, i) => ({ width: i === 0 ? 30 : i === head.length - 1 ? 40 : 12 }));
+            styleHeaderRow(ws.addRow(head));
+            userStats.forEach(u => {
+                const row = [u.name, u.total, u.errors];
+                categoriesList.forEach(c => row.push(u.cats[c]));
+                row.push(u.id);
+                const added = ws.addRow(row);
                 styleDataRow(added);
-                added.getCell(5).alignment = { vertical: 'top', wrapText: true };
+                fillBadge(added.getCell(3), u.total ? u.errors / u.total * 100 : 0);
             });
-        });
+        }
 
-        // Сохранение
+        // 2. РЕЙТИНГ КАЧЕСТВА
+        if (showQuality) {
+            const ws = wb.addWorksheet('Качество (рейтинг)');
+            ws.columns = [{ width: 8 }, { width: 30 }, { width: 15 }, { width: 15 }, { width: 15 }, { width: 15 }];
+            styleHeaderRow(ws.addRow(['Место', 'Сотрудник', 'Задач', 'С ошибками', '% ошибок', 'Качество']));
+            
+            const ranked = [...userStats].sort((a, b) => {
+                const ap = a.total ? a.errors / a.total : 0;
+                const bp = b.total ? b.errors / b.total : 0;
+                return ap - bp;
+            });
+            ranked.forEach((u, idx) => {
+                const pct = u.total ? (u.errors / u.total * 100) : 0;
+                const q = u.total ? (u.qSum / u.total * 100) : 0;
+                const medal = idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : (idx + 1);
+                const added = ws.addRow([medal, u.name, u.total, u.errors, pct / 100, q / 100]);
+                styleDataRow(added);
+                fillBadge(added.getCell(5), pct);
+                added.getCell(5).numFmt = '0.0%';
+                added.getCell(6).numFmt = '0.0%';
+            });
+        }
+
+        // 3. ДИНАМИКА ПО СОТРУДНИКАМ
+        if (showDynamics) {
+            const ws = wb.addWorksheet('Динамика (по неделям)');
+            const weeksSet = new Set();
+            filteredUsers.forEach(u => {
+                u.tasks.forEach(t => {
+                    if (projectMode === 'current' && currentProjectId !== 'default' && t.projectId !== currentProjectId) return;
+                    const d = t.startDate || t.endDate;
+                    if (!d || (from && d < from) || (to && d > to)) return;
+                    const dt = new Date(d + 'T00:00:00');
+                    const dow = dt.getDay() || 7;
+                    const mon = new Date(dt); mon.setDate(dt.getDate() - dow + 1);
+                    weeksSet.add(mon.toISOString().slice(0, 10));
+                });
+            });
+            const sortedWeeks = Array.from(weeksSet).sort();
+            
+            const head = ['Сотрудник'];
+            sortedWeeks.forEach(w => {
+                const d = new Date(w + 'T00:00:00');
+                const sun = new Date(d); sun.setDate(d.getDate() + 6);
+                head.push(`${pad2(d.getDate())}.${pad2(d.getMonth()+1)}–${pad2(sun.getDate())}.${pad2(sun.getMonth()+1)}`);
+            });
+            ws.columns = head.map((h, i) => ({ width: i === 0 ? 30 : 14 }));
+            styleHeaderRow(ws.addRow(head));
+
+            userStats.forEach(u => {
+                const row = [u.name];
+                const uRaw = filteredUsers.find(x => x.id === u.id);
+                sortedWeeks.forEach(w => {
+                    const wTasks = uRaw.tasks.filter(t => {
+                        if (projectMode === 'current' && currentProjectId !== 'default' && t.projectId !== currentProjectId) return false;
+                        const d = t.startDate || t.endDate;
+                        if (!d) return false;
+                        const dt = new Date(d + 'T00:00:00');
+                        const dow = dt.getDay() || 7;
+                        const mon = new Date(dt); mon.setDate(dt.getDate() - dow + 1);
+                        return mon.toISOString().slice(0, 10) === w;
+                    });
+                    if (!wTasks.length) row.push('—');
+                    else {
+                        const errs = wTasks.filter(t => t.hasErrors).length;
+                        row.push(errs / wTasks.length);
+                    }
+                });
+                const added = ws.addRow(row);
+                styleDataRow(added);
+                for (let i = 1; i < row.length; i++) {
+                    if (typeof row[i] === 'number') {
+                        fillBadge(added.getCell(i + 1), row[i] * 100);
+                        added.getCell(i + 1).numFmt = '0.0%';
+                    } else {
+                        added.getCell(i + 1).alignment = { horizontal: 'center' };
+                    }
+                }
+            });
+        }
+
+        // 4. ОШИБКИ ПО КАТЕГОРИЯМ
+        if (showCats) {
+            const ws = wb.addWorksheet('Ошибки (категории)');
+            ws.columns = [{ width: 35 }, { width: 15 }, { width: 15 }, { width: 15 }];
+            styleHeaderRow(ws.addRow(['Категория', 'Кол-во', 'Доля от задач', '% от всех ошибок']));
+            
+            let totalTasks = 0, totalErrors = 0;
+            const catTotals = {}; categoriesList.forEach(c => catTotals[c] = 0);
+            userStats.forEach(u => {
+                totalTasks += u.total; totalErrors += u.errors;
+                categoriesList.forEach(c => catTotals[c] += u.cats[c]);
+            });
+
+            categoriesList.forEach(c => {
+                const v = catTotals[c];
+                if (v === 0) return;
+                const pctTasks = totalTasks ? v / totalTasks : 0;
+                const pctErrors = totalErrors ? v / totalErrors : 0;
+                const added = ws.addRow([CAT_SHORT_LABELS[c] || c, v, pctTasks, pctErrors]);
+                styleDataRow(added);
+                added.getCell(3).numFmt = '0.0%';
+                added.getCell(4).numFmt = '0.0%';
+            });
+        }
+
         const buffer = await wb.xlsx.writeBuffer();
         const blob = new Blob([buffer], { type: 'application/octet-stream' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `сводка_${qFrom}_${qTo}.xlsx`;
+        a.download = `итоговый_отчет_${from || 'all'}_${to || 'all'}.xlsx`;
         a.click();
         URL.revokeObjectURL(url);
-        showToast('Отчёт готов ✓');
+        showToast('Excel готов ✓');
     } catch (e) {
         console.error(e);
         alert('Ошибка экспорта: ' + e.message);
