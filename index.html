@@ -446,7 +446,7 @@ body.dark-theme tr.paint-gray { background-color: #2E2E2E !important; color: #A0
         <div class="header-actions">
             <a href="https://ffvy7phzfb-dot.github.io/Analytic-/" target="_blank" class="btn-header ghost">AI Аналитик</a>
             <button class="btn-header ghost" onclick="openAccountSwitcher()" style="display:none;" id="switchAccountBtn">🔄 Сменить аккаунт</button>
-            <button class="btn-header ghost" id="themeToggleBtn" onclick="toggleTheme()">🌙 Тёмная тема</button>
+            <button class="btn-header ghost" id="themeToggleBtn" onclick="toggleTheme()">🌙 Тема</button>
             <button class="btn-header danger" onclick="logoutUser()">Выйти</button>
         </div>
     </div>
@@ -3191,24 +3191,17 @@ async function exportManagerReport() {
         const today = new Date();
         const isoT = today.toISOString().slice(0, 10);
 
+        // Квартал
         const qStart = new Date(today.getFullYear(), Math.floor(today.getMonth() / 3) * 3, 1);
         const qFrom = qStart.toISOString().slice(0, 10);
         const qTo = isoT;
 
-        const prevQEnd = new Date(qStart); prevQEnd.setDate(prevQEnd.getDate() - 1);
-        const prevQStart = new Date(prevQEnd.getFullYear(), Math.floor(prevQEnd.getMonth() / 3) * 3, 1);
-        const pQFrom = prevQStart.toISOString().slice(0, 10);
-        const pQTo = prevQEnd.toISOString().slice(0, 10);
-
+        // Неделя
         const weekFrom = new Date(today); weekFrom.setDate(weekFrom.getDate() - 6);
         const wFrom = weekFrom.toISOString().slice(0, 10);
         const wTo = isoT;
 
-        const prevWEnd = new Date(weekFrom); prevWEnd.setDate(prevWEnd.getDate() - 1);
-        const prevWFrom = new Date(prevWEnd); prevWFrom.setDate(prevWEnd.getDate() - 6);
-        const pwFrom = prevWFrom.toISOString().slice(0, 10);
-        const pwTo = prevWEnd.toISOString().slice(0, 10);
-
+        // Агрегаторы
         const agg = (from, to) => {
             let total = 0, errors = 0, qSum = 0;
             const cats = {}; categoriesList.forEach(c => cats[c] = 0);
@@ -3274,22 +3267,18 @@ async function exportManagerReport() {
         };
 
         const curQ = agg(qFrom, qTo);
-        const oldQ = agg(pQFrom, pQTo);
         const curW = agg(wFrom, wTo);
-        const oldW = agg(pwFrom, pwTo);
         const quarterWeeks = getWeekBuckets(qFrom, qTo);
         const weekKeys = Object.keys(quarterWeeks).sort();
         const userQ = aggByUser(qFrom, qTo);
 
+        // Стили
         const C = {
-            header:    'FF34495E',
-            primary:   'FF5B9DF9',
-            primaryBg: 'FFEEF4FF',
-            green:     'FFD4EDDA', greenTxt: 'FF155724',
-            warn:      'FFFFF3CD', warnTxt:  'FF856404',
-            bad:       'FFF8D7DA', badTxt:   'FF721C24',
-            gray:      'FFF5F5F7',
-            border:    'FFDDDDDD'
+            header: 'FF34495E', primary: 'FF5B9DF9', primaryBg: 'FFEEF4FF',
+            green: 'FFD4EDDA', greenTxt: 'FF155724',
+            warn: 'FFFFF3CD', warnTxt: 'FF856404',
+            bad: 'FFF8D7DA', badTxt: 'FF721C24',
+            border: 'FFDDDDDD'
         };
 
         const wb = new ExcelJS.Workbook();
@@ -3297,366 +3286,206 @@ async function exportManagerReport() {
         wb.created = new Date();
 
         const thinBorder = {
-            top:    { style: 'thin', color: { argb: C.border } },
-            left:   { style: 'thin', color: { argb: C.border } },
-            bottom: { style: 'thin', color: { argb: C.border } },
-            right:  { style: 'thin', color: { argb: C.border } }
+            top: { style: 'thin', color: { argb: C.border } }, left: { style: 'thin', color: { argb: C.border } },
+            bottom: { style: 'thin', color: { argb: C.border } }, right: { style: 'thin', color: { argb: C.border } }
         };
-        const styleTitle = (cell) => {
-            cell.font = { bold: true, size: 18, color: { argb: C.primary } };
-            cell.alignment = { horizontal: 'center', vertical: 'middle' };
-        };
-        const styleSubtitle = (cell) => {
-            cell.font = { size: 11, color: { argb: 'FF6E6E73' }, italic: true };
-            cell.alignment = { horizontal: 'center' };
-        };
-        const styleHeaderRow = (row, bg = C.header) => {
+
+        const styleHeaderRow = (row) => {
             row.eachCell(c => {
                 c.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 11 };
-                c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bg } };
+                c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: C.header } };
                 c.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
                 c.border = thinBorder;
             });
             row.height = 26;
         };
+
         const styleDataRow = (row) => {
             row.eachCell(c => {
                 c.border = thinBorder;
                 c.alignment = { vertical: 'middle', wrapText: true };
             });
         };
+
         const fillBadge = (cell, pct) => {
             let fill, txt;
-            if (pct <= 5)      { fill = C.green; txt = C.greenTxt; }
-            else if (pct <= 15){ fill = C.warn;  txt = C.warnTxt;  }
-            else               { fill = C.bad;   txt = C.badTxt;   }
+            if (pct <= 5) { fill = C.green; txt = C.greenTxt; }
+            else if (pct <= 15) { fill = C.warn; txt = C.warnTxt; }
+            else { fill = C.bad; txt = C.badTxt; }
             cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: fill } };
             cell.font = { bold: true, color: { argb: txt } };
             cell.alignment = { horizontal: 'center', vertical: 'middle' };
         };
-        const deltaText = (cur, old, invert = true) => {
-            if (old === null || old === undefined || old === 0) return '—';
-            const d = cur - old;
-            if (Math.abs(d) < 0.01) return '0';
-            const good = invert ? d < 0 : d > 0;
-            return (d > 0 ? '+' : '') + d.toFixed(1) + (good ? ' ✅' : ' ⚠️');
-        };
 
-        const projLabel = projectMode === 'all'
-            ? 'Все проекты'
-            : (window.currentProjectId === 'default'
-                ? 'Общий проект'
-                : ((window.myProjects || []).find(p => p.id === window.currentProjectId)?.name || 'Проект'));
-        const groupLabel = group === 'all' ? 'все' : group === 'newbie' ? 'новички' : 'опытные';
         const periodQ = `${formatDateShort(qFrom)} – ${formatDateShort(qTo)}`;
         const periodW = `${formatDateShort(wFrom)} – ${formatDateShort(wTo)}`;
 
-        const ws1 = wb.addWorksheet('Сводка', { properties: { tabColor: { argb: C.primary } } });
-        ws1.columns = [{ width: 32 }, { width: 20 }, { width: 20 }, { width: 20 }];
+        // === ЛИСТ 1: ОБЩИЙ ПРОГРЕСС ===
+        const ws1 = wb.addWorksheet('Общий прогресс', { properties: { tabColor: { argb: C.primary } } });
+        ws1.columns = [{ width: 25 }, { width: 15 }, { width: 20 }, { width: 15 }, { width: 15 }];
+        
+        ws1.mergeCells('A1:E1');
+        const titleCell = ws1.getCell('A1');
+        titleCell.value = `Общий прогресс (${periodQ})`;
+        titleCell.font = { bold: true, size: 16, color: { argb: C.primary } };
+        titleCell.alignment = { horizontal: 'center', vertical: 'middle' };
+        ws1.getRow(1).height = 30;
 
-        ws1.mergeCells('A1:D1');
-        styleTitle(ws1.getCell('A1'));
-        ws1.getCell('A1').value = 'Отчёт о качестве работы команды';
-        ws1.getRow(1).height = 32;
-
-        ws1.mergeCells('A2:D2');
-        styleSubtitle(ws1.getCell('A2'));
-        ws1.getCell('A2').value = `${projLabel} · группа: ${groupLabel} · сформирован: ${today.toLocaleDateString('ru-RU')}`;
+        ws1.mergeCells('A2:E2');
+        ws1.getCell('A2').value = `Всего задач: ${curQ.total} · С ошибками: ${curQ.errors} (${curQ.errPct.toFixed(1)}%) · Среднее качество: ${curQ.avgQ.toFixed(1)}%`;
+        ws1.getCell('A2').font = { size: 12, color: { argb: 'FF6E6E73' }, italic: true };
+        ws1.getCell('A2').alignment = { horizontal: 'center' };
         ws1.getRow(2).height = 20;
 
         ws1.addRow([]);
-
-        styleHeaderRow(ws1.addRow(['Показатель', 'Квартал', 'Прошлый квартал', 'Δ']));
-        const kpiRows = [
-            ['Задач за квартал',       curQ.total,   oldQ.total,   deltaText(curQ.total, oldQ.total, false)],
-            ['С ошибками',             curQ.errors,  oldQ.errors,  deltaText(curQ.errors, oldQ.errors, true)],
-            ['% ошибок',               curQ.errPct.toFixed(1) + '%', oldQ.errPct.toFixed(1) + '%', deltaText(curQ.errPct, oldQ.errPct, true)],
-            ['Среднее качество',       curQ.avgQ.toFixed(1) + '%',  oldQ.avgQ.toFixed(1) + '%',  deltaText(curQ.avgQ, oldQ.avgQ, false)]
-        ];
-        kpiRows.forEach(r => {
-            const row = ws1.addRow(r);
+        styleHeaderRow(ws1.addRow(['Период', 'Задач', 'Качество', 'Норма', 'Δ']));
+        
+        weekKeys.forEach(k => {
+            const b = quarterWeeks[k];
+            const q = b.total ? (b.qSum / b.total * 100) : 0;
+            const row = ws1.addRow([b.label, b.total, q.toFixed(2) + '%', '100%', (q - 100).toFixed(2)]);
             styleDataRow(row);
-            row.getCell(1).font = { bold: true };
+            fillBadge(row.getCell(3), q);
         });
 
-        ws1.addRow([]);
-        styleHeaderRow(ws1.addRow(['Показатель', 'Неделя', 'Прошлая неделя', 'Δ']));
-        const kpiRowsW = [
-            ['Задач за неделю',        curW.total,   oldW.total,   deltaText(curW.total, oldW.total, false)],
-            ['С ошибками',             curW.errors,  oldW.errors,  deltaText(curW.errors, oldW.errors, true)],
-            ['% ошибок',               curW.errPct.toFixed(1) + '%', oldW.errPct.toFixed(1) + '%', deltaText(curW.errPct, oldW.errPct, true)],
-            ['Среднее качество',       curW.avgQ.toFixed(1) + '%',  oldW.avgQ.toFixed(1) + '%',  deltaText(curW.avgQ, oldW.avgQ, false)]
-        ];
-        kpiRowsW.forEach(r => {
-            const row = ws1.addRow(r);
-            styleDataRow(row);
-            row.getCell(1).font = { bold: true };
-        });
-
-        const note = document.getElementById('repManagerNote')?.value;
-        if (note && note.trim()) {
-            ws1.addRow([]);
-            const h = ws1.addRow(['Комментарий менеджера']);
-            ws1.mergeCells(`A${h.number}:D${h.number}`);
-            styleHeaderRow(h, C.primary);
-            const nr = ws1.addRow([note]);
-            ws1.mergeCells(`A${nr.number}:D${nr.number}`);
-            styleDataRow(nr);
-            nr.height = 60;
-            nr.getCell(1).alignment = { wrapText: true, vertical: 'top' };
-        }
-
-        const ws2 = wb.addWorksheet('Ошибки квартал', { properties: { tabColor: { argb: 'FFEF4444' } } });
-        ws2.columns = [{ width: 32 }, { width: 12 }, { width: 14 }, { width: 14 }, { width: 16 }];
-
+        // === ЛИСТ 2: ДИНАМИКА ОБЩАЯ ===
+        const ws2 = wb.addWorksheet('Динамика общая', { properties: { tabColor: { argb: 'FF34C759' } } });
+        ws2.columns = [{ width: 20 }, { width: 12 }, { width: 12 }, { width: 15 }, { width: 15 }];
         ws2.mergeCells('A1:E1');
-        styleTitle(ws2.getCell('A1'));
-        ws2.getCell('A1').value = `Типичные ошибки за квартал (${periodQ})`;
-        ws2.getRow(1).height = 28;
-
-        ws2.mergeCells('A2:E2');
-        styleSubtitle(ws2.getCell('A2'));
-        ws2.getCell('A2').value = `Всего задач: ${curQ.total} · с ошибками: ${curQ.errors} (${curQ.errPct.toFixed(1)}%)`;
-        ws2.getRow(2).height = 18;
-
+        ws2.getCell('A1').value = `Динамика общей ошибки (${periodQ})`;
+        ws2.getCell('A1').font = { bold: true, size: 16, color: { argb: C.primary } };
+        ws2.getCell('A1').alignment = { horizontal: 'center' };
+        
         ws2.addRow([]);
-        styleHeaderRow(ws2.addRow(['Категория', 'Кол-во', 'Доля от задач', 'Прошлый квартал', 'Δ']));
-
-        categoriesList.forEach(cat => {
-            const cv = curQ.cats[cat] || 0;
-            const ov = oldQ.cats[cat] || 0;
-            if (cv === 0 && ov === 0) return;
-            const pct = curQ.total ? (cv / curQ.total * 100) : 0;
-            const delta = deltaText(cv, ov, true);
-            const row = ws2.addRow([
-                CAT_SHORT_LABELS[cat] || cat,
-                cv,
-                pct.toFixed(1) + '%',
-                ov,
-                delta
-            ]);
-            styleDataRow(row);
-            row.getCell(1).font = { bold: true };
-            if (pct >= 5) {
-                row.getCell(3).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: C.bad } };
-                row.getCell(3).font = { bold: true, color: { argb: C.badTxt } };
-            }
-        });
-
-        const totRow = ws2.addRow(['ИТОГО', curQ.errors, curQ.errPct.toFixed(1) + '%', oldQ.errors, deltaText(curQ.errors, oldQ.errors, true)]);
-        styleDataRow(totRow);
-        totRow.eachCell(c => {
-            c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: C.primaryBg } };
-            c.font = { bold: true };
-        });
-
-        const ws3 = wb.addWorksheet('Ошибки неделя', { properties: { tabColor: { argb: 'FFEF4444' } } });
-        ws3.columns = [{ width: 32 }, { width: 12 }, { width: 14 }, { width: 14 }, { width: 16 }];
-
-        ws3.mergeCells('A1:E1');
-        styleTitle(ws3.getCell('A1'));
-        ws3.getCell('A1').value = `Типичные ошибки за неделю (${periodW})`;
-        ws3.getRow(1).height = 28;
-
-        ws3.mergeCells('A2:E2');
-        styleSubtitle(ws3.getCell('A2'));
-        ws3.getCell('A2').value = `Всего задач: ${curW.total} · с ошибками: ${curW.errors} (${curW.errPct.toFixed(1)}%)`;
-        ws3.getRow(2).height = 18;
-
-        ws3.addRow([]);
-        styleHeaderRow(ws3.addRow(['Категория', 'Кол-во', 'Доля от задач', 'Прошлая неделя', 'Δ']));
-
-        categoriesList.forEach(cat => {
-            const cv = curW.cats[cat] || 0;
-            const ov = oldW.cats[cat] || 0;
-            if (cv === 0 && ov === 0) return;
-            const pct = curW.total ? (cv / curW.total * 100) : 0;
-            const delta = deltaText(cv, ov, true);
-            const row = ws3.addRow([
-                CAT_SHORT_LABELS[cat] || cat,
-                cv,
-                pct.toFixed(1) + '%',
-                ov,
-                delta
-            ]);
-            styleDataRow(row);
-            row.getCell(1).font = { bold: true };
-            if (pct >= 5) {
-                row.getCell(3).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: C.bad } };
-                row.getCell(3).font = { bold: true, color: { argb: C.badTxt } };
-            }
-        });
-
-        const totRowW = ws3.addRow(['ИТОГО', curW.errors, curW.errPct.toFixed(1) + '%', oldW.errors, deltaText(curW.errors, oldW.errors, true)]);
-        styleDataRow(totRowW);
-        totRowW.eachCell(c => {
-            c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: C.primaryBg } };
-            c.font = { bold: true };
-        });
-
-        const ws4 = wb.addWorksheet('Динамика неделя', { properties: { tabColor: { argb: 'FF34C759' } } });
-        ws4.columns = [
-            { width: 18 }, { width: 12 }, { width: 12 },
-            { width: 14 }, { width: 14 }, { width: 22 }
-        ];
-
-        ws4.mergeCells('A1:F1');
-        styleTitle(ws4.getCell('A1'));
-        ws4.getCell('A1').value = `Динамика по неделям (${periodQ})`;
-        ws4.getRow(1).height = 28;
-
-        ws4.mergeCells('A2:F2');
-        styleSubtitle(ws4.getCell('A2'));
-        ws4.getCell('A2').value = `Недель в периоде: ${weekKeys.length}`;
-        ws4.getRow(2).height = 18;
-
-        ws4.addRow([]);
-        styleHeaderRow(ws4.addRow(['Неделя', 'Задач', 'С ошиб.', '% ошибок', 'Качество', 'Визуально (% ошибок)']));
-
-        let maxErrW = 1;
-        weekKeys.forEach(k => { if (quarterWeeks[k].total) maxErrW = Math.max(maxErrW, quarterWeeks[k].errors / quarterWeeks[k].total * 100); });
-
+        styleHeaderRow(ws2.addRow(['Неделя', 'Задач', 'С ошибками', '% ошибок', 'Качество']));
+        
         weekKeys.forEach(k => {
             const b = quarterWeeks[k];
             const errPct = b.total ? (b.errors / b.total * 100) : 0;
             const q = b.total ? (b.qSum / b.total * 100) : 0;
-            const barLen = Math.round((errPct / maxErrW) * 20);
-            const bar = '█'.repeat(barLen);
-            const row = ws4.addRow([b.label, b.total, b.errors, errPct.toFixed(1) + '%', q.toFixed(1) + '%', bar]);
+            const row = ws2.addRow([b.label, b.total, b.errors, errPct.toFixed(1) + '%', q.toFixed(1) + '%']);
             styleDataRow(row);
-            row.getCell(1).font = { bold: true };
             fillBadge(row.getCell(4), errPct);
-            row.getCell(6).font = { color: { argb: 'FFEF4444' }, name: 'Consolas' };
         });
 
-        const ws5 = wb.addWorksheet('Динамика по сотрудникам', { properties: { tabColor: { argb: 'FF7B6FE8' } } });
-        const cols5 = [{ width: 30 }, { width: 10 }]; 
-        weekKeys.forEach(() => cols5.push({ width: 11 }));
-        cols5.push({ width: 12 }); 
-        ws5.columns = cols5;
+        // === ЛИСТ 3: ДИНАМИКА ПО СОТРУДНИКАМ ===
+        const ws3 = wb.addWorksheet('Динамика по сотрудникам', { properties: { tabColor: { argb: 'FF7B6FE8' } } });
+        const cols3 = [{ width: 30 }];
+        weekKeys.forEach(() => cols3.push({ width: 12 }));
+        cols3.push({ width: 12 }); // Тренд
+        ws3.columns = cols3;
 
-        const lastColLetter = ws5.getColumn(2 + weekKeys.length + 1).letter;
-        ws5.mergeCells(`A1:${lastColLetter}1`);
-        styleTitle(ws5.getCell('A1'));
-        ws5.getCell('A1').value = `Динамика по сотрудникам: % ошибок по неделям (${periodQ})`;
-        ws5.getRow(1).height = 28;
+        ws3.mergeCells(`A1:${ws3.getColumn(1 + weekKeys.length + 1).letter}1`);
+        ws3.getCell('A1').value = `Динамика по сотрудникам (% ошибок) — ${periodQ}`;
+        ws3.getCell('A1').font = { bold: true, size: 16, color: { argb: C.primary } };
+        ws3.getCell('A1').alignment = { horizontal: 'center' };
+        
+        ws3.addRow([]);
+        const head3 = ['Сотрудник'];
+        weekKeys.forEach(k => head3.push(quarterWeeks[k].label));
+        head3.push('Тренд');
+        styleHeaderRow(ws3.addRow(head3));
 
-        ws5.mergeCells(`A2:${lastColLetter}2`);
-        styleSubtitle(ws5.getCell('A2'));
-        ws5.getCell('A2').value = `Строк: ${Object.keys(userQ).length} · недель: ${weekKeys.length}. Цвет: зелёный ≤5%, жёлтый ≤15%, красный >15%`;
-        ws5.getRow(2).height = 18;
-
-        ws5.addRow([]);
-        const head5 = ['Сотрудник', '% ошибок (квартал)'];
-        weekKeys.forEach(k => head5.push(quarterWeeks[k].label));
-        head5.push('Тренд');
-        styleHeaderRow(ws5.addRow(head5));
-
-        const usersSorted = Object.values(userQ)
-            .filter(u => u.total > 0)
-            .sort((a, b) => {
-                const aP = a.total ? a.errors / a.total : 0;
-                const bP = b.total ? b.errors / b.total : 0;
-                return bP - aP;
-            });
-
-        usersSorted.forEach(u => {
-            const qPct = u.total ? (u.errors / u.total * 100) : 0;
-            const row = ws5.addRow([u.name, qPct.toFixed(1) + '%']);
-
+        const sortedUsers3 = Object.values(userQ).filter(u => u.total > 0).sort((a, b) => a.name.localeCompare(b.name));
+        sortedUsers3.forEach(u => {
+            const row = ws3.addRow([u.name]);
             let first = null, last = null;
             weekKeys.forEach((k, idx) => {
                 const b = quarterWeeks[k];
                 const bu = b.byUser[u.id];
-                const cell = row.getCell(3 + idx); 
+                const cell = row.getCell(2 + idx);
                 if (!bu || !bu.total) {
                     cell.value = '—';
+                    cell.alignment = { horizontal: 'center' };
                 } else {
-                    const pct = bu.total ? (bu.errors / bu.total * 100) : 0;
+                    const pct = (bu.errors / bu.total * 100);
                     cell.value = pct.toFixed(1) + '%';
+                    fillBadge(cell, pct);
                     if (first === null) first = pct;
                     last = pct;
                 }
             });
-
             let trend = '—';
             if (first !== null && last !== null) {
                 const d = last - first;
                 trend = (d > 0.5 ? '↑ +' : d < -0.5 ? '↓ ' : '→ ') + d.toFixed(1) + ' п.п.';
             }
-            const trendCell = row.getCell(3 + weekKeys.length);
-            trendCell.value = trend;
-
+            const tCell = row.getCell(2 + weekKeys.length);
+            tCell.value = trend;
+            tCell.alignment = { horizontal: 'center' };
             styleDataRow(row);
             row.getCell(1).font = { bold: true };
-            fillBadge(row.getCell(2), qPct);
-
-            weekKeys.forEach((k, idx) => {
-                const cell = row.getCell(3 + idx);
-                const txt = cell.value;
-                if (typeof txt === 'string' && txt.endsWith('%')) {
-                    const v = parseFloat(txt);
-                    fillBadge(cell, v);
-                } else {
-                    cell.alignment = { horizontal: 'center', vertical: 'middle' };
-                }
-            });
-
-            trendCell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
-            if (trend.startsWith('↓')) trendCell.font = { color: { argb: C.greenTxt }, bold: true };
-            else if (trend.startsWith('↑')) trendCell.font = { color: { argb: C.badTxt }, bold: true };
         });
 
-        const ws6 = wb.addWorksheet('Рейтинг сотрудников', { properties: { tabColor: { argb: 'FFFF9500' } } });
-        ws6.columns = [
-            { width: 8 }, { width: 30 }, { width: 10 }, { width: 10 }, { width: 12 }, { width: 12 }, { width: 26 }
-        ];
-
-        ws6.mergeCells('A1:G1');
-        styleTitle(ws6.getCell('A1'));
-        ws6.getCell('A1').value = `Рейтинг сотрудников (${periodQ})`;
-        ws6.getRow(1).height = 28;
-
-        ws6.mergeCells('A2:G2');
-        styleSubtitle(ws6.getCell('A2'));
-        ws6.getCell('A2').value = `Сортировка: сначала лучшие (по % ошибок), затем худшие`;
-        ws6.getRow(2).height = 18;
-
-        ws6.addRow([]);
-        styleHeaderRow(ws6.addRow(['№', 'Сотрудник', 'Задач', 'С ошибками', '% ошибок', 'Качество', 'Топ-ошибка']));
-
-        const rankSorted = Object.values(userQ)
-            .filter(u => u.total > 0)
-            .sort((a, b) => {
-                const aP = a.total ? a.errors / a.total : 0;
-                const bP = b.total ? b.errors / b.total : 0;
-                return aP - bP;
-            });
+        // === ЛИСТ 4: РЕЙТИНГ СОТРУДНИКОВ ===
+        const ws4 = wb.addWorksheet('Рейтинг сотрудников', { properties: { tabColor: { argb: 'FFFF9500' } } });
+        ws4.columns = [{ width: 8 }, { width: 30 }, { width: 12 }, { width: 12 }, { width: 15 }, { width: 15 }];
+        ws4.mergeCells('A1:F1');
+        ws4.getCell('A1').value = `Рейтинг сотрудников (${periodQ})`;
+        ws4.getCell('A1').font = { bold: true, size: 16, color: { argb: C.primary } };
+        ws4.getCell('A1').alignment = { horizontal: 'center' };
+        
+        ws4.addRow([]);
+        styleHeaderRow(ws4.addRow(['№', 'Сотрудник', 'Всего задач', 'С ошибками', '% ошибок', 'Качество']));
+        
+        const rankSorted = Object.values(userQ).filter(u => u.total > 0).sort((a, b) => {
+            const aP = a.errors / a.total;
+            const bP = b.errors / b.total;
+            return aP - bP; // Лучшие (меньше ошибок) сверху
+        });
 
         rankSorted.forEach((u, idx) => {
-            const errPct = u.total ? (u.errors / u.total * 100) : 0;
-            const q = u.total ? (u.qSum / u.total * 100) : 0;
-            const topCat = categoriesList
-                .map(c => ({ c, v: u.cats[c] || 0 }))
-                .sort((a, b) => b.v - a.v)[0];
-            const topCatText = topCat && topCat.v > 0
-                ? `${CAT_SHORT_LABELS[topCat.c] || topCat.c} (${topCat.v})`
-                : '—';
-
-            const row = ws6.addRow([
-                idx + 1, u.name, u.total, u.errors, errPct.toFixed(1) + '%', q.toFixed(1) + '%', topCatText
-            ]);
+            const errPct = u.errors / u.total * 100;
+            const q = u.qSum / u.total * 100;
+            const row = ws4.addRow([idx + 1, u.name, u.total, u.errors, errPct.toFixed(1) + '%', q.toFixed(1) + '%']);
             styleDataRow(row);
-            row.getCell(1).alignment = { horizontal: 'center', vertical: 'middle' };
-            row.getCell(2).font = { bold: true };
             fillBadge(row.getCell(5), errPct);
-
             if (idx === 0) row.getCell(1).value = '🥇';
             else if (idx === 1) row.getCell(1).value = '🥈';
             else if (idx === 2) row.getCell(1).value = '🥉';
-            else if (idx === rankSorted.length - 1 && rankSorted.length > 3) row.getCell(1).value = '⚠️';
         });
 
+        // === ЛИСТ 5: ОШИБКИ КВАРТАЛ ===
+        const ws5 = wb.addWorksheet('Ошибки квартал', { properties: { tabColor: { argb: 'FFEF4444' } } });
+        ws5.columns = [{ width: 35 }, { width: 15 }, { width: 15 }, { width: 15 }];
+        ws5.mergeCells('A1:D1');
+        ws5.getCell('A1').value = `Ошибки квартал (${periodQ})`;
+        ws5.getCell('A1').font = { bold: true, size: 16, color: { argb: C.primary } };
+        ws5.getCell('A1').alignment = { horizontal: 'center' };
+
+        ws5.addRow([]);
+        styleHeaderRow(ws5.addRow(['Категория', 'Кол-во ошибок', 'Доля от задач', '% задач с этой ошибкой']));
+        
+        categoriesList.forEach(cat => {
+            const count = curQ.cats[cat] || 0;
+            if (count === 0) return;
+            const pctTotal = (count / curQ.total * 100);
+            const row = ws5.addRow([CAT_SHORT_LABELS[cat] || cat, count, (count / curQ.errors * 100).toFixed(1) + '%', pctTotal.toFixed(1) + '%']);
+            styleDataRow(row);
+            row.getCell(1).font = { bold: true };
+        });
+
+        // === ЛИСТ 6: ОШИБКИ НЕДЕЛЯ ===
+        const ws6 = wb.addWorksheet('Ошибки неделя', { properties: { tabColor: { argb: 'FFEF4444' } } });
+        ws6.columns = [{ width: 35 }, { width: 15 }, { width: 15 }];
+        ws6.mergeCells('A1:C1');
+        ws6.getCell('A1').value = `Ошибки неделя (${periodW})`;
+        ws6.getCell('A1').font = { bold: true, size: 16, color: { argb: C.primary } };
+        ws6.getCell('A1').alignment = { horizontal: 'center' };
+
+        ws6.addRow([]);
+        styleHeaderRow(ws6.addRow(['Категория', 'Кол-во ошибок', 'Доля от задач']));
+        
+        categoriesList.forEach(cat => {
+            const count = curW.cats[cat] || 0;
+            if (count === 0) return;
+            const pct = (count / curW.total * 100);
+            const row = ws6.addRow([CAT_SHORT_LABELS[cat] || cat, count, pct.toFixed(1) + '%']);
+            styleDataRow(row);
+            row.getCell(1).font = { bold: true };
+        });
+
+        // Сохранение
         const buffer = await wb.xlsx.writeBuffer();
         const blob = new Blob([buffer], { type: 'application/octet-stream' });
         const url = URL.createObjectURL(blob);
@@ -3671,7 +3500,6 @@ async function exportManagerReport() {
         alert('Ошибка экспорта: ' + e.message);
     }
 }
-
 function switchProject(id) {
     if (id === window.currentProjectId) return;
     const curMain = document.getElementById('mainData').value;
