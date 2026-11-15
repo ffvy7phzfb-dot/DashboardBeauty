@@ -973,23 +973,46 @@ body.dark-theme tr.paint-gray { background-color: #2E2E2E !important; color: #A0
     </div>
 
     <!-- ================== ИТОГОВЫЙ ОТЧЁТ ================== -->
+<!-- ================== ИТОГОВЫЙ ОТЧЁТ ================== -->
 <div class="tab-content" id="tab-manager-report">
     <div class="container">
         <div class="box" style="min-width:100%;">
+
             <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:20px;">
-                <h3 style="margin:0;">Итоговый отчёт</h3>
+                <h3 style="margin:0;">📋 Итоговый отчёт — конструктор</h3>
                 <div style="display:flex; gap:8px; flex-wrap:wrap;">
                     <button class="btn-copy" onclick="renderManagerReport()" style="padding:10px 16px;">🔄 Сформировать</button>
-                    <button class="btn-copy" onclick="exportManagerReport()" style="padding:10px 16px; background:var(--c-primary); color:#fff;">📋 Выгрузить в Excel</button>
+                    <button class="btn-copy" onclick="exportManagerReport()" style="padding:10px 16px; background:var(--c-primary); color:#fff;">📥 Выгрузить в Excel</button>
                     <button class="btn-copy" onclick="window.print()" style="padding:10px 16px;">🖨 PDF / Печать</button>
                 </div>
             </div>
 
-            <!-- 1. СРАВНЕНИЕ -->
+            <!-- Общие настройки -->
+            <div class="block-config" style="background:var(--c-surface-2); padding:16px; border-radius:12px; border:1px solid var(--c-border); margin-bottom:16px;">
+                <div style="display:flex; gap:20px; flex-wrap:wrap; align-items:flex-end;">
+                    <div class="field-group" style="margin:0; min-width:200px;">
+                        <label>Группа сотрудников</label>
+                        <select id="repGroup" onchange="renderManagerReport()">
+                            <option value="all">все</option>
+                            <option value="newbie">только новички</option>
+                            <option value="experienced">только опытные</option>
+                        </select>
+                    </div>
+                    <div class="field-group" style="margin:0; min-width:220px;">
+                        <label>Проект (пул)</label>
+                        <select id="repProject" onchange="renderManagerReport()">
+                            <option value="current">📁 Текущий пул</option>
+                            <option value="all">🌐 Все пулы</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 1. СРАВНЕНИЕ ПЕРИОДОВ -->
             <div class="block-config" style="background:var(--c-surface-2); padding:16px; border-radius:12px; border:1px solid var(--c-border); margin-bottom:12px;">
                 <div class="block-header" style="display:flex; align-items:center; gap:10px; margin-bottom:10px;">
-                    <input type="checkbox" id="chk-report-compare" checked onchange="renderManagerReport()" style="width:20px; height:20px;">
-                    <label for="chk-report-compare" style="font-weight:700; font-size:15px;">⚖️ Сравнение периодов (Общий вид)</label>
+                    <input type="checkbox" id="chk-report-compare" checked onchange="renderManagerReport()" style="width:20px; height:20px; cursor:pointer;">
+                    <label for="chk-report-compare" style="font-weight:700; font-size:15px; cursor:pointer;">⚖️ Сравнение периодов (Общий вид)</label>
                 </div>
                 <div class="block-dates" style="display:flex; gap:12px; flex-wrap:wrap; padding-left:30px;">
                     <div class="field-group"><label>Период А (от)</label><input type="date" id="repCmpAFrom" onchange="renderManagerReport()"></div>
@@ -999,11 +1022,11 @@ body.dark-theme tr.paint-gray { background-color: #2E2E2E !important; color: #A0
                 </div>
             </div>
 
-            <!-- 2. ДИНАМИКА -->
+            <!-- 2. ДИНАМИКА ПО СОТРУДНИКАМ (матрица) -->
             <div class="block-config" style="background:var(--c-surface-2); padding:16px; border-radius:12px; border:1px solid var(--c-border); margin-bottom:12px;">
                 <div class="block-header" style="display:flex; align-items:center; gap:10px; margin-bottom:10px;">
-                    <input type="checkbox" id="chk-report-dynamics" checked onchange="renderManagerReport()" style="width:20px; height:20px;">
-                    <label for="chk-report-dynamics" style="font-weight:700; font-size:15px;">📊 Динамика по сотрудникам (матрица)</label>
+                    <input type="checkbox" id="chk-report-dynamics" checked onchange="renderManagerReport()" style="width:20px; height:20px; cursor:pointer;">
+                    <label for="chk-report-dynamics" style="font-weight:700; font-size:15px; cursor:pointer;">📊 Динамика по сотрудникам (матрица)</label>
                 </div>
                 <div class="block-dates" style="display:flex; gap:12px; flex-wrap:wrap; padding-left:30px;">
                     <div class="field-group"><label>Дата от</label><input type="date" id="repDynFrom" onchange="renderManagerReport()"></div>
@@ -1011,11 +1034,23 @@ body.dark-theme tr.paint-gray { background-color: #2E2E2E !important; color: #A0
                 </div>
             </div>
 
-            <!-- 3. ОШИБКИ КВАРТАЛ -->
+            <!-- 3. КАЧЕСТВО ПО СОТРУДНИКАМ -->
             <div class="block-config" style="background:var(--c-surface-2); padding:16px; border-radius:12px; border:1px solid var(--c-border); margin-bottom:12px;">
                 <div class="block-header" style="display:flex; align-items:center; gap:10px; margin-bottom:10px;">
-                    <input type="checkbox" id="chk-report-q-errors" checked onchange="renderManagerReport()" style="width:20px; height:20px;">
-                    <label for="chk-report-q-errors" style="font-weight:700; font-size:15px;">🚨 Типичные ошибки за квартал</label>
+                    <input type="checkbox" id="chk-report-quality-emp" checked onchange="renderManagerReport()" style="width:20px; height:20px; cursor:pointer;">
+                    <label for="chk-report-quality-emp" style="font-weight:700; font-size:15px; cursor:pointer;">👥 Качество по сотрудникам</label>
+                </div>
+                <div class="block-dates" style="display:flex; gap:12px; flex-wrap:wrap; padding-left:30px;">
+                    <div class="field-group"><label>Дата от</label><input type="date" id="repQualFrom" onchange="renderManagerReport()"></div>
+                    <div class="field-group"><label>Дата до</label><input type="date" id="repQualTo" onchange="renderManagerReport()"></div>
+                </div>
+            </div>
+
+            <!-- 4. ОШИБКИ ЗА КВАРТАЛ -->
+            <div class="block-config" style="background:var(--c-surface-2); padding:16px; border-radius:12px; border:1px solid var(--c-border); margin-bottom:12px;">
+                <div class="block-header" style="display:flex; align-items:center; gap:10px; margin-bottom:10px;">
+                    <input type="checkbox" id="chk-report-q-errors" checked onchange="renderManagerReport()" style="width:20px; height:20px; cursor:pointer;">
+                    <label for="chk-report-q-errors" style="font-weight:700; font-size:15px; cursor:pointer;">🚨 Типичные ошибки за квартал</label>
                 </div>
                 <div class="block-dates" style="display:flex; gap:12px; flex-wrap:wrap; padding-left:30px;">
                     <div class="field-group"><label>Дата от</label><input type="date" id="repQErrFrom" onchange="renderManagerReport()"></div>
@@ -1023,26 +1058,16 @@ body.dark-theme tr.paint-gray { background-color: #2E2E2E !important; color: #A0
                 </div>
             </div>
 
-            <!-- 4. ОШИБКИ НЕДЕЛЯ -->
+            <!-- 5. ОШИБКИ ЗА НЕДЕЛЮ -->
             <div class="block-config" style="background:var(--c-surface-2); padding:16px; border-radius:12px; border:1px solid var(--c-border); margin-bottom:12px;">
                 <div class="block-header" style="display:flex; align-items:center; gap:10px; margin-bottom:10px;">
-                    <input type="checkbox" id="chk-report-w-errors" checked onchange="renderManagerReport()" style="width:20px; height:20px;">
-                    <label for="chk-report-w-errors" style="font-weight:700; font-size:15px;">🚨 Типичные ошибки за неделю</label>
+                    <input type="checkbox" id="chk-report-w-errors" checked onchange="renderManagerReport()" style="width:20px; height:20px; cursor:pointer;">
+                    <label for="chk-report-w-errors" style="font-weight:700; font-size:15px; cursor:pointer;">🚨 Типичные ошибки за неделю</label>
                 </div>
                 <div class="block-dates" style="display:flex; gap:12px; flex-wrap:wrap; padding-left:30px;">
                     <div class="field-group"><label>Дата от</label><input type="date" id="repWErrFrom" onchange="renderManagerReport()"></div>
                     <div class="field-group"><label>Дата до</label><input type="date" id="repWErrTo" onchange="renderManagerReport()"></div>
                 </div>
-            </div>
-
-            <!-- Группа (общая для всех, если нужно) -->
-            <div class="field-group" style="margin: 20px 0;">
-                <label>Группа (для всех блоков)</label>
-                <select id="repGroup" onchange="renderManagerReport()" style="padding:8px 12px; border-radius:8px; border:1px solid var(--c-border);">
-                    <option value="all">все</option>
-                    <option value="newbie">новички</option>
-                    <option value="experienced">опытные</option>
-                </select>
             </div>
 
             <hr style="margin: 20px 0; border: none; border-top: 2px dashed var(--c-border);">
@@ -1594,6 +1619,8 @@ document.addEventListener('DOMContentLoaded', () => {
     setDef('repQErrTo', today.toISOString().slice(0,10));
     setDef('repWErrFrom', new Date(today.getTime() - 7 * 86400000).toISOString().slice(0,10));
     setDef('repWErrTo', today.toISOString().slice(0,10));
+    setDef('repQualFrom', past30.toISOString().slice(0,10));
+setDef('repQualTo', today.toISOString().slice(0,10));
 });
 
 function syncQualityFromMain() {
@@ -3130,20 +3157,69 @@ function renderReportHeader(from, to, projectMode, group, usersCount) {
     </div>`;
 }
 
+/* ============================================================
+   ИТОГОВЫЙ ОТЧЁТ — КОНСТРУКТОР
+   ============================================================ */
+
+// Утилита: множество недель (понедельник ISO) в диапазоне
+function _getWeeksList(users, from, to, projectMode) {
+    const pid = window.currentProjectId;
+    const weeks = new Set();
+    users.forEach(u => (u.tasks || []).forEach(t => {
+        if (projectMode === 'current' && pid !== 'default' && t.projectId !== pid) return;
+        const d = t.startDate || t.endDate;
+        if (!d || d < from || d > to) return;
+        const dt = new Date(d + 'T00:00:00');
+        const dow = dt.getDay() || 7;
+        const mon = new Date(dt); mon.setDate(dt.getDate() - dow + 1);
+        weeks.add(mon.toISOString().slice(0, 10));
+    }));
+    return Array.from(weeks).sort();
+}
+
+// Утилита: цвет % ошибок
+function _errPctClass(pct) {
+    if (pct <= 5) return 'q-green';
+    if (pct <= 15) return 'q-orange';
+    return 'q-red';
+}
+
+// Утилита: получить задачи пользователя в диапазоне
+function _userTasksInRange(u, from, to, projectMode) {
+    const pid = window.currentProjectId;
+    return (u.tasks || []).filter(t => {
+        if (projectMode === 'current' && pid !== 'default' && t.projectId !== pid) return false;
+        const d = t.startDate || t.endDate;
+        if (!d) return false;
+        if (from && d < from) return false;
+        if (to && d > to) return false;
+        return true;
+    });
+}
+
+// Утилита: неделя (пн) для даты
+function _weekStartKey(dateStr) {
+    const dt = new Date(dateStr + 'T00:00:00');
+    const dow = dt.getDay() || 7;
+    const mon = new Date(dt); mon.setDate(dt.getDate() - dow + 1);
+    return mon.toISOString().slice(0, 10);
+}
+
+/* ---------- ГЛАВНЫЙ РЕНДЕР ---------- */
 function renderManagerReport() {
     const body = document.getElementById('repBody');
     if (!body) return;
+
     if (!window.globalReport || window.globalReport.length === 0) {
-        body.innerHTML = `<div style="text-align:center; padding:40px;"><p>Данные не загружены. Загрузите их во вкладке «Сводка».</p></div>`;
+        body.innerHTML = `<div style="text-align:center; padding:40px; color:var(--c-text-3);">
+            <p style="font-size:15px;">Данные не загружены.</p>
+            <p style="font-size:13px;">Зайдите во вкладку «Сводка» и нажмите «загрузить и обработать».</p>
+        </div>`;
         return;
     }
 
-    const projectMode = 'current'; 
+    const projectMode = document.getElementById('repProject')?.value || 'current';
     const group = document.getElementById('repGroup')?.value || 'all';
-    const showCompare = document.getElementById('chk-report-compare')?.checked;
-    const showDynamics = document.getElementById('chk-report-dynamics')?.checked;
-    const showQErrors = document.getElementById('chk-report-q-errors')?.checked;
-    const showWErrors = document.getElementById('chk-report-w-errors')?.checked;
 
     const filteredUsers = globalReport.filter(u => {
         if (userCards[u.id]?.archived) return false;
@@ -3153,185 +3229,321 @@ function renderManagerReport() {
         return true;
     });
 
-    // Вспомогательная функция для Сравнения
+    const showCompare   = document.getElementById('chk-report-compare')?.checked;
+    const showDynamics  = document.getElementById('chk-report-dynamics')?.checked;
+    const showQuality   = document.getElementById('chk-report-quality-emp')?.checked;
+    const showQErrors   = document.getElementById('chk-report-q-errors')?.checked;
+    const showWErrors   = document.getElementById('chk-report-w-errors')?.checked;
+
+    /* ---------- БЛОК 1: СРАВНЕНИЕ ПЕРИОДОВ ---------- */
     const buildCompare = () => {
-        const aF = document.getElementById('repCmpAFrom').value, aT = document.getElementById('repCmpATo').value;
-        const bF = document.getElementById('repCmpBFrom').value, bT = document.getElementById('repCmpBTo').value;
-        if(!aF || !aT || !bF || !bT) return `<p style="text-align:center;color:var(--c-text-3);">Заполните все даты для сравнения.</p>`;
-        
+        const aF = document.getElementById('repCmpAFrom').value;
+        const aT = document.getElementById('repCmpATo').value;
+        const bF = document.getElementById('repCmpBFrom').value;
+        const bT = document.getElementById('repCmpBTo').value;
+
+        if (!aF || !aT || !bF || !bT) {
+            return `<div class="rep-block"><h3 class="rep-block-title">⚖️ Сравнение периодов</h3>
+                <p style="text-align:center; color:var(--c-text-3); padding:20px;">Заполните все четыре даты.</p></div>`;
+        }
+
         const calc = (from, to) => {
-            let total = 0, errs = 0;
+            let total = 0, errs = 0, qSum = 0;
             const cats = {}; categoriesList.forEach(c => cats[c] = 0);
-            filteredUsers.forEach(u => u.tasks.forEach(t => {
-                if (currentProjectId !== 'default' && t.projectId !== currentProjectId) return;
-                const d = t.startDate || t.endDate;
-                if (!d || d < from || d > to) return;
-                total++; if (t.hasErrors) errs++;
-                categoriesList.forEach(c => { if (t.cats[c]) cats[c]++; });
-            }));
-            return { total, errs, pct: total ? errs/total*100 : 0, cats };
+            filteredUsers.forEach(u => {
+                _userTasksInRange(u, from, to, projectMode).forEach(t => {
+                    total++;
+                    if (t.hasErrors) errs++;
+                    qSum += (t.quality !== undefined && !isNaN(t.quality)) ? t.quality : 0;
+                    categoriesList.forEach(c => { if (t.cats[c]) cats[c]++; });
+                });
+            });
+            return {
+                total, errs, cats,
+                pct: total ? errs / total * 100 : 0,
+                qAvg: total ? (qSum / total) * 100 : 0
+            };
         };
-        
-        const A = calc(aF, aT), B = calc(bF, bT);
+
+        const A = calc(aF, aT);
+        const B = calc(bF, bT);
+
+        if (A.total === 0 && B.total === 0) {
+            return `<div class="rep-block"><h3 class="rep-block-title">⚖️ Сравнение периодов</h3>
+                <p style="text-align:center; color:var(--c-text-3); padding:20px;">В выбранных периодах нет данных.</p></div>`;
+        }
+
         const diff = B.pct - A.pct;
         const good = diff <= 0;
-        
+        const sign = diff > 0 ? '+' : '';
+
+        let titleText = 'Уровень ошибок не изменился';
+        if (diff < -2) titleText = 'Ошибок стало меньше ↓';
+        else if (diff > 2) titleText = 'Ошибок стало больше ↑';
+
         let catsHtml = '';
         categoriesList.forEach(c => {
-            let d = 0;
-            if (A.cats[c] > 0) d = Math.round(((B.cats[c] - A.cats[c]) / A.cats[c]) * 100);
-            else if (B.cats[c] > 0) d = 100;
-            if (d !== 0) catsHtml += `<span>${CAT_SHORT_LABELS[c] || c}: <b style="color:${d<=0?'var(--c-green)':'var(--c-red)'}">${d>0?'+':''}${d}%</b></span>`;
+            const a = A.cats[c], b = B.cats[c];
+            if (a === 0 && b === 0) return;
+            let dp = 0;
+            if (a > 0) dp = Math.round(((b - a) / a) * 100);
+            else if (b > 0) dp = 100;
+            const shortName = CAT_SHORT_LABELS[c] ? CAT_SHORT_LABELS[c].toLowerCase() : c;
+            const color = dp <= 0 ? 'good' : 'bad';
+            catsHtml += `<div class="cmp-cat-item" title="Было: ${a}, Стало: ${b}">${shortName} <b class="${color}">${dp > 0 ? '+' : ''}${dp}%</b></div>`;
         });
 
-        return `<div style="margin-bottom:40px;">
-            <h3 style="text-align:center; margin-bottom:20px;">Сравнение периодов</h3>
-            <div class="cmp-wrapper" style="text-align:center; margin-bottom:20px;">
-                <div class="cmp-big-pct ${good ? 'good' : 'bad'}" style="font-size:64px; font-weight:800; margin-bottom:8px; color:${good ? 'var(--c-green)' : 'var(--c-red)'}">${diff > 0 ? '+' : ''}${diff.toFixed(1)} п.п.</div>
-                <div style="font-size:14px; color:var(--c-text-2);">заданий с ошибками</div>
-                <div style="display:flex; justify-content:center; align-items:center; gap:20px; margin:20px 0;">
-                    <div style="background:var(--c-surface-2); padding:16px 30px; border-radius:16px; text-align:center; border:1px solid var(--c-border);">
-                        <div style="font-size:32px; font-weight:800;">${A.errs} <span style="font-size:16px; color:var(--c-text-3);">(${A.pct.toFixed(1)}%)</span></div>
-                        <div style="font-size:12px; color:var(--c-text-3); margin-top:4px;">${formatDateShort(aF)} – ${formatDateShort(aT)}<br>Q: ${(100-A.pct).toFixed(1)}%</div>
+        return `<div class="rep-block">
+            <h3 class="rep-block-title">⚖️ Сравнение периодов</h3>
+            <div class="cmp-wrapper" style="text-align:center; margin-bottom:0;">
+                <div class="cmp-main-title">${titleText}</div>
+                <div class="cmp-big-pct ${good ? 'good' : 'bad'}">${sign}${diff.toFixed(1)} п.п.</div>
+                <div class="cmp-sub-title">заданий с ошибками</div>
+                <div class="cmp-cards">
+                    <div class="cmp-card">
+                        <div class="val">${A.errs} <span style="font-size:16px; color:var(--c-text-3); font-weight:500;">(${A.pct.toFixed(1)}%)</span></div>
+                        <div class="date">${formatDateShort(aF)}–${formatDateShort(aT)}<br><small style="color:var(--c-text-3);">Q: ${A.qAvg.toFixed(1)}%</small></div>
                     </div>
-                    <div style="font-size:24px; color:var(--c-text-3);">→</div>
-                    <div style="background:var(--c-surface-2); padding:16px 30px; border-radius:16px; text-align:center; border:1px solid ${good?'var(--c-green)':'var(--c-red)'};">
-                        <div style="font-size:32px; font-weight:800; color:${good?'var(--c-green)':'var(--c-red)'}">${B.errs} <span style="font-size:16px; color:var(--c-text-3);">(${B.pct.toFixed(1)}%)</span></div>
-                        <div style="font-size:12px; color:var(--c-text-3); margin-top:4px;">${formatDateShort(bF)} – ${formatDateShort(bT)}<br>Q: ${(100-B.pct).toFixed(1)}%</div>
+                    <div class="cmp-arrow">→</div>
+                    <div class="cmp-card after">
+                        <div class="val">${B.errs} <span style="font-size:16px; color:var(--c-text-3); font-weight:500;">(${B.pct.toFixed(1)}%)</span></div>
+                        <div class="date">${formatDateShort(bF)}–${formatDateShort(bT)}<br><small style="color:var(--c-text-3);">Q: ${B.qAvg.toFixed(1)}%</small></div>
                     </div>
                 </div>
-                <div style="display:flex; justify-content:center; flex-wrap:wrap; gap:16px; background:var(--c-surface-2); padding:12px 24px; border-radius:20px; font-size:13px; font-weight:600; color:var(--c-text-2); margin-bottom:16px;">${catsHtml || 'Нет изменений в категориях'}</div>
-                <div><span style="display:inline-block; padding:6px 16px; border-radius:20px; font-weight:600; font-size:13px; background:${good?'var(--c-green-soft)':'var(--c-red-soft)'}; color:${good?'var(--c-green-text)':'var(--c-red-text)'};">${good ? '🌿 Динамика положительная' : '⚠️ Динамика отрицательная'}</span></div>
+                <div class="cmp-cats">${catsHtml || '<div class="cmp-cat-item">нет изменений в категориях</div>'}</div>
+                <div class="cmp-footer">
+                    <div class="cmp-footer-badge ${good ? '' : 'bad'}">${good ? '🌿 динамика положительная' : '⚠️ динамика отрицательная'}</div>
+                </div>
             </div>
         </div>`;
     };
 
-    // Вспомогательная функция для Динамики
+    /* ---------- БЛОК 2: ДИНАМИКА (матрица сотрудники × недели) ---------- */
     const buildDynamics = () => {
-        const from = document.getElementById('repDynFrom').value, to = document.getElementById('repDynTo').value;
-        if(!from || !to) return `<p style="text-align:center;color:var(--c-text-3);">Выберите даты для динамики.</p>`;
-        
-        const weeks = new Set();
-        filteredUsers.forEach(u => u.tasks.forEach(t => {
-            if (currentProjectId !== 'default' && t.projectId !== currentProjectId) return;
-            const d = t.startDate || t.endDate;
-            if (!d || d < from || d > to) return;
-            const dt = new Date(d + 'T00:00:00'); const dow = dt.getDay()||7;
-            const mon = new Date(dt); mon.setDate(dt.getDate() - dow + 1);
-            weeks.add(mon.toISOString().slice(0,10));
-        }));
-        const sortedWeeks = Array.from(weeks).sort();
+        const from = document.getElementById('repDynFrom').value;
+        const to = document.getElementById('repDynTo').value;
+        if (!from || !to) {
+            return `<div class="rep-block"><h3 class="rep-block-title">📊 Динамика по сотрудникам</h3>
+                <p style="text-align:center; color:var(--c-text-3); padding:20px;">Выберите даты.</p></div>`;
+        }
 
-        let html = `<div style="margin-bottom:40px;">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-                <h3 style="margin:0;">Динамика по сотрудникам</h3>
-                <div style="display:flex; gap:16px; font-size:12px; color:var(--c-text-2); background:var(--c-surface-2); padding:8px 16px; border-radius:20px; border:1px solid var(--c-border);">
-                    <span style="display:flex; align-items:center; gap:6px;"><span style="width:14px; height:14px; background:rgba(52,199,89,0.4); border-radius:4px;"></span> ≤5% (Отлично)</span>
-                    <span style="display:flex; align-items:center; gap:6px;"><span style="width:14px; height:14px; background:rgba(255,149,0,0.4); border-radius:4px;"></span> 5-15% (Средне)</span>
-                    <span style="display:flex; align-items:center; gap:6px;"><span style="width:14px; height:14px; background:rgba(255,59,48,0.4); border-radius:4px;"></span> >15% (Плохо)</span>
+        const weeks = _getWeeksList(filteredUsers, from, to, projectMode);
+        if (weeks.length === 0) {
+            return `<div class="rep-block"><h3 class="rep-block-title">📊 Динамика по сотрудникам</h3>
+                <p style="text-align:center; color:var(--c-text-3); padding:20px;">Нет задач в выбранном диапазоне.</p></div>`;
+        }
+
+        let html = `<div class="rep-block">
+            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:12px;">
+                <h3 class="rep-block-title" style="margin:0;">📊 Динамика по сотрудникам</h3>
+                <div style="display:flex; gap:14px; font-size:12px; color:var(--c-text-2); background:var(--c-surface-2); padding:8px 16px; border-radius:20px; border:1px solid var(--c-border); flex-wrap:wrap;">
+                    <span style="display:flex; align-items:center; gap:6px;"><span style="width:14px; height:14px; background:rgba(52,199,89,0.4); border-radius:4px;"></span> ≤5%</span>
+                    <span style="display:flex; align-items:center; gap:6px;"><span style="width:14px; height:14px; background:rgba(255,149,0,0.4); border-radius:4px;"></span> 5–15%</span>
+                    <span style="display:flex; align-items:center; gap:6px;"><span style="width:14px; height:14px; background:rgba(255,59,48,0.4); border-radius:4px;"></span> &gt;15%</span>
                 </div>
             </div>
-            <div style="overflow-x:auto;"><table class="summary-table"><thead><tr><th style="text-align:left;">Сотрудник</th>`;
-        sortedWeeks.forEach(w => {
-            const d = new Date(w+'T00:00:00');
-            html += `<th>${pad2(d.getDate())}.${pad2(d.getMonth()+1)}</th>`;
+            <div style="overflow-x:auto;"><table class="summary-table"><thead><tr>
+                <th style="text-align:left; min-width:150px;">Сотрудник</th>`;
+
+        weeks.forEach(w => {
+            const d = new Date(w + 'T00:00:00');
+            html += `<th>${pad2(d.getDate())}.${pad2(d.getMonth() + 1)}</th>`;
         });
         html += `<th>Тренд</th></tr></thead><tbody>`;
 
-        filteredUsers.forEach(u => {
-            const uTasksAll = u.tasks.filter(t => {
-                if (currentProjectId !== 'default' && t.projectId !== currentProjectId) return false;
-                const d = t.startDate || t.endDate;
-                if (!d || d < from || d > to) return false;
-                return true;
-            });
-            if (!uTasksAll.length) return;
-            
-            html += `<tr><td class="name-col">${u.name}</td>`;
+        // строки — только сотрудники с задачами в диапазоне
+        const usersWithTasks = filteredUsers.filter(u =>
+            _userTasksInRange(u, from, to, projectMode).length > 0
+        ).sort((a, b) => a.name.localeCompare(b.name));
+
+        if (usersWithTasks.length === 0) {
+            html += `<tr><td colspan="${weeks.length + 2}" style="text-align:center; color:var(--c-text-3); padding:20px;">Нет сотрудников с задачами.</td></tr>`;
+        }
+
+        usersWithTasks.forEach(u => {
+            const uTasks = _userTasksInRange(u, from, to, projectMode);
+            html += `<tr><td class="name-col">${escapeHtml(u.name)}</td>`;
+
             let firstPct = null, lastPct = null;
-            
-            sortedWeeks.forEach(w => {
-                const wTasks = uTasksAll.filter(t => {
-                    const d = t.startDate || t.endDate;
-                    const dt = new Date(d + 'T00:00:00'); const dow = dt.getDay()||7;
-                    const mon = new Date(dt); mon.setDate(dt.getDate() - dow + 1);
-                    return mon.toISOString().slice(0,10) === w;
-                });
-                if (!wTasks.length) { html += `<td style="color:#CCC;">—</td>`; }
-                else {
+
+            weeks.forEach(w => {
+                const wTasks = uTasks.filter(t => _weekStartKey(t.startDate || t.endDate) === w);
+                if (wTasks.length === 0) {
+                    html += `<td style="color:#CCC;">—</td>`;
+                } else {
                     const errs = wTasks.filter(t => t.hasErrors).length;
                     const pct = errs / wTasks.length * 100;
-                    let qSum = 0; wTasks.forEach(t => qSum += (t.quality || 0)); 
+                    let qSum = 0;
+                    wTasks.forEach(t => qSum += (t.quality || 0));
                     const qAvg = (qSum / wTasks.length) * 100;
-                    
+
                     if (firstPct === null) firstPct = pct;
                     lastPct = pct;
-                    
-                    const cls = pct <= 5 ? 'q-green' : pct <= 15 ? 'q-orange' : 'q-red';
+
+                    const cls = _errPctClass(pct);
                     html += `<td class="${cls}" style="padding:6px 8px; line-height:1.2;">
                         <div style="font-size:14px; font-weight:800; margin-bottom:2px;">${pct.toFixed(1)}%</div>
-                        <div style="font-size:10px; opacity:0.8; font-weight:500;">Q: ${qAvg.toFixed(0)} | Задач: ${wTasks.length}</div>
+                        <div style="font-size:10px; opacity:0.85; font-weight:500;">Q: ${qAvg.toFixed(0)} | Задач: ${wTasks.length}</div>
                     </td>`;
                 }
             });
-            
-            let trendHtml = '<span style="color:var(--c-text-3);">→ 0 п.п.</span>';
+
+            // Тренд: ошибок меньше => качество выросло => ↑ зелёная
+            let trendHtml = '<span style="color:var(--c-text-3); font-weight:600;">→ 0 п.п.</span>';
             if (firstPct !== null && lastPct !== null) {
-                const diff = lastPct - firstPct;
-                if (diff < -0.5) trendHtml = `<span style="color:var(--c-green); font-weight:700;">↑ ${Math.abs(diff).toFixed(1)} п.п.</span>`;
-                else if (diff > 0.5) trendHtml = `<span style="color:var(--c-red); font-weight:700;">↓ ${diff.toFixed(1)} п.п.</span>`;
+                const d = lastPct - firstPct;
+                if (d < -0.5) {
+                    trendHtml = `<span style="color:var(--c-green); font-weight:700;">↑ ${Math.abs(d).toFixed(1)} п.п.</span>`;
+                } else if (d > 0.5) {
+                    trendHtml = `<span style="color:var(--c-red); font-weight:700;">↓ ${d.toFixed(1)} п.п.</span>`;
+                }
             }
             html += `<td>${trendHtml}</td></tr>`;
         });
-        return html + `</tbody></table></div></div>`;
+
+        html += `</tbody></table></div></div>`;
+        return html;
     };
 
-    // Вспомогательная функция для Ошибок (таблица как в Сводке)
+    /* ---------- БЛОК 3: КАЧЕСТВО ПО СОТРУДНИКАМ ---------- */
+    const buildQualityByEmp = () => {
+        const from = document.getElementById('repQualFrom').value;
+        const to = document.getElementById('repQualTo').value;
+        if (!from || !to) {
+            return `<div class="rep-block"><h3 class="rep-block-title">👥 Качество по сотрудникам</h3>
+                <p style="text-align:center; color:var(--c-text-3); padding:20px;">Выберите даты.</p></div>`;
+        }
+
+        const rows = [];
+        filteredUsers.forEach(u => {
+            const uTasks = _userTasksInRange(u, from, to, projectMode);
+            if (!uTasks.length) return;
+            const errs = uTasks.filter(t => t.hasErrors).length;
+            const pct = errs / uTasks.length * 100;
+            rows.push({ name: u.name, total: uTasks.length, errors: errs, pct });
+        });
+        rows.sort((a, b) => a.pct - b.pct); // сначала лучшие
+
+        if (rows.length === 0) {
+            return `<div class="rep-block"><h3 class="rep-block-title">👥 Качество по сотрудникам</h3>
+                <p style="text-align:center; color:var(--c-text-3); padding:20px;">Нет данных в выбранном диапазоне.</p></div>`;
+        }
+
+        const totalTasks = rows.reduce((s, r) => s + r.total, 0);
+        const totalErrs = rows.reduce((s, r) => s + r.errors, 0);
+        const totalPct = totalTasks ? totalErrs / totalTasks * 100 : 0;
+
+        let html = `<div class="rep-block">
+            <h3 class="rep-block-title">👥 Качество по сотрудникам <span style="font-size:12px; color:var(--c-text-3); font-weight:400;">${formatDateShort(from)} – ${formatDateShort(to)}</span></h3>
+            <div style="overflow-x:auto;"><table class="summary-table"><thead><tr>
+                <th style="text-align:left; min-width:180px;">Сотрудник</th>
+                <th>Задач</th>
+                <th>Ошибок</th>
+                <th>% ошибок</th>
+            </tr></thead><tbody>`;
+
+        rows.forEach(r => {
+            const cls = _errPctClass(r.pct);
+            html += `<tr>
+                <td class="name-col">${escapeHtml(r.name)}</td>
+                <td>${r.total}</td>
+                <td>${r.errors}</td>
+                <td class="${cls}" style="font-weight:700;">${r.pct.toFixed(1)}%</td>
+            </tr>`;
+        });
+
+        html += `<tr class="total-row">
+            <td style="text-align:right;">ИТОГО:</td>
+            <td>${totalTasks}</td>
+            <td>${totalErrs}</td>
+            <td>${totalPct.toFixed(1)}%</td>
+        </tr></tbody></table></div></div>`;
+        return html;
+    };
+
+    /* ---------- БЛОК 4/5: ОШИБКИ (таблица как в Сводке) ---------- */
     const buildErrors = (from, to, title) => {
-        if(!from || !to) return `<p style="text-align:center;color:var(--c-text-3);">Выберите даты для ${title.toLowerCase()}.</p>`;
-        let html = `<div style="margin-bottom:40px;"><h3>${title}</h3><table class="summary-table"><thead><tr>
-            <th style="text-align:left;">Сотрудник</th><th>Всего</th><th>С ошибками</th>`;
-        categoriesList.forEach(c => html += `<th>${CAT_SHORT_LABELS[c] || c}</th>`);
-        html += `</tr></thead><tbody>`;
-        
+        if (!from || !to) {
+            return `<div class="rep-block"><h3 class="rep-block-title">${title}</h3>
+                <p style="text-align:center; color:var(--c-text-3); padding:20px;">Выберите даты.</p></div>`;
+        }
+
+        let html = `<div class="rep-block">
+            <h3 class="rep-block-title">${title} <span style="font-size:12px; color:var(--c-text-3); font-weight:400;">${formatDateShort(from)} – ${formatDateShort(to)}</span></h3>
+            <div style="overflow-x:auto;"><table class="summary-table"><thead><tr>
+                <th style="text-align:left; min-width:150px;">Сотрудник</th>
+                <th>Всего</th>
+                <th>С ошибками</th>`;
+        categoriesList.forEach(c => {
+            html += `<th title="${escapeHtml(c)}">${CAT_SHORT_LABELS[c] || c}</th>`;
+        });
+        html += `<th>Итого</th></tr></thead><tbody>`;
+
         let tTotal = 0, tErr = 0;
         const tCats = {}; categoriesList.forEach(c => tCats[c] = 0);
-        
-        filteredUsers.forEach(u => {
-            const uTasks = u.tasks.filter(t => {
-                if (currentProjectId !== 'default' && t.projectId !== currentProjectId) return false;
-                const d = t.startDate || t.endDate;
-                if (!d || d < from || d > to) return false;
-                return true;
-            });
+        let rendered = 0;
+
+        filteredUsers.slice().sort((a, b) => a.name.localeCompare(b.name)).forEach(u => {
+            const uTasks = _userTasksInRange(u, from, to, projectMode);
             if (!uTasks.length) return;
-            
+            rendered++;
+
             const errs = uTasks.filter(t => t.hasErrors).length;
             const cats = {}; categoriesList.forEach(c => cats[c] = 0);
             uTasks.forEach(t => categoriesList.forEach(c => { if (t.cats[c]) cats[c]++; }));
-            
-            tTotal += uTasks.length; tErr += errs;
+
+            tTotal += uTasks.length;
+            tErr += errs;
             categoriesList.forEach(c => tCats[c] += cats[c]);
-            
-            html += `<tr><td class="name-col">${u.name}</td><td><b>${uTasks.length}</b></td><td><b>${errs}</b></td>`;
-            categoriesList.forEach(c => html += `<td class="${cats[c]===0?'zero-cell':''}">${cats[c]}</td>`);
-            html += `</tr>`;
+
+            let sumCat = 0; categoriesList.forEach(c => sumCat += cats[c]);
+
+            html += `<tr>
+                <td class="name-col">${escapeHtml(u.name)}</td>
+                <td><b>${uTasks.length}</b></td>
+                <td><b>${errs}</b></td>`;
+            categoriesList.forEach(c => {
+                html += `<td class="${cats[c] === 0 ? 'zero-cell' : ''}">${cats[c]}</td>`;
+            });
+            html += `<td style="font-weight:700; color:var(--c-primary);">${sumCat}</td></tr>`;
         });
-        
-        html += `<tr class="total-row"><td style="text-align:right;">ИТОГО:</td><td>${tTotal}</td><td>${tErr}</td>`;
-        categoriesList.forEach(c => html += `<td>${tCats[c]}</td>`);
-        return html + `</tr></tbody></table></div>`;
+
+        if (rendered === 0) {
+            html += `<tr><td colspan="${categoriesList.length + 4}" style="text-align:center; color:var(--c-text-3); padding:20px;">Нет данных в выбранном диапазоне.</td></tr>`;
+        } else {
+            let sumTotalCat = 0; categoriesList.forEach(c => sumTotalCat += tCats[c]);
+            html += `<tr class="total-row">
+                <td style="text-align:right;">ИТОГО:</td>
+                <td>${tTotal}</td>
+                <td>${tErr}</td>`;
+            categoriesList.forEach(c => html += `<td>${tCats[c]}</td>`);
+            html += `<td>${sumTotalCat}</td></tr>`;
+        }
+
+        html += `</tbody></table></div></div>`;
+        return html;
     };
 
+    /* ---------- СБОРКА ---------- */
     let html = '';
-    if (showCompare) html += buildCompare();
+    if (showCompare)  html += buildCompare();
     if (showDynamics) html += buildDynamics();
-    if (showQErrors) html += buildErrors(document.getElementById('repQErrFrom').value, document.getElementById('repQErrTo').value, 'Типичные ошибки за квартал');
-    if (showWErrors) html += buildErrors(document.getElementById('repWErrFrom').value, document.getElementById('repWErrTo').value, 'Типичные ошибки за неделю');
+    if (showQuality)  html += buildQualityByEmp();
+    if (showQErrors)  html += buildErrors(
+        document.getElementById('repQErrFrom').value,
+        document.getElementById('repQErrTo').value,
+        '🚨 Типичные ошибки за квартал'
+    );
+    if (showWErrors)  html += buildErrors(
+        document.getElementById('repWErrFrom').value,
+        document.getElementById('repWErrTo').value,
+        '🚨 Типичные ошибки за неделю'
+    );
 
-    body.innerHTML = html || '<p style="text-align:center; color:#999; padding:40px;">Выберите хотя бы один блок для отображения.</p>';
+    body.innerHTML = html || `<p style="text-align:center; color:var(--c-text-3); padding:40px;">Отметьте хотя бы один блок галочкой выше.</p>`;
 }
-    
+
+/* ---------- ЭКСПОРТ В EXCEL ---------- */
 function loadExcelJS() {
     if (window.ExcelJS) return Promise.resolve(window.ExcelJS);
     return new Promise((resolve, reject) => {
@@ -3342,17 +3554,19 @@ function loadExcelJS() {
         document.head.appendChild(s);
     });
 }
+
 async function exportManagerReport() {
-    if (!window.globalReport || !window.globalReport.length) { alert('Нет данных'); return; }
+    if (!window.globalReport || !window.globalReport.length) {
+        alert('Нет данных. Загрузите отчёт в Сводке.');
+        return;
+    }
+
     try {
         showToast('Готовим Excel…');
         const ExcelJS = await loadExcelJS();
 
-        const group = document.getElementById('repGroup').value;
-        const showCompare = document.getElementById('chk-report-compare').checked;
-        const showDynamics = document.getElementById('chk-report-dynamics').checked;
-        const showQErrors = document.getElementById('chk-report-q-errors').checked;
-        const showWErrors = document.getElementById('chk-report-w-errors').checked;
+        const projectMode = document.getElementById('repProject')?.value || 'current';
+        const group = document.getElementById('repGroup')?.value || 'all';
 
         const filteredUsers = globalReport.filter(u => {
             if (userCards[u.id]?.archived) return false;
@@ -3362,191 +3576,378 @@ async function exportManagerReport() {
             return true;
         });
 
+        const showCompare  = document.getElementById('chk-report-compare')?.checked;
+        const showDynamics = document.getElementById('chk-report-dynamics')?.checked;
+        const showQuality  = document.getElementById('chk-report-quality-emp')?.checked;
+        const showQErrors  = document.getElementById('chk-report-q-errors')?.checked;
+        const showWErrors  = document.getElementById('chk-report-w-errors')?.checked;
+
+        if (!showCompare && !showDynamics && !showQuality && !showQErrors && !showWErrors) {
+            alert('Отметьте хотя бы один блок галочкой.');
+            return;
+        }
+
         const wb = new ExcelJS.Workbook();
-        const C = { header: 'FF34495E', primary: 'FF5B9DF9', green: 'FFD4EDDA', greenTxt: 'FF155724', warn: 'FFFFF3CD', warnTxt: 'FF856404', bad: 'FFF8D7DA', badTxt: 'FF721C24', border: 'FFDDDDDD' };
-        const thinBorder = { top: { style: 'thin', color: { argb: C.border } }, left: { style: 'thin', color: { argb: C.border } }, bottom: { style: 'thin', color: { argb: C.border } }, right: { style: 'thin', color: { argb: C.border } } };
+        wb.creator = 'Дашборд';
+        wb.created = new Date();
+
+        const COL = {
+            header: 'FF34495E',
+            green: 'FFD4EDDA', greenTxt: 'FF155724',
+            warn: 'FFFFF3CD',  warnTxt: 'FF856404',
+            bad: 'FFF8D7DA',   badTxt: 'FF721C24',
+            border: 'FFDDDDDD',
+            totalBg: 'FFEAF2FE'
+        };
+        const thin = {
+            top:    { style: 'thin', color: { argb: COL.border } },
+            left:   { style: 'thin', color: { argb: COL.border } },
+            bottom: { style: 'thin', color: { argb: COL.border } },
+            right:  { style: 'thin', color: { argb: COL.border } }
+        };
         const styleHeaderRow = (row) => {
-            row.eachCell(c => { c.font = { bold: true, color: { argb: 'FFFFFFFF' } }; c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: C.header } }; c.alignment = { vertical: 'middle', horizontal: 'center' }; c.border = thinBorder; });
+            row.eachCell(c => {
+                c.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+                c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COL.header } };
+                c.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+                c.border = thin;
+            });
             row.height = 26;
         };
         const styleDataRow = (row) => {
-            row.eachCell(c => { c.border = thinBorder; c.alignment = { vertical: 'middle', wrapText: true }; });
+            row.eachCell(c => {
+                c.border = thin;
+                c.alignment = { vertical: 'middle', wrapText: true };
+            });
         };
-        const fillBadge = (cell, pct) => {
+        const fillByPct = (cell, pct) => {
             let fill, txt;
-            if (pct <= 5) { fill = C.green; txt = C.greenTxt; }
-            else if (pct <= 15) { fill = C.warn; txt = C.warnTxt; }
-            else { fill = C.bad; txt = C.badTxt; }
+            if (pct <= 5)       { fill = COL.green; txt = COL.greenTxt; }
+            else if (pct <= 15) { fill = COL.warn;  txt = COL.warnTxt; }
+            else                { fill = COL.bad;   txt = COL.badTxt; }
             cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: fill } };
             cell.font = { bold: true, color: { argb: txt } };
-            cell.alignment = { horizontal: 'center' };
+            cell.alignment = { horizontal: 'center', vertical: 'middle' };
         };
 
-        // 1. Сравнение
+        /* ===== ЛИСТ 1: СРАВНЕНИЕ ===== */
         if (showCompare) {
-            const aF = document.getElementById('repCmpAFrom').value, aT = document.getElementById('repCmpATo').value;
-            const bF = document.getElementById('repCmpBFrom').value, bT = document.getElementById('repCmpBTo').value;
-            if(aF && aT && bF && bT) {
+            const aF = document.getElementById('repCmpAFrom').value;
+            const aT = document.getElementById('repCmpATo').value;
+            const bF = document.getElementById('repCmpBFrom').value;
+            const bT = document.getElementById('repCmpBTo').value;
+
+            if (aF && aT && bF && bT) {
                 const calc = (from, to) => {
-                    let total = 0, errs = 0;
-                    filteredUsers.forEach(u => u.tasks.forEach(t => {
-                        if (currentProjectId !== 'default' && t.projectId !== currentProjectId) return;
-                        const d = t.startDate || t.endDate;
-                        if (!d || d < from || d > to) return;
-                        total++; if (t.hasErrors) errs++;
-                    }));
-                    return { total, errs, pct: total ? errs/total*100 : 0 };
-                };
-                const A = calc(aF, aT), B = calc(bF, bT);
-                const diff = B.pct - A.pct;
-                
-                const ws = wb.addWorksheet('Сравнение периодов');
-                ws.columns = [{ width: 30 }, { width: 20 }, { width: 20 }];
-                styleHeaderRow(ws.addRow(['Показатель', 'Период А', 'Период Б']));
-                const row1 = ws.addRow(['Заданий с ошибками', A.errs, B.errs]); styleDataRow(row1);
-                const row2 = ws.addRow(['% ошибок', A.pct / 100, B.pct / 100]); styleDataRow(row2);
-                row2.getCell(2).numFmt = '0.0%'; row2.getCell(3).numFmt = '0.0%';
-                const row3 = ws.addRow(['Разница (п.п.)', '', diff / 100]); styleDataRow(row3);
-                row3.getCell(3).numFmt = '0.0%';
-            }
-        }
-
-        // 2. Динамика
-        if (showDynamics) {
-            const from = document.getElementById('repDynFrom').value, to = document.getElementById('repDynTo').value;
-            if(from && to) {
-                const weeks = new Set();
-                filteredUsers.forEach(u => u.tasks.forEach(t => {
-                    if (currentProjectId !== 'default' && t.projectId !== currentProjectId) return;
-                    const d = t.startDate || t.endDate;
-                    if (!d || d < from || d > to) return;
-                    const dt = new Date(d + 'T00:00:00'); const dow = dt.getDay()||7;
-                    const mon = new Date(dt); mon.setDate(dt.getDate() - dow + 1);
-                    weeks.add(mon.toISOString().slice(0,10));
-                }));
-                const sortedWeeks = Array.from(weeks).sort();
-
-                const ws = wb.addWorksheet('Динамика');
-                const head = ['Сотрудник'];
-                sortedWeeks.forEach(w => { const d = new Date(w+'T00:00:00'); head.push(`${pad2(d.getDate())}.${pad2(d.getMonth()+1)}`); });
-                head.push('Тренд');
-                ws.columns = head.map((h, i) => ({ width: i === 0 ? 30 : 14 }));
-                styleHeaderRow(ws.addRow(head));
-
-                filteredUsers.forEach(u => {
-                    const uTasksAll = u.tasks.filter(t => {
-                        if (currentProjectId !== 'default' && t.projectId !== currentProjectId) return false;
-                        const d = t.startDate || t.endDate;
-                        if (!d || d < from || d > to) return false;
-                        return true;
-                    });
-                    if (!uTasksAll.length) return;
-
-                    const row = [u.name];
-                    let firstPct = null, lastPct = null;
-                    sortedWeeks.forEach(w => {
-                        const wTasks = uTasksAll.filter(t => {
-                            const d = t.startDate || t.endDate;
-                            const dt = new Date(d + 'T00:00:00'); const dow = dt.getDay()||7;
-                            const mon = new Date(dt); mon.setDate(dt.getDate() - dow + 1);
-                            return mon.toISOString().slice(0,10) === w;
+                    let total = 0, errs = 0, qSum = 0;
+                    const cats = {}; categoriesList.forEach(c => cats[c] = 0);
+                    filteredUsers.forEach(u => {
+                        _userTasksInRange(u, from, to, projectMode).forEach(t => {
+                            total++;
+                            if (t.hasErrors) errs++;
+                            qSum += (t.quality !== undefined && !isNaN(t.quality)) ? t.quality : 0;
+                            categoriesList.forEach(c => { if (t.cats[c]) cats[c]++; });
                         });
-                        if (!wTasks.length) { row.push('—'); }
-                        else {
-                            const errs = wTasks.filter(t => t.hasErrors).length;
-                            const pct = errs / wTasks.length * 100;
-                            row.push(pct / 100);
-                            if (firstPct === null) firstPct = pct;
-                            lastPct = pct;
+                    });
+                    return {
+                        total, errs, cats,
+                        pct: total ? errs / total : 0,
+                        qAvg: total ? qSum / total : 0
+                    };
+                };
+                const A = calc(aF, aT);
+                const B = calc(bF, bT);
+                const diff = B.pct - A.pct;
+                const good = diff <= 0;
+
+                const ws = wb.addWorksheet('Сравнение периодов');
+                ws.columns = [{ width: 32 }, { width: 20 }, { width: 20 }, { width: 16 }];
+                styleHeaderRow(ws.addRow(['Показатель', 'Период А', 'Период Б', 'Разница']));
+
+                let r1 = ws.addRow([
+                    'Период',
+                    `${formatDateShort(aF)} – ${formatDateShort(aT)}`,
+                    `${formatDateShort(bF)} – ${formatDateShort(bT)}`,
+                    ''
+                ]);
+                styleDataRow(r1);
+
+                let r2 = ws.addRow(['Заданий с ошибками', A.errs, B.errs, B.errs - A.errs]);
+                styleDataRow(r2);
+                fillByPct(r2.getCell(2), A.pct * 100);
+                fillByPct(r2.getCell(3), B.pct * 100);
+
+                let r3 = ws.addRow(['% ошибок', A.pct, B.pct, diff]);
+                styleDataRow(r3);
+                r3.getCell(2).numFmt = '0.0%';
+                r3.getCell(3).numFmt = '0.0%';
+                r3.getCell(4).numFmt = '+0.0%;-0.0%;0.0%';
+                fillByPct(r3.getCell(2), A.pct * 100);
+                fillByPct(r3.getCell(3), B.pct * 100);
+                r3.getCell(4).font = { bold: true, color: { argb: good ? COL.greenTxt : COL.badTxt } };
+
+                let r4 = ws.addRow(['Среднее качество Q', A.qAvg, B.qAvg, B.qAvg - A.qAvg]);
+                styleDataRow(r4);
+                r4.getCell(2).numFmt = '0.0"%"';
+                r4.getCell(3).numFmt = '0.0"%"';
+                r4.getCell(4).numFmt = '+0.0" п.п.";-0.0" п.п.";0.0" п.п."';
+
+                ws.addRow([]);
+                const headerCats = ws.addRow(['Категория ошибок', 'Период А', 'Период Б', 'Разница']);
+                styleHeaderRow(headerCats);
+
+                categoriesList.forEach(c => {
+                    if (A.cats[c] === 0 && B.cats[c] === 0) return;
+                    const row = ws.addRow([CAT_SHORT_LABELS[c] || c, A.cats[c], B.cats[c], B.cats[c] - A.cats[c]]);
+                    styleDataRow(row);
+                });
+
+                ws.addRow([]);
+                const verdict = ws.addRow([good ? '🌿 Динамика положительная' : '⚠️ Динамика отрицательная']);
+                verdict.font = { bold: true, size: 12, color: { argb: good ? COL.greenTxt : COL.badTxt } };
+            }
+        }
+
+        /* ===== ЛИСТ 2: ДИНАМИКА ===== */
+        if (showDynamics) {
+            const from = document.getElementById('repDynFrom').value;
+            const to = document.getElementById('repDynTo').value;
+
+            if (from && to) {
+                const weeks = _getWeeksList(filteredUsers, from, to, projectMode);
+                if (weeks.length > 0) {
+                    const ws = wb.addWorksheet('Динамика по сотрудникам');
+                    const head = ['Сотрудник'];
+                    const weekLabels = [];
+                    weeks.forEach(w => {
+                        const d = new Date(w + 'T00:00:00');
+                        const lbl = `${pad2(d.getDate())}.${pad2(d.getMonth() + 1)}`;
+                        head.push(lbl + ' % ошибок', lbl + ' Q', lbl + ' задач');
+                        weekLabels.push(lbl);
+                    });
+                    head.push('Тренд');
+                    ws.columns = head.map((h, i) => ({ width: i === 0 ? 28 : 13 }));
+                    styleHeaderRow(ws.addRow(head));
+
+                    const usersWithTasks = filteredUsers.filter(u =>
+                        _userTasksInRange(u, from, to, projectMode).length > 0
+                    ).sort((a, b) => a.name.localeCompare(b.name));
+
+                    usersWithTasks.forEach(u => {
+                        const uTasks = _userTasksInRange(u, from, to, projectMode);
+                        const row = [u.name];
+                        let firstPct = null, lastPct = null;
+
+                        weeks.forEach(w => {
+                            const wTasks = uTasks.filter(t => _weekStartKey(t.startDate || t.endDate) === w);
+                            if (!wTasks.length) {
+                                row.push('—', '—', '—');
+                            } else {
+                                const errs = wTasks.filter(t => t.hasErrors).length;
+                                const pct = errs / wTasks.length * 100;
+                                let qSum = 0;
+                                wTasks.forEach(t => qSum += (t.quality || 0));
+                                const qAvg = qSum / wTasks.length * 100;
+                                row.push(pct, qAvg, wTasks.length);
+                                if (firstPct === null) firstPct = pct;
+                                lastPct = pct;
+                            }
+                        });
+
+                        let trend = '—';
+                        if (firstPct !== null && lastPct !== null) {
+                            const d = lastPct - firstPct;
+                            trend = d < -0.5 ? `↑ ${Math.abs(d).toFixed(1)} п.п.`
+                                  : d > 0.5  ? `↓ ${d.toFixed(1)} п.п.`
+                                  : '→ 0 п.п.';
                         }
-                    });
-                    let trend = '—';
-                    if (firstPct !== null && lastPct !== null) {
-                        const diff = lastPct - firstPct;
-                        trend = diff < -0.5 ? `↑ ${Math.abs(diff).toFixed(1)} п.п.` : diff > 0.5 ? `↓ ${diff.toFixed(1)} п.п.` : '→ 0 п.п.';
-                    }
-                    row.push(trend);
+                        row.push(trend);
 
-                    const added = ws.addRow(row);
-                    styleDataRow(added);
-                    for (let i = 1; i < row.length - 1; i++) {
-                        if (typeof row[i] === 'number') { fillBadge(added.getCell(i + 1), row[i] * 100); added.getCell(i + 1).numFmt = '0.0%'; }
-                        else added.getCell(i + 1).alignment = { horizontal: 'center' };
-                    }
-                });
+                        const added = ws.addRow(row);
+                        styleDataRow(added);
+
+                        // форматирование ячеек-метрик
+                        let colIdx = 1; // стартуем после "Сотрудник"
+                        weeks.forEach(() => {
+                            const pctCell = added.getCell(colIdx + 1);
+                            const qCell   = added.getCell(colIdx + 2);
+                            const cntCell = added.getCell(colIdx + 3);
+                            if (typeof row[colIdx] === 'number') {
+                                pctCell.numFmt = '0.0"%"';
+                                fillByPct(pctCell, row[colIdx]);
+                            } else {
+                                pctCell.alignment = { horizontal: 'center' };
+                            }
+                            if (typeof row[colIdx + 1] === 'number') {
+                                qCell.numFmt = '0.0"%"';
+                                qCell.alignment = { horizontal: 'center' };
+                            } else {
+                                qCell.alignment = { horizontal: 'center' };
+                            }
+                            if (typeof row[colIdx + 2] === 'number') {
+                                cntCell.alignment = { horizontal: 'center' };
+                            } else {
+                                cntCell.alignment = { horizontal: 'center' };
+                            }
+                            colIdx += 3;
+                        });
+
+                        // тренд — последняя ячейка
+                        const trendCell = added.getCell(colIdx + 1);
+                        if (row[colIdx].startsWith('↑')) trendCell.font = { bold: true, color: { argb: COL.greenTxt } };
+                        else if (row[colIdx].startsWith('↓')) trendCell.font = { bold: true, color: { argb: COL.badTxt } };
+                        trendCell.alignment = { horizontal: 'center' };
+                    });
+
+                    // Автофильтр по заголовку
+                    ws.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: head.length } };
+                }
             }
         }
 
-        // 3. Ошибки (Квартал)
+        /* ===== ЛИСТ 3: КАЧЕСТВО ПО СОТРУДНИКАМ ===== */
+        if (showQuality) {
+            const from = document.getElementById('repQualFrom').value;
+            const to = document.getElementById('repQualTo').value;
+
+            if (from && to) {
+                const rows = [];
+                filteredUsers.forEach(u => {
+                    const uTasks = _userTasksInRange(u, from, to, projectMode);
+                    if (!uTasks.length) return;
+                    const errs = uTasks.filter(t => t.hasErrors).length;
+                    const pct = errs / uTasks.length * 100;
+                    rows.push({ name: u.name, total: uTasks.length, errors: errs, pct });
+                });
+                rows.sort((a, b) => a.pct - b.pct);
+
+                if (rows.length > 0) {
+                    const ws = wb.addWorksheet('Качество по сотрудникам');
+                    ws.columns = [{ width: 30 }, { width: 14 }, { width: 14 }, { width: 14 }];
+                    styleHeaderRow(ws.addRow(['Сотрудник', 'Задач', 'Ошибок', '% ошибок']));
+
+                    rows.forEach(r => {
+                        const added = ws.addRow([r.name, r.total, r.errors, r.pct / 100]);
+                        styleDataRow(added);
+                        fillByPct(added.getCell(4), r.pct);
+                        added.getCell(4).numFmt = '0.0%';
+                        added.getCell(2).alignment = { horizontal: 'center' };
+                        added.getCell(3).alignment = { horizontal: 'center' };
+                    });
+
+                    const totalTasks = rows.reduce((s, r) => s + r.total, 0);
+                    const totalErrs = rows.reduce((s, r) => s + r.errors, 0);
+                    const totalPct = totalTasks ? totalErrs / totalTasks * 100 : 0;
+
+                    const totalRow = ws.addRow(['ИТОГО:', totalTasks, totalErrs, totalPct / 100]);
+                    styleDataRow(totalRow);
+                    totalRow.eachCell(c => {
+                        c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COL.totalBg } };
+                        c.font = { bold: true };
+                    });
+                    totalRow.getCell(4).numFmt = '0.0%';
+
+                    ws.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: 4 } };
+                }
+            }
+        }
+
+        /* ===== ЛИСТ 4/5: ОШИБКИ (квартал / неделя) ===== */
+        const buildErrorsSheet = (sheetName, from, to, title) => {
+            if (!from || !to) return;
+
+            const ws = wb.addWorksheet(sheetName);
+            const head = ['Сотрудник', 'Всего', 'С ошибками'];
+            categoriesList.forEach(c => head.push(CAT_SHORT_LABELS[c] || c));
+            head.push('Итого');
+            ws.columns = head.map((h, i) => ({ width: i === 0 ? 28 : (i === head.length - 1 ? 10 : 13) }));
+            styleHeaderRow(ws.addRow(head));
+
+            let tTotal = 0, tErr = 0;
+            const tCats = {}; categoriesList.forEach(c => tCats[c] = 0);
+            let rendered = 0;
+
+            filteredUsers.slice().sort((a, b) => a.name.localeCompare(b.name)).forEach(u => {
+                const uTasks = _userTasksInRange(u, from, to, projectMode);
+                if (!uTasks.length) return;
+                rendered++;
+
+                const errs = uTasks.filter(t => t.hasErrors).length;
+                const cats = {}; categoriesList.forEach(c => cats[c] = 0);
+                uTasks.forEach(t => categoriesList.forEach(c => { if (t.cats[c]) cats[c]++; }));
+
+                tTotal += uTasks.length;
+                tErr += errs;
+                categoriesList.forEach(c => tCats[c] += cats[c]);
+
+                let sumCat = 0; categoriesList.forEach(c => sumCat += cats[c]);
+
+                const rowData = [u.name, uTasks.length, errs];
+                categoriesList.forEach(c => rowData.push(cats[c]));
+                rowData.push(sumCat);
+
+                const added = ws.addRow(rowData);
+                styleDataRow(added);
+                added.getCell(2).alignment = { horizontal: 'center' };
+                added.getCell(3).alignment = { horizontal: 'center' };
+                const lastCol = head.length;
+                added.getCell(lastCol).font = { bold: true };
+
+                // подсветка "Всего задач" по % ошибок
+                const pct = uTasks.length ? errs / uTasks.length * 100 : 0;
+                fillByPct(added.getCell(2), pct);
+            });
+
+            if (rendered > 0) {
+                let sumTotalCat = 0; categoriesList.forEach(c => sumTotalCat += tCats[c]);
+                const totalRowData = ['ИТОГО:', tTotal, tErr];
+                categoriesList.forEach(c => totalRowData.push(tCats[c]));
+                totalRowData.push(sumTotalCat);
+
+                const totalRow = ws.addRow(totalRowData);
+                styleDataRow(totalRow);
+                totalRow.eachCell(c => {
+                    c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COL.totalBg } };
+                    c.font = { bold: true };
+                });
+
+                ws.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: head.length } };
+            } else {
+                ws.addRow(['Нет данных в выбранном диапазоне.']);
+            }
+        };
+
         if (showQErrors) {
-            const from = document.getElementById('repQErrFrom').value, to = document.getElementById('repQErrTo').value;
-            if(from && to) {
-                const ws = wb.addWorksheet('Ошибки (Квартал)');
-                const head = ['Сотрудник', 'Всего задач', 'С ошибками'];
-                categoriesList.forEach(c => head.push(CAT_SHORT_LABELS[c] || c));
-                ws.columns = head.map((h, i) => ({ width: i === 0 ? 30 : 12 }));
-                styleHeaderRow(ws.addRow(head));
-                filteredUsers.forEach(u => {
-                    const uTasks = u.tasks.filter(t => {
-                        if (currentProjectId !== 'default' && t.projectId !== currentProjectId) return false;
-                        const d = t.startDate || t.endDate;
-                        if (!d || d < from || d > to) return false;
-                        return true;
-                    });
-                    if (!uTasks.length) return;
-                    const errs = uTasks.filter(t => t.hasErrors).length;
-                    const cats = {}; categoriesList.forEach(c => cats[c] = 0);
-                    uTasks.forEach(t => categoriesList.forEach(c => { if (t.cats[c]) cats[c]++; }));
-                    const row = [u.name, uTasks.length, errs];
-                    categoriesList.forEach(c => row.push(cats[c]));
-                    const added = ws.addRow(row);
-                    styleDataRow(added);
-                    fillBadge(added.getCell(3), uTasks.length ? errs / uTasks.length * 100 : 0);
-                });
-            }
+            buildErrorsSheet(
+                'Ошибки (квартал)',
+                document.getElementById('repQErrFrom').value,
+                document.getElementById('repQErrTo').value,
+                'Типичные ошибки за квартал'
+            );
         }
-
-        // 4. Ошибки (Неделя)
         if (showWErrors) {
-            const from = document.getElementById('repWErrFrom').value, to = document.getElementById('repWErrTo').value;
-            if(from && to) {
-                const ws = wb.addWorksheet('Ошибки (Неделя)');
-                const head = ['Сотрудник', 'Всего задач', 'С ошибками'];
-                categoriesList.forEach(c => head.push(CAT_SHORT_LABELS[c] || c));
-                ws.columns = head.map((h, i) => ({ width: i === 0 ? 30 : 12 }));
-                styleHeaderRow(ws.addRow(head));
-                filteredUsers.forEach(u => {
-                    const uTasks = u.tasks.filter(t => {
-                        if (currentProjectId !== 'default' && t.projectId !== currentProjectId) return false;
-                        const d = t.startDate || t.endDate;
-                        if (!d || d < from || d > to) return false;
-                        return true;
-                    });
-                    if (!uTasks.length) return;
-                    const errs = uTasks.filter(t => t.hasErrors).length;
-                    const cats = {}; categoriesList.forEach(c => cats[c] = 0);
-                    uTasks.forEach(t => categoriesList.forEach(c => { if (t.cats[c]) cats[c]++; }));
-                    const row = [u.name, uTasks.length, errs];
-                    categoriesList.forEach(c => row.push(cats[c]));
-                    const added = ws.addRow(row);
-                    styleDataRow(added);
-                    fillBadge(added.getCell(3), uTasks.length ? errs / uTasks.length * 100 : 0);
-                });
-            }
+            buildErrorsSheet(
+                'Ошибки (неделя)',
+                document.getElementById('repWErrFrom').value,
+                document.getElementById('repWErrTo').value,
+                'Типичные ошибки за неделю'
+            );
         }
 
-        if(wb.worksheets.length === 0) {
-            alert('Нет данных для выгрузки. Выберите хотя бы один блок и заполните даты.');
+        if (wb.worksheets.length === 0) {
+            alert('Нет данных для выгрузки. Проверьте даты и галочки.');
             return;
         }
 
         const buffer = await wb.xlsx.writeBuffer();
-        const blob = new Blob([buffer], { type: 'application/octet-stream' });
+        const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `итоговый_отчет_${new Date().toISOString().slice(0,10)}.xlsx`;
+        a.download = `итоговый_отчет_${new Date().toISOString().slice(0, 10)}.xlsx`;
+        document.body.appendChild(a);
         a.click();
+        document.body.removeChild(a);
         URL.revokeObjectURL(url);
         showToast('Excel готов ✓');
     } catch (e) {
