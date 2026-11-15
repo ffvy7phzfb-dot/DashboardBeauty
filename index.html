@@ -1550,15 +1550,9 @@ document.addEventListener('DOMContentLoaded', () => {
         [emailInput, passInput].forEach(inp => {
             inp.addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
             inp.addEventListener('input', hideAuthError);
-            document.addEventListener('DOMContentLoaded', () => {
-    const emailInput = document.getElementById('authEmail');
-    const passInput = document.getElementById('authPassword');
-    if (emailInput && passInput) {
-        [emailInput, passInput].forEach(inp => {
-            inp.addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
-            inp.addEventListener('input', hideAuthError);
         });
     }
+    
     checkSession();
 
     const settingsIds = [
@@ -1581,10 +1575,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const pFrom = past.toISOString().slice(0,10);
     const pTo = today.toISOString().slice(0,10);
     const setVal = (id, val) => { const el = document.getElementById(id); if (el && !el.value) el.value = val; };
+    
     ['cmpAFrom','cmpATo','cmpBFrom','cmpBTo','cmpDateFrom','cmpDateTo','repDateFrom','repDateTo']
         .forEach(id => setVal(id, id.endsWith('To') || id === 'repDateTo' ? pTo : pFrom));
 
-    // ВСТАВИТЬ ВОТ СЮДА:
+    // Даты по умолчанию для конструктора Итогового отчета
     const past30 = new Date(today); past30.setDate(past30.getDate() - 30);
     const past60 = new Date(today); past60.setDate(past60.getDate() - 60);
     
@@ -1599,33 +1594,6 @@ document.addEventListener('DOMContentLoaded', () => {
     setDef('repQErrTo', today.toISOString().slice(0,10));
     setDef('repWErrFrom', new Date(today.getTime() - 7 * 86400000).toISOString().slice(0,10));
     setDef('repWErrTo', today.toISOString().slice(0,10));
-});
-        });
-    }
-    checkSession();
-
-    const settingsIds = [
-        'filterUser', 'filterDateFrom', 'filterDateTo', 'filterMark', 'filterPaint',
-        'progNorm', 'progStep', 'progGroup', 'progFrom', 'progTo',
-        'cmpTarget', 'cmpAFrom', 'cmpATo', 'cmpBFrom', 'cmpBTo',
-        'cmpPeriodType', 'cmpDateFrom', 'cmpDateTo',
-        'wpMode', 'wpStep', 'wpMetric',
-        'repProject', 'repGroup', 'repDateFrom', 'repDateTo'
-    ];
-    settingsIds.forEach(id => {
-        const el = document.getElementById(id);
-        if (!el) return;
-        el.addEventListener('change', debouncedSaveSettings);
-        if (el.tagName === 'INPUT' && el.type === 'number') el.addEventListener('input', debouncedSaveSettings);
-    });
-
-    const today = new Date();
-    const past = new Date(today); past.setDate(past.getDate() - 90);
-    const pFrom = past.toISOString().slice(0,10);
-    const pTo = today.toISOString().slice(0,10);
-    const setVal = (id, val) => { const el = document.getElementById(id); if (el && !el.value) el.value = val; };
-    ['cmpAFrom','cmpATo','cmpBFrom','cmpBTo','cmpDateFrom','cmpDateTo','repDateFrom','repDateTo']
-        .forEach(id => setVal(id, id.endsWith('To') || id === 'repDateTo' ? pTo : pFrom));
 });
 
 function syncQualityFromMain() {
