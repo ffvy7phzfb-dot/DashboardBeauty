@@ -1094,10 +1094,6 @@ body.dark-theme tr.paint-gray { background-color: #2E2E2E !important; color: #A0
                     </div>
                 </div>
                 
-                <div class="field-group">
-                    <label>Название пула</label>
-                    <input type="text" id="settingsTemplateName" placeholder="Название...">
-                </div>
 
                 <div class="field-group">
                     <label>Категории ошибок (каждая с новой строки)</label>
@@ -1326,6 +1322,8 @@ async function saveToCloud() {
     if (!currentUser) return;
     try {
         const settings = collectAllSettings();
+        // Принудительно сохраняем выбранный шаблон, чтобы он применялся везде
+settings.templateKey = currentTemplateKey; 
         const mainText = document.getElementById('mainData') ? document.getElementById('mainData').value : '';
         const namesText = document.getElementById('namesData') ? document.getElementById('namesData').value : '';
 
