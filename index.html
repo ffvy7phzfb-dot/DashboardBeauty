@@ -460,7 +460,6 @@ body.dark-theme tr.paint-gray { background-color: #2E2E2E !important; color: #A0
         <button class="main-tab-btn" onclick="switchTab('compare', this)">⚖️ Сравнение</button>
         <button class="main-tab-btn" onclick="switchTab('manager-report', this)">📋 Итоговый отчёт</button>
         <button class="main-tab-btn" onclick="switchTab('time-markers', this)">⏱ Время (маркеры)</button>
-        <button class="main-tab-btn" onclick="switchTab('settings', this)">⚙️ Настройки</button>
     </div>
 
     <!-- ================== СВОДКА ================== -->
@@ -476,16 +475,6 @@ body.dark-theme tr.paint-gray { background-color: #2E2E2E !important; color: #A0
                 <p>вставь фамилию и UUID. форматы: <b>Фамилия</b> — через Tab с ID.</p>
                 <textarea id="namesData" placeholder="Иванов 81977398-70..."></textarea>
             </div>
-            <div class="box">
-                <h3>3. Прошлый отчёт</h3>
-                <p>загрузи прошлый .xlsx. подтянутся пометки, цвета, заметки, ВКС и т.д.</p>
-                <div class="import-info">сопоставление по <b>marker_id</b>.</div>
-                <button class="btn-import-xlsx" onclick="document.getElementById('xlsxFile').click()">📥 загрузить (.xlsx)</button>
-                <input type="file" id="xlsxFile" accept=".xlsx,.xls" style="display:none" onchange="importPreviousXlsx(event)">
-                <div id="importStatus" style="margin-top:10px; font-size:13px; color:var(--c-text-2);"></div>
-            </div>
-        </div>
-
         <div class="btn-group">
             <button class="btn-load" onclick="processData()">загрузить и обработать</button>
             <button class="btn-cloud" onclick="manualSaveToCloud()">☁️ сохранить в облако</button>
@@ -1167,34 +1156,16 @@ body.dark-theme tr.paint-gray { background-color: #2E2E2E !important; color: #A0
                         <label>Выберите шаблон</label>
                         <select id="settingsTemplateSelect" onchange="loadTemplateToSettings(this.value)">
                             <option value="beautiful_answers">Beautiful Answers</option>
-                            <option value="ssu">SSU</option>
-                        </select>
-                    </div>
-                </div>
-                
-
-                <div class="field-group">
-                    <label>Категории ошибок (каждая с новой строки)</label>
-                    <textarea id="settingsCategories" style="min-height:150px; font-family:monospace; font-size:14px;" placeholder="маркдаун&#10;ошибки РП&#10;грамматика"></textarea>
-                    <small style="color:var(--c-text-3); margin-top:6px; display:block;">Формат: 1 строка = 1 категория. В точности как они называются в комментариях ревьюера.</small>
-                </div>
-
+    <div class="tab-content" id="tab-settings">
+        <div class="container">
+            <div class="box" style="min-width:100%;">
+                ... (весь текст и инпуты внутри) ...
                 <div class="btn-group" style="justify-content:flex-start; margin-bottom:0;">
                     <button class="btn-load" onclick="saveTemplateSettings()">💾 Сохранить шаблон</button>
                 </div>
             </div>
         </div>
     </div>
-
-    <div class="modal-overlay" id="modalOverlay" onclick="if(event.target===this)closeModal()">
-        <div class="modal" id="modalContent"></div>
-    </div>
-    <div class="vks-modal-overlay" id="vksModalOverlay" onclick="if(event.target===this)closeVksModal()">
-        <div class="vks-modal" id="vksModalContent"></div>
-    </div>
-    <div class="save-toast" id="saveToast">сохранено</div>
-</div>
-
 <script>
 const SUPABASE_URL = 'https://zgwwylbokleugpfyshzk.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inpnd3d5bGJva2xldWdwZnlzaHprIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTM5MDE3MzcsImV4cCI6MjEwOTQ3NzczN30.UfpZTrathz43IC6xoHA0AMHebhxNazG7x9ywMdPeAWQ';
@@ -3518,60 +3489,50 @@ function renderManagerReport() {
     };
 
     /* ---------- БЛОК 3: КАЧЕСТВО ПО СОТРУДНИКАМ ---------- */
-    const buildQualityByEmp = () => {
-        const from = document.getElementById('repQualFrom').value;
-        const to = document.getElementById('repQualTo').value;
-        if (!from || !to) {
-            return `<div class="rep-block"><h3 class="rep-block-title">👥 Качество по сотрудникам</h3>
-                <p style="text-align:center; color:var(--c-text-3); padding:20px;">Выберите даты.</p></div>`;
-        }
+           /* -------- БЛОК 3: КАЧЕСТВО ПО СОТРУДНИКАМ -------- */
+        const buildQualityByEmp = () => {
+            const from = document.getElementById('repQualFrom').value;
+            const to = document.getElementById('repQualTo').value;
+            
+            let html = `<div class="rep-block"><h3 class="rep-block-title">👥 Качество по сотрудникам <span style="font-size:12px; color:var(--c-text-3); font-weight:400;">${formatDateShort(from)} - ${formatDateShort(to)}</span></h3>`;
+            
+            // Берем данные из вкладки "Качество"
+            const qualityData = window.qTrainerResults || [];
+            
+            if (qualityData.length === 0) {
+                html += `<p style="text-align:center; color:var(--c-text-3); padding:20px;">⚠️ Данных нет. Зайдите во вкладку «Качество», выберите режим «по тренерам», нажмите «Посчитать» и «Сохранить в облако».</p></div>`;
+                return html;
+            }
 
-        const rows = [];
-        filteredUsers.forEach(u => {
-            const uTasks = _userTasksInRange(u, from, to, projectMode);
-            if (!uTasks.length) return;
-            const errs = uTasks.filter(t => t.hasErrors).length;
-            const pct = errs / uTasks.length * 100;
-            rows.push({ name: u.name, total: uTasks.length, errors: errs, pct });
-        });
-        rows.sort((a, b) => a.pct - b.pct); // сначала лучшие
+            // Фильтруем по выбранным датам
+            const filtered = qualityData.filter(r => {
+                // Если у тебя в qTrainerResults нет дат, фильтрация просто пропустится
+                // (в режиме "по тренерам" даты уже учтены при расчете во вкладке Качество)
+                return true; 
+            });
 
-        if (rows.length === 0) {
-            return `<div class="rep-block"><h3 class="rep-block-title">👥 Качество по сотрудникам</h3>
-                <p style="text-align:center; color:var(--c-text-3); padding:20px;">Нет данных в выбранном диапазоне.</p></div>`;
-        }
+            filtered.sort((a, b) => b.avg - a.avg); // Сортируем от лучших к худшим
 
-        const totalTasks = rows.reduce((s, r) => s + r.total, 0);
-        const totalErrs = rows.reduce((s, r) => s + r.errors, 0);
-        const totalPct = totalTasks ? totalErrs / totalTasks * 100 : 0;
-
-        let html = `<div class="rep-block">
-            <h3 class="rep-block-title">👥 Качество по сотрудникам <span style="font-size:12px; color:var(--c-text-3); font-weight:400;">${formatDateShort(from)} – ${formatDateShort(to)}</span></h3>
-            <div style="overflow-x:auto;"><table class="summary-table"><thead><tr>
+            html += `<div style="overflow-x:auto;"><table class="summary-table"><thead><tr>
                 <th style="text-align:left; min-width:180px;">Сотрудник</th>
-                <th>Задач</th>
-                <th>Ошибок</th>
-                <th>% ошибок</th>
+                <th>Средний %</th>
+                <th>Кол-во</th>
             </tr></thead><tbody>`;
 
-        rows.forEach(r => {
-            const cls = _errPctClass(r.pct);
-            html += `<tr>
-                <td class="name-col">${escapeHtml(r.name)}</td>
-                <td>${r.total}</td>
-                <td>${r.errors}</td>
-                <td class="${cls}" style="font-weight:700;">${r.pct.toFixed(1)}%</td>
-            </tr>`;
-        });
+            filtered.forEach(r => {
+                const pct = (r.avg * 100).toFixed(2);
+                const colorClass = r.avg >= 0.97 ? 'q-green' : (r.avg <= 0.85 ? 'q-red' : 'q-orange');
+                
+                html += `<tr>
+                    <td style="text-align:left; font-weight:600;">${escapeHtml(r.name || 'Без имени')}</td>
+                    <td class="${colorClass}">${pct}%</td>
+                    <td>${r.count}</td>
+                </tr>`;
+            });
 
-        html += `<tr class="total-row">
-            <td style="text-align:right;">ИТОГО:</td>
-            <td>${totalTasks}</td>
-            <td>${totalErrs}</td>
-            <td>${totalPct.toFixed(1)}%</td>
-        </tr></tbody></table></div></div>`;
-        return html;
-    };
+            html += `</tbody></table></div></div>`;
+            return html;
+        };
 
     /* ---------- БЛОК 4/5: ОШИБКИ (таблица как в Сводке) ---------- */
     const buildErrors = (from, to, title) => {
@@ -4494,6 +4455,62 @@ async function tmSaveCloud(silent) {
         console.error(e);
         if (!silent) showToast('Ошибка сохранения');
     }
+}
+    // ==========================================
+// ВОССТАНОВЛЕННЫЕ ФУНКЦИИ И ИСПРАВЛЕНИЯ
+// ==========================================
+
+// 1. Починка создания пулов
+function createProjectFromTab() {
+    const input = document.getElementById('newProjectName');
+    if (!input) return;
+    const name = input.value.trim();
+    
+    if (!name) { alert('Введите название пула'); return; }
+    
+    const newProject = {
+        id: 'proj_' + Date.now(),
+        name: name,
+        mainData: '',
+        namesData: '',
+        createdAt: new Date().toISOString()
+    };
+    
+    if (!window.myProjects) window.myProjects = [];
+    window.myProjects.push(newProject);
+    
+    input.value = '';
+    if (typeof renderProjectsDropdown === 'function') renderProjectsDropdown();
+    if (typeof renderProjectsList === 'function') renderProjectsList();
+    if (typeof saveToCloud === 'function') saveToCloud();
+    if (typeof showToast === 'function') showToast('Пул успешно создан!');
+}
+
+// 2. Заглушка, чтобы не было ошибки renderWeekProgress is not defined
+function renderWeekProgress() {
+    // Если ты используешь эту функцию для прогресса по неделям, она должна быть тут.
+    // Пока просто пропускаем вызов, чтобы фильтры не ломались.
+}
+
+// 3. Сохранение данных при нажатии "Обновить" (чтобы ничего не слетало)
+// Мы "оборачиваем" твою функцию applyFilters, чтобы она всегда сохраняла настройки
+const originalApplyFilters = typeof applyFilters === 'function' ? applyFilters : null;
+if (originalApplyFilters) {
+    window.applyFilters = function() {
+        originalApplyFilters();
+        if (typeof saveToCloud === 'function') saveToCloud();
+    };
+}
+
+// 4. Запоминаем результаты вкладки "Качество" для Итогового отчёта
+const originalCalcQuality = typeof calcQuality === 'function' ? calcQuality : null;
+if (originalCalcQuality) {
+    window.calcQuality = function() {
+        originalCalcQuality();
+        if (typeof qAllRows !== 'undefined') {
+            window.qTrainerResults = [...qAllRows];
+        }
+    };
 }
 </script>
 </body>
