@@ -1316,21 +1316,21 @@ function switchTemplate(templateKey) {
 
 function loadTemplateToSettings(key) {
     if (!userTemplates[key]) return;
-    document.getElementById('settingsTemplateName').value = userTemplates[key].name;
     document.getElementById('settingsCategories').value = userTemplates[key].categories.join('\n');
 }
 
 function saveTemplateSettings() {
     const key = document.getElementById('settingsTemplateSelect').value;
-    const name = document.getElementById('settingsTemplateName').value.trim();
     const catsRaw = document.getElementById('settingsCategories').value;
-    if (!name) { alert('Введите название пула'); return; }
     
     const newCats = catsRaw.split('\n').map(s => s.trim()).filter(Boolean);
     if (newCats.length === 0) { alert('Добавьте хотя бы одну категорию'); return; }
 
     const newShort = {};
     newCats.forEach(c => { newShort[c] = c.length > 15 ? c.slice(0, 15) + '...' : c; });
+
+    // Название берем из дефолтного шаблона, чтобы не сломать структуру
+    const name = DEFAULT_TEMPLATES[key] ? DEFAULT_TEMPLATES[key].name : key;
 
     userTemplates[key] = { name: name, categories: newCats, shortLabels: newShort };
     
@@ -2230,18 +2230,18 @@ function processData() {
         if (actualCat) {
             let isError = false;
             
-                           if (currentTemplateKey === 'ssu') {
-                    // Для SSU: ошибка есть, если текст НЕ "без ошибок" и НЕ "-"
-                    const val = blockText.trim().toLowerCase();
-                    const ignoreValues = ['без ошибок', 'без ошибки', 'нет', 'отсутствует', '-', '—', '–', ''];
-                    
-                    // Если это "Рекомендация", мы её не считаем ошибкой
-                    const isRecommendation = catName.toLowerCase().includes('рекомендация');
-                    
-                    if (!isRecommendation && val.length > 0 && !ignoreValues.includes(val)) {
-                        isError = true;
-                    }
-                }
+if (currentTemplateKey === 'ssu') {
+    // Для SSU: ошибка есть, если текст НЕ "без ошибок" и НЕ "-"
+    const val = blockText.trim().toLowerCase();
+    const ignoreValues = ['без ошибок', 'без ошибки', 'нет', 'отсутствует', '-', '—', '–', ''];
+    
+    // Если это "Рекомендация", мы её не считаем ошибкой
+    const isRecommendation = catName.toLowerCase().includes('рекомендация');
+    
+    if (!isRecommendation && val.length > 0 && !ignoreValues.includes(val)) {
+        isError = true;
+    }
+}
             } else {
                 // Для BA: если категория есть и текст не пустой, считаем ошибкой (твоя старая логика)
                 if (blockText.length > 0) {
