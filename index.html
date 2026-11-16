@@ -1161,6 +1161,9 @@ body.dark-theme tr.paint-gray { background-color: #2E2E2E !important; color: #A0
             <div id="tmHint" style="margin-top:12px; font-size:12px; color:var(--c-text-2);"></div>
         </div>
     </div>
+        <div class="modal-overlay" id="modalOverlay" onclick="if(event.target===this)closeModal()">
+        <div class="modal" id="modalContent"></div>
+    </div>
 <script>
 const SUPABASE_URL = 'https://zgwwylbokleugpfyshzk.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inpnd3d5bGJva2xldWdwZnlzaHprIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTM5MDE3MzcsImV4cCI6MjEwOTQ3NzczN30.UfpZTrathz43IC6xoHA0AMHebhxNazG7x9ywMdPeAWQ';
