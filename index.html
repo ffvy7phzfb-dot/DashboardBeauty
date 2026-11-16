@@ -2230,11 +2230,17 @@ function processData() {
         if (actualCat) {
             let isError = false;
             
-            if (currentTemplateKey === 'ssu') {
-                // Для SSU: ошибка есть, если текст НЕ "без ошибок" и НЕ "-"
-                const notErrorPattern = /^без ошибки|без ошибок|нет|[-—–]$/i;
-                if (blockText.length > 0 && !notErrorPattern.test(blockText)) {
-                    isError = true;
+                           if (currentTemplateKey === 'ssu') {
+                    // Для SSU: ошибка есть, если текст НЕ "без ошибок" и НЕ "-"
+                    const val = blockText.trim().toLowerCase();
+                    const ignoreValues = ['без ошибок', 'без ошибки', 'нет', 'отсутствует', '-', '—', '–', ''];
+                    
+                    // Если это "Рекомендация", мы её не считаем ошибкой
+                    const isRecommendation = catName.toLowerCase().includes('рекомендация');
+                    
+                    if (!isRecommendation && val.length > 0 && !ignoreValues.includes(val)) {
+                        isError = true;
+                    }
                 }
             } else {
                 // Для BA: если категория есть и текст не пустой, считаем ошибкой (твоя старая логика)
