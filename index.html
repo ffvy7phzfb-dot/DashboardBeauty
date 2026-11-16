@@ -2211,30 +2211,51 @@ function processData() {
         categoriesList.forEach(c => taskCats[c] = false);
 
        if (comment) {
-    const catPattern = categoriesList.map(c => c.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|');
-    const regexSplit = new RegExp(`(${catPattern})`, 'gi');
-    const parts = comment.split(regexSplit);
-    for (let i = 1; i < parts.length; i += 2) {
-        const catName = parts[i];
-        const blockText = parts[i+1] || '';
+    // Очищаем от служебной фразы
+    const cleanComment = comment.replace(/Исправлено валидатором/gi, '').trim();
+    
+    // Разбиваем комментарий на строки (каждая категория обычно с новой строки)
+    const lines = cleanComment.split(/\r?\n/);
+
+    lines.forEach(line => {
+        const colonIndex = line.indexOf(':');
+        if (colonIndex === -1) return; // если нет двоеточия, пропускаем
+
+        const catName = line.slice(0, colonIndex).trim();
+        const blockText = line.slice(colonIndex + 1).trim();
+
+        // Ищем, есть ли такая категория в нашем списке
         const actualCat = categoriesList.find(c => c.toLowerCase() === catName.toLowerCase());
+
         if (actualCat) {
-            const cleanBlock = blockText.replace(/^[:\-\s\.]+/, '').trim();
-            const noErrorPattern = /без ошибк|no error|no mistakes|none|clean|^[-—–]?$/i;
-            if (cleanBlock.length > 0 && !noErrorPattern.test(cleanBlock)) {
+            let isError = false;
+            
+            if (currentTemplateKey === 'ssu') {
+                // Для SSU: ошибка есть, если текст НЕ "без ошибок" и НЕ "-"
+                const notErrorPattern = /^без ошибки|без ошибок|нет|[-—–]$/i;
+                if (blockText.length > 0 && !notErrorPattern.test(blockText)) {
+                    isError = true;
+                }
+            } else {
+                // Для BA: если категория есть и текст не пустой, считаем ошибкой (твоя старая логика)
+                if (blockText.length > 0) {
+                    isError = true;
+                }
+            }
+
+            if (isError) {
                 taskCats[actualCat] = true;
                 taskHasErrors = true;
                 taskComments[markerId].push({
                     date: startDateOnly || endDateOnly || '',
                     taskStart: startFull,
                     category: actualCat,
-                    text: cleanBlock.slice(0, 500)
+                    text: blockText.slice(0, 500)
                 });
             }
         }
-    }
+    });
 }
-
         user.tasks.push({
             startDate: startDateOnly, endDate: endDateOnly,
             startTime: startFull,
