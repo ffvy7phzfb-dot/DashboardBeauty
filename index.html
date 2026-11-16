@@ -1439,7 +1439,7 @@ async function logoutUser() {
     const isSure = confirm('Выйти из текущего аккаунта? (Данные сохранятся в облако)');
     if (!isSure) return;
     try { await saveToCloud(); } catch(e) { console.warn('saveToCloud on logout failed', e); }
-    await supabaseClient.auth.signOut();
+   await supabaseClient.auth.signOut({ scope: 'local' });
     location.reload();
 }
 
