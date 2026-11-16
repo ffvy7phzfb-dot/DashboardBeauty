@@ -459,6 +459,7 @@ body.dark-theme tr.paint-gray { background-color: #2E2E2E !important; color: #A0
         <button class="main-tab-btn" onclick="switchTab('progress', this)">📈 Общий прогресс</button>
         <button class="main-tab-btn" onclick="switchTab('compare', this)">⚖️ Сравнение</button>
         <button class="main-tab-btn" onclick="switchTab('manager-report', this)">📋 Итоговый отчёт</button>
+        <button class="main-tab-btn" onclick="switchTab('time-markers', this)">⏱ Время (маркеры)</button>
         <button class="main-tab-btn" onclick="switchTab('settings', this)">⚙️ Настройки</button>
     </div>
 
@@ -1077,7 +1078,84 @@ body.dark-theme tr.paint-gray { background-color: #2E2E2E !important; color: #A0
         </div>
     </div>
 </div>
+    <!-- ================== ВРЕМЯ ПО МАРКЕРАМ ================== -->
+    <div class="tab-content" id="tab-time-markers">
+        <div class="container">
+            <div class="box" style="min-width:100%;">
+                <h3>⏱ Расчёт времени по маркерам</h3>
+                <p>Данные можно взять из Сводки одной кнопкой — или вставить вручную. Порядок столбцов не важен, поиск по названию: <b>Start Date</b>, <b>End Date</b>, <b>Marker ID</b>.</p>
+                <div class="btn-group" style="margin:14px 0 0 0; justify-content:flex-start;">
+                    <button class="btn-cloud" onclick="tmPullFromMain()">🔄 Взять из Сводки</button>
+                    <button class="btn-copy" onclick="tmSaveCloud()">☁️ Сохранить в облако</button>
+                    <span id="tmPullInfo" style="align-self:center; font-size:12px; color:var(--c-text-3);"></span>
+                </div>
+            </div>
+        </div>
 
+        <div class="container">
+            <div class="box">
+                <h3>① Столбцы (Start / End / Marker ID)</h3>
+                <p>Вставь три столбца с шапкой. Или нажми «Взять из Сводки».</p>
+                <textarea id="tmColsInput" style="height:180px;" placeholder="Marker ID&#9;Start Date&#9;End Date&#10;M001&#9;01.02.2025 10:00&#9;01.02.2025 11:30"></textarea>
+            </div>
+            <div class="box">
+                <h3>② Фамилии ↔ Marker ID</h3>
+                <p>Подставится из Сводки автоматически, если там были фамилии. Можно править.</p>
+                <textarea id="tmMapInput" style="height:180px;" placeholder="Иванов И.И.&#9;M001&#10;Петров П.П.&#9;M002"></textarea>
+            </div>
+        </div>
+
+        <div class="btn-group">
+            <button class="btn-calc" onclick="tmCalculate()">📊 Рассчитать</button>
+            <button class="btn-copy" onclick="tmExport()" id="tmExportBtn" disabled>📥 Экспорт в Excel</button>
+            <button class="btn-copy" onclick="tmCopy()" id="tmCopyBtn" disabled>📋 Копировать таблицу</button>
+            <button class="btn-clear" onclick="tmClear()">🧹 Очистить</button>
+        </div>
+
+        <div id="tmError" style="display:none; background:var(--c-red-soft); color:var(--c-red-text); padding:12px 16px; border-radius:var(--r-md); margin-bottom:20px; font-size:14px; font-weight:500;"></div>
+
+        <div class="progress-kpi-grid" id="tmKpiGrid" style="display:none;">
+            <div class="progress-kpi" style="border-left-color: var(--c-primary);">
+                <div class="lbl">Всего записей</div>
+                <div class="val" id="tmKpiCount">0</div>
+                <div class="sub">обработано строк</div>
+            </div>
+            <div class="progress-kpi" style="border-left-color: var(--c-green);">
+                <div class="lbl">Суммарное время по проекту</div>
+                <div class="val" id="tmKpiTotal">00:00:00</div>
+                <div class="sub">сложенное время</div>
+            </div>
+            <div class="progress-kpi" style="border-left-color: var(--c-orange);">
+                <div class="lbl">Среднее по проекту</div>
+                <div class="val" id="tmKpiAvg">00:00:00</div>
+                <div class="sub">на одну запись</div>
+            </div>
+            <div class="progress-kpi" style="border-left-color: var(--c-purple);">
+                <div class="lbl">Сотрудников</div>
+                <div class="val" id="tmKpiPeople">0</div>
+                <div class="sub">уникальных маркеров</div>
+            </div>
+        </div>
+
+        <div class="results" id="tmResultBox" style="display:none;">
+            <h3 style="margin-top:0; font-size:16px;">Результат по сотрудникам</h3>
+            <div style="overflow-x:auto;">
+                <table class="progress-table" id="tmResultTable">
+                    <thead>
+                        <tr>
+                            <th style="text-align:left;">Фамилия</th>
+                            <th style="text-align:left;">Marker ID</th>
+                            <th>Записей</th>
+                            <th>Общее время</th>
+                            <th>Среднее время</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+            <div id="tmHint" style="margin-top:12px; font-size:12px; color:var(--c-text-2);"></div>
+        </div>
+    </div>
     <!-- ================== НАСТРОЙКИ ================== -->
     <div class="tab-content" id="tab-settings">
         <div class="container">
@@ -4122,6 +4200,274 @@ document.addEventListener('DOMContentLoaded', () => {
         updateThemeBtn(true);
     }
 });
+    // ============================================================
+// ВРЕМЯ ПО МАРКЕРАМ (с сохранением в облако)
+// ============================================================
+let tmLastRows = [];
+let tmOriginalRows = []; // сырые строки Сводки
+
+// --- утилиты ---
+function tmFormatDuration(ms) {
+    if (ms < 0 || isNaN(ms)) return '00:00:00';
+    const s = Math.floor(ms / 1000);
+    const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
+    return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`;
+}
+function tmParseDate(v) {
+    if (v === null || v === undefined || v === '') return null;
+    if (v instanceof Date) return v;
+    if (typeof v === 'number') return new Date((v - 25569) * 86400000);
+    const t = String(v).trim();
+    if (!t) return null;
+    let d = new Date(t.replace(',', '.'));
+    if (!isNaN(d)) return d;
+    const m = t.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})[\sT]+(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?$/);
+    if (m) return new Date(+m[3], +m[2]-1, +m[1], +m[4], +m[5], +(m[6]||0));
+    return null;
+}
+function tmNorm(s) { return String(s).toLowerCase().replace(/[\s_\-().]/g,''); }
+function tmFindIndex(header, aliases) {
+    const nh = header.map(tmNorm);
+    for (const a of aliases) {
+        const t = tmNorm(a);
+        const i = nh.indexOf(t);
+        if (i !== -1) return i;
+    }
+    for (const a of aliases) {
+        const t = tmNorm(a);
+        const i = nh.findIndex(h => h.includes(t));
+        if (i !== -1) return i;
+    }
+    return -1;
+}
+function tmParseTable(text) {
+    const lines = text.replace(/\r/g,'').split('\n').filter(l => l.trim() !== '');
+    return lines.map(line => {
+        let sep = '\t';
+        if (!line.includes('\t')) {
+            if (line.includes(';')) sep = ';';
+            else if (line.includes('|')) sep = '|';
+            else if (line.includes(',')) sep = ',';
+            else sep = null;
+        }
+        return sep ? line.split(sep).map(c => c.trim()) : [line.trim()];
+    });
+}
+function tmParseMapping(text) {
+    const map = new Map();
+    if (!text.trim()) return map;
+    for (const r of tmParseTable(text)) {
+        if (r.length < 2) continue;
+        let name = r[0], marker = r[1];
+        if (/^[A-Za-z0-9_\-]+$/.test(name) && /[А-Яа-яЁё]/.test(marker)) {
+            [name, marker] = [marker, name];
+        }
+        if (name && marker) map.set(tmNorm(marker), name);
+    }
+    return map;
+}
+
+// --- хук на Сводку: обернём processData ---
+(function() {
+    const origProcess = window.processData;
+    if (typeof origProcess === 'function') {
+        window.processData = function() {
+            // Восстанавливаем исходные textarea, чтобы processData читал их
+            try { origProcess.apply(this, arguments); } catch (e) { console.error(e); }
+            // После обработки — сохраняем сырые строки для вкладки «Время»
+            try {
+                const md = document.getElementById('mainData');
+                const nd = document.getElementById('namesData');
+                if (md && md.value.trim()) {
+                    tmOriginalRows = md.value;
+                    // автоподставить в вкладку «Время»
+                    const colsEl = document.getElementById('tmColsInput');
+                    if (colsEl && !colsEl.value.trim()) colsEl.value = md.value;
+                }
+                if (nd && nd.value.trim()) {
+                    const mapEl = document.getElementById('tmMapInput');
+                    if (mapEl && !mapEl.value.trim()) mapEl.value = nd.value;
+                }
+            } catch (e) { console.error('tm hook', e); }
+            // автосохранение в облако
+            if (typeof tmSaveCloud === 'function') tmSaveCloud(true);
+        };
+    }
+})();
+
+// --- Взять из Сводки ---
+function tmPullFromMain() {
+    const md = document.getElementById('mainData');
+    const nd = document.getElementById('namesData');
+    const info = document.getElementById('tmPullInfo');
+    if (!md || !md.value.trim()) {
+        if (info) info.textContent = '⚠️ в Сводке нет данных';
+        return;
+    }
+    document.getElementById('tmColsInput').value = md.value;
+    if (nd && nd.value.trim()) document.getElementById('tmMapInput').value = nd.value;
+    if (info) info.textContent = '✓ данные подставлены из Сводки';
+    tmSaveCloud(true);
+}
+
+// --- расчёт ---
+function tmCalculate() {
+    const errEl = document.getElementById('tmError');
+    errEl.style.display = 'none';
+    errEl.textContent = '';
+
+    const raw = document.getElementById('tmColsInput').value;
+    if (!raw.trim()) { tmShowError('Вставьте столбцы в окно ①.'); return; }
+
+    const table = tmParseTable(raw);
+    if (table.length < 2) { tmShowError('Нужна хотя бы шапка и одна строка данных.'); return; }
+
+    const header = table[0];
+    const dataRows = table.slice(1);
+    const iStart  = tmFindIndex(header, ['Start Date','Start','Начало','Дата начала','Старт']);
+    const iEnd    = tmFindIndex(header, ['End Date','End','Конец','Дата окончания','Финиш']);
+    const iMarker = tmFindIndex(header, ['Marker ID','Marker','ID','Маркер','Метка','Идентификатор']);
+    if (iStart === -1 || iEnd === -1 || iMarker === -1) {
+        tmShowError('Не найдены нужные столбцы. В шапке: ' + header.join(' | '));
+        return;
+    }
+
+    const nameMap = tmParseMapping(document.getElementById('tmMapInput').value);
+    const perMarker = new Map();
+    let grand = 0, valid = 0;
+
+    for (const r of dataRows) {
+        const start = tmParseDate(r[iStart]);
+        const end   = tmParseDate(r[iEnd]);
+        const markerRaw = (r[iMarker] ?? '').trim();
+        if (!start || !end || !markerRaw) continue;
+        const diff = end - start;
+        if (diff < 0) continue;
+        grand += diff; valid++;
+        const key = tmNorm(markerRaw);
+        if (!perMarker.has(key)) perMarker.set(key, { raw: markerRaw, count: 0, totalMs: 0 });
+        const m = perMarker.get(key);
+        m.count++; m.totalMs += diff;
+    }
+    if (!valid) { tmShowError('Не удалось распознать ни одной корректной строки.'); return; }
+
+    document.getElementById('tmKpiCount').textContent = valid;
+    document.getElementById('tmKpiTotal').textContent = tmFormatDuration(grand);
+    document.getElementById('tmKpiAvg').textContent = tmFormatDuration(grand / valid);
+    document.getElementById('tmKpiPeople').textContent = perMarker.size;
+    document.getElementById('tmKpiGrid').style.display = 'grid';
+
+    tmLastRows = [...perMarker.entries()].map(([key, info]) => ({
+        name: nameMap.get(key) || '',
+        marker: info.raw,
+        count: info.count,
+        total: info.totalMs,
+        avg: info.totalMs / info.count
+    })).sort((a,b) => b.total - a.total);
+
+    const tbody = document.querySelector('#tmResultTable tbody');
+    tbody.innerHTML = '';
+    for (const r of tmLastRows) {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td style="text-align:left; font-weight:600;">${r.name || '<span class="no-name">— не сопоставлено —</span>'}</td>
+            <td style="text-align:left; font-family:var(--f-mono); font-size:12px; color:var(--c-text-3);">${escapeHtml(r.marker)}</td>
+            <td>${r.count}</td>
+            <td>${tmFormatDuration(r.total)}</td>
+            <td>${tmFormatDuration(r.avg)}</td>
+        `;
+        tbody.appendChild(tr);
+    }
+    const unmatched = tmLastRows.filter(r => !r.name).length;
+    document.getElementById('tmHint').textContent = unmatched
+        ? `⚠️ ${unmatched} маркер(ов) не сопоставлено с фамилиями — проверьте окно ②.`
+        : `✓ Все ${tmLastRows.length} маркеров сопоставлены.`;
+
+    document.getElementById('tmResultBox').style.display = 'block';
+    document.getElementById('tmExportBtn').disabled = false;
+    document.getElementById('tmCopyBtn').disabled = false;
+
+    tmSaveCloud(true);
+}
+
+function tmShowError(msg) {
+    const el = document.getElementById('tmError');
+    el.textContent = '⚠️ ' + msg;
+    el.style.display = 'block';
+}
+function tmExport() {
+    if (!tmLastRows.length) return;
+    let csv = 'Фамилия;Marker ID;Записей;Общее время;Среднее время\n';
+    for (const r of tmLastRows) csv += [r.name || '—', r.marker, r.count, tmFormatDuration(r.total), tmFormatDuration(r.avg)].join(';') + '\n';
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob); a.download = 'время_по_маркерам.csv'; a.click();
+}
+function tmCopy() {
+    if (!tmLastRows.length) return;
+    let txt = 'Фамилия\tMarker ID\tЗаписей\tОбщее время\tСреднее время\n';
+    for (const r of tmLastRows) txt += [r.name || '—', r.marker, r.count, tmFormatDuration(r.total), tmFormatDuration(r.avg)].join('\t') + '\n';
+    navigator.clipboard.writeText(txt).then(() => {
+        const btn = document.getElementById('tmCopyBtn');
+        btn.textContent = '✅ Скопировано';
+        setTimeout(() => btn.textContent = '📋 Копировать таблицу', 1500);
+    }).catch(() => alert('Не удалось скопировать.'));
+}
+function tmClear() {
+    document.getElementById('tmColsInput').value = '';
+    document.getElementById('tmMapInput').value = '';
+    document.getElementById('tmKpiGrid').style.display = 'none';
+    document.getElementById('tmResultBox').style.display = 'none';
+    document.getElementById('tmError').style.display = 'none';
+    document.getElementById('tmExportBtn').disabled = true;
+    document.getElementById('tmCopyBtn').disabled = true;
+    tmLastRows = [];
+    tmSaveCloud(true);
+}
+
+// --- СОХРАНЕНИЕ В ОБЛАКО ---
+// Дополняем уже существующие collectAllSettings/applyAllSettings
+(function() {
+    const origCollect = window.collectAllSettings;
+    if (typeof origCollect === 'function') {
+        window.collectAllSettings = function() {
+            const s = origCollect.apply(this, arguments) || {};
+            s.timeMarkers = {
+                cols: document.getElementById('tmColsInput')?.value || '',
+                map: document.getElementById('tmMapInput')?.value || ''
+            };
+            return s;
+        };
+    }
+    const origApply = window.applyAllSettings;
+    if (typeof origApply === 'function') {
+        window.applyAllSettings = function(settings) {
+            origApply.apply(this, arguments);
+            if (settings && settings.timeMarkers) {
+                const tm = settings.timeMarkers;
+                setTimeout(() => {
+                    const c = document.getElementById('tmColsInput');
+                    const m = document.getElementById('tmMapInput');
+                    if (c && tm.cols) c.value = tm.cols;
+                    if (m && tm.map) m.value = tm.map;
+                    // если данные есть — сразу посчитать
+                    if (c && c.value.trim()) tmCalculate();
+                }, 200);
+            }
+        };
+    }
+})();
+
+async function tmSaveCloud(silent) {
+    if (typeof saveToCloud !== 'function') return;
+    try {
+        await saveToCloud();
+        if (!silent) showToast('Время сохранено в облако ☁️');
+    } catch (e) {
+        console.error(e);
+        if (!silent) showToast('Ошибка сохранения');
+    }
+}
 </script>
 </body>
 </html>
