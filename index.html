@@ -1150,19 +1150,28 @@ const DEFAULT_TEMPLATES = {
     'ssu': {
         name: 'SSU',
         categories: [
-            'маркдаун', 'ошибки РП', 'грамматика, орфография, пунктуация, не те слова',
-            'пропущенная ё, опечатка, потерянная точка', 'систем', 'контекст, ты/вы',
-            'комментарий', 'единообразие'
+            'Опечатка',
+            'Контекст',
+            'Тип-оформление',
+            'Смысловая опечатка',
+            'LaTeX',
+            'Картинка',
+            'Тег тематики',
+            'Тег типа вопроса',
+            'Неправильный ответ',
+            'Рекомендация'
         ],
         shortLabels: {
-            'маркдаун': 'Маркдаун',
-            'ошибки РП': 'Ошибки РП',
-            'грамматика, орфография, пунктуация, не те слова': 'Грамматика',
-            'пропущенная ё, опечатка, потерянная точка': 'Пропущенная ё',
-            'систем': 'Системы',
-            'контекст, ты/вы': 'Контекст',
-            'комментарий': 'Комментарии',
-            'единообразие': 'Единообразие'
+            'Опечатка': 'Опечатка',
+            'Контекст': 'Контекст',
+            'Тип-оформление': 'Тип-оформл.',
+            'Смысловая опечатка': 'Смысл. опеч.',
+            'LaTeX': 'LaTeX',
+            'Картинка': 'Картинка',
+            'Тег тематики': 'Тег тематики',
+            'Тег типа вопроса': 'Тег типа',
+            'Неправильный ответ': 'Неверный отв.',
+            'Рекомендация': 'Рекомендация'
         }
     }
 };
@@ -2125,30 +2134,30 @@ function processData() {
         const taskCats = {};
         categoriesList.forEach(c => taskCats[c] = false);
 
-        if (comment) {
-            const catPattern = categoriesList.map(c => c.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|');
-            const regexSplit = new RegExp(`(${catPattern})`, 'gi');
-            const parts = comment.split(regexSplit);
-            for (let i = 1; i < parts.length; i += 2) {
-                const catName = parts[i];
-                const blockText = parts[i+1] || '';
-                const actualCat = categoriesList.find(c => c.toLowerCase() === catName.toLowerCase());
-                if (actualCat) {
-                    const cleanBlock = blockText.replace(/^[:\-\s\.]+/, '').trim();
-                    const noErrorPattern = /без ошибк|no error|no mistakes|none|clean/i;
-                    if (cleanBlock.length > 0 && !noErrorPattern.test(cleanBlock)) {
-                        taskCats[actualCat] = true;
-                        taskHasErrors = true;
-                        taskComments[markerId].push({
-                            date: startDateOnly || endDateOnly || '',
-                            taskStart: startFull,
-                            category: actualCat,
-                            text: cleanBlock.slice(0, 500)
-                        });
-                    }
-                }
+       if (comment) {
+    const catPattern = categoriesList.map(c => c.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|');
+    const regexSplit = new RegExp(`(${catPattern})`, 'gi');
+    const parts = comment.split(regexSplit);
+    for (let i = 1; i < parts.length; i += 2) {
+        const catName = parts[i];
+        const blockText = parts[i+1] || '';
+        const actualCat = categoriesList.find(c => c.toLowerCase() === catName.toLowerCase());
+        if (actualCat) {
+            const cleanBlock = blockText.replace(/^[:\-\s\.]+/, '').trim();
+            const noErrorPattern = /без ошибк|no error|no mistakes|none|clean|^[-—–]?$/i;
+            if (cleanBlock.length > 0 && !noErrorPattern.test(cleanBlock)) {
+                taskCats[actualCat] = true;
+                taskHasErrors = true;
+                taskComments[markerId].push({
+                    date: startDateOnly || endDateOnly || '',
+                    taskStart: startFull,
+                    category: actualCat,
+                    text: cleanBlock.slice(0, 500)
+                });
             }
         }
+    }
+}
 
         user.tasks.push({
             startDate: startDateOnly, endDate: endDateOnly,
