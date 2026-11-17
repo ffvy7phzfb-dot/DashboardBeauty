@@ -2202,6 +2202,7 @@ function processData() {
 
                 // 1. Очищаем название от звездочек и лишних пробелов
                 let catName = line.slice(0, colonIndex).replace(/\*/g, '').trim();
+                                console.log("🔎 Проверяю категорию:", catName, "| Ищу в списке:", categoriesList);
                 let blockText = line.slice(colonIndex + 1).trim();
 
                 // 2. Если после двоеточия пусто, берем следующую строку
