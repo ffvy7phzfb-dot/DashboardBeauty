@@ -2207,24 +2207,31 @@ function processData() {
             let isError = false;
             
 if (currentTemplateKey === 'ssu') {
-    // Для SSU: ошибка есть, если текст НЕ "без ошибок" и НЕ "-"
+    // Приводим текст к нижнему регистру и убираем лишние пробелы
     const val = blockText.trim().toLowerCase();
-    const ignoreValues = ['без ошибок', 'без ошибки', 'нет', 'отсутствует', '-', '—', '–', ''];
     
-    // Если это "Рекомендация", мы её не считаем ошибкой
+    // Список того, что НЕ является ошибкой (добавили точки и запятые на всякий случай)
+    const ignoreValues = [
+        'без ошибок', 'без ошибки', 'нет', 'отсутствует', 
+        '-', '—', '–', '', 
+        'без ошибок.', 'без ошибки.', 'нет.', '-.', 
+        'исправлено валидатором'
+    ];
+    
+    // Проверяем, не является ли это категорией "Рекомендация"
     const isRecommendation = catName.toLowerCase().includes('рекомендация');
     
+    // Ошибка ставится ТОЛЬКО если это не рекомендация, текст не пустой и его нет в списке "без ошибок"
     if (!isRecommendation && val.length > 0 && !ignoreValues.includes(val)) {
         isError = true;
     }
+} 
+else {
+    // Для Beautiful Answers (оставляем без изменений)
+    if (blockText.length > 0) {
+        isError = true;
+    }
 }
- else {
-                // Для BA: если категория есть и текст не пустой, считаем ошибкой (твоя старая логика)
-                if (blockText.length > 0) {
-                    isError = true;
-                }
-            }
-
             if (isError) {
                 taskCats[actualCat] = true;
                 taskHasErrors = true;
