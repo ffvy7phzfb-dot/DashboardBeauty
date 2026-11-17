@@ -2415,7 +2415,7 @@ function renderReport(users) {
             <td class="${getCellPaint('doneWithErrors')}" onclick="handleCellClick('${user.id}', 'doneWithErrors')"><b>${user.doneWithErrors}</b></td>`;
         
         categoriesList.forEach(cat => {
-            const v = user.catErrors[cat];
+                         const v = (u.cats && u.cats[cat]) || (u.catErrors && u.catErrors[cat]) || 0;
             html += `<td class="${v===0?'zero-cell':''} ${getCellPaint(cat)}" onclick="handleCellClick('${user.id}', '${cat}')">${v}</td>`;
         });
         html += `<td class="id-col ${getCellPaint('id')}" onclick="handleCellClick('${user.id}', 'id')" title="${user.id}">${user.id}</td></tr>`;
