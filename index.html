@@ -2207,22 +2207,19 @@ function processData() {
             let isError = false;
             
 if (currentTemplateKey === 'ssu') {
-    // Приводим текст к нижнему регистру и убираем лишние пробелы
     const val = blockText.trim().toLowerCase();
-    
-    // Список того, что НЕ является ошибкой (добавили точки и запятые на всякий случай)
-    const ignoreValues = [
-        'без ошибок', 'без ошибки', 'нет', 'отсутствует', 
-        '-', '—', '–', '', 
-        'без ошибок.', 'без ошибки.', 'нет.', '-.', 
-        'исправлено валидатором'
-    ];
-    
-    // Проверяем, не является ли это категорией "Рекомендация"
-    const isRecommendation = catName.toLowerCase().includes('рекомендация');
-    
-    // Ошибка ставится ТОЛЬКО если это не рекомендация, текст не пустой и его нет в списке "без ошибок"
-    if (!isRecommendation && val.length > 0 && !ignoreValues.includes(val)) {
+    const lowerCat = catName.toLowerCase();
+
+    // 1. Если это Рекомендация — это ВСЕГДА не ошибка (даже если там есть текст)
+    if (lowerCat.includes('рекомендация')) {
+        isError = false;
+    } 
+    // 2. Если написано "без ошибок" (с точкой или без) или стоит прочерк — это не ошибка
+ else if (val === '' || val.startsWith('без ошибок') || val === '-' || val === '—' || val === '–') {
+                    isError = false;
+    } 
+    // 3. Во всех остальных случаях — это ошибка
+    else {
         isError = true;
     }
 } 
