@@ -2218,9 +2218,26 @@ function processData() {
                 const lowerCat = catName.toLowerCase();
 
                 // 1. Если пусто, прочерк или есть корень "без ошиб" (ловит "без ошибок", "без ошибки" и т.д.)
-                if (lowerText.trim() === '' || lowerText === '-' || lowerText === '—' || lowerText === '–' || lowerText.includes('без ошиб')) {
-                    isError = false;
-                } 
+                                    // Универсальная проверка для обоих шаблонов (BA и SSU)
+                    const lowerText = blockText.toLowerCase();
+                    const lowerCat = catName.toLowerCase();
+
+                    // 1. Если это СЛУЖЕБНАЯ строка (типа "Расчет по критериям") — пропускаем
+                    if (lowerCat.includes('расчет') || lowerCat.includes('качество') || lowerCat.includes('рекомендованное время')) {
+                        isError = false;
+                    }
+                    // 2. Если пусто, прочерк или есть корень "без ошиб" — НЕ ошибка
+                    else if (lowerText.trim() === '' || lowerText === '-' || lowerText === '—' || lowerText === '–' || lowerText.includes('без ошиб')) {
+                        isError = false;
+                    } 
+                    // 3. Если это Рекомендация — НЕ ошибка (даже если там есть текст)
+                    else if (lowerCat.includes('рекомендация')) {
+                        isError = false;
+                    } 
+                    // 4. Во всех остальных случаях — ЭТО ОШИБКА
+                    else {
+                        isError = true;
+                    }
                 // 2. Если это Рекомендация — НЕ ошибка
                 else if (lowerCat.includes('рекомендация')) {
                     isError = false;
