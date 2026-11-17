@@ -2152,13 +2152,11 @@ function processData() {
     }
 
     const namesMap = parseNames(namesText);
-    // Разбиваем текст на строки. Если Excel вставил переносы внутри ячейки, мы это починим ниже.
     const rawLines = mainText.split(/\r?\n/);
     
     const report = {}; 
     window.taskComments = {};
 
-    // Словарь синонимов для надежности
     const searchKeywords = [
         { key: 'маркдаун', full: 'маркдаун' },
         { key: 'ошибки рп', full: 'ошибки РП' },
@@ -2179,15 +2177,11 @@ function processData() {
         { key: 'неправильный ответ', full: 'Неправильный ответ' }
     ];
 
-    // Функция для обработки одной целой строки данных
     const processRow = (rowStr) => {
         rowStr = rowStr.trim();
         if (!rowStr) return;
-        
-        // Пропускаем заголовок
         if (rowStr.toLowerCase().includes('marker_id') && rowStr.toLowerCase().includes('start_date')) return;
 
-        // Разбиваем на колонки. Если меньше 4 - значит это обрывок, игнорируем.
         const parts = rowStr.split('\t');
         if (parts.length < 4) return;
 
@@ -2196,7 +2190,6 @@ function processData() {
         const endDate = parts[2] ? parts[2].trim().slice(0, 10) : '';
         let quality = null;
         
-        // Ищем качество и комментарий
         let commentIndex = 3;
         if (parts.length >= 5) {
             const parsedQ = parseFloat((parts[3] || '').replace(',', '.'));
@@ -2222,19 +2215,14 @@ function processData() {
         let taskHasErrors = false;
 
         if (comment) {
-            // Убираем "Исправлено валидатором"
             let cleanComment = comment.replace(/Исправлено валидатором/gi, ' ').trim();
-            
-            // Очищаем от звездочек и лишних пробелов
             let normalizedText = cleanComment.replace(/\*|_|«|»|"/g, ' ').replace(/\s+/g, ' ');
             let lowerText = normalizedText.toLowerCase();
             
-            // Ищем позиции всех ключевых слов
             let matches = [];
             searchKeywords.forEach(kw => {
                 let pos = lowerText.indexOf(kw.key);
                 while (pos !== -1) {
-                    // Проверяем, что это начало слова
                     let prevChar = pos > 0 ? lowerText[pos - 1] : ' ';
                     if (!/[а-яa-z0-9]/.test(prevChar)) {
                         matches.push({ index: pos, length: kw.key.length, category: kw.full });
@@ -2243,10 +2231,8 @@ function processData() {
                 }
             });
 
-            // Сортируем по порядку появления
             matches.sort((a, b) => a.index - b.index);
             
-            // Удаляем дубликаты
             let uniqueMatches = [];
             matches.forEach(m => {
                 if (uniqueMatches.length === 0 || uniqueMatches[uniqueMatches.length - 1].index !== m.index) {
@@ -2254,7 +2240,6 @@ function processData() {
                 }
             });
 
-            // Разбиваем текст на блоки между категориями
             for (let i = 0; i < uniqueMatches.length; i++) {
                 let startIdx = uniqueMatches[i].index + uniqueMatches[i].length;
                 let endIdx = (i + 1 < uniqueMatches.length) ? uniqueMatches[i + 1].index : normalizedText.length;
@@ -2262,7 +2247,6 @@ function processData() {
                 let blockText = normalizedText.slice(startIdx, endIdx).replace(/^[:\-\s]+/, '').trim();
                 let cat = uniqueMatches[i].category;
 
-                // Игнорируем, если ошибки нет
                 let lowerBlock = blockText.toLowerCase();
                 if (lowerBlock.includes('без ошиб') || lowerBlock === '-' || lowerBlock === '—' || lowerBlock === 'ок' || 
                     lowerBlock.includes('рекомендованное время') || lowerBlock.includes('допустимое время') || 
@@ -2271,7 +2255,6 @@ function processData() {
                     continue;
                 }
 
-                // Записываем ошибку
                 if (blockText) {
                     taskCats[cat] = true;
                     taskHasErrors = true;
@@ -2300,25 +2283,24 @@ function processData() {
         });
     };
 
-    // УМНАЯ СБОРКА СТРОК
+    // УМНАЯ СБОРКА СТРОК (проверка на UUID)
     let currentRow = '';
     rawLines.forEach(line => {
-        // Считаем, сколько колонок (табов) в строке
+        // Если строка начинается с UUID (длинный ID с дефисами) или содержит 4+ таба (полная строка данных)
+        const isUuidStart = /^[0-9a-f]{8}-[0-9a-f]{4}/i.test(line.trim());
         const tabCount = (line.match(/\t/g) || []).length;
         
-        if (tabCount >= 3) {
-            // Если в строке 3 и больше табов, это начало новой записи
-            // Сначала обрабатываем то, что накопили
+        if (isUuidStart || tabCount >= 3) {
+            // Это 100% НОВАЯ задача. Сохраняем предыдущую.
             if (currentRow) processRow(currentRow);
             currentRow = line; 
         } else {
-            // Если табов мало, это продолжение комментария. Приклеиваем к текущей строке.
+            // Это продолжение комментария.
             if (currentRow) {
-                currentRow += ' ' + line; // Склеиваем через пробел, чтобы не ломать табы
+                currentRow += ' ' + line.trim(); 
             }
         }
     });
-    // Обрабатываем последнюю накопленную строку
     if (currentRow) processRow(currentRow);
 
     globalReport = Object.values(report);
