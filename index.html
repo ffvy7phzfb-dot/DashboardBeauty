@@ -2173,6 +2173,19 @@ function processData() {
     const report = {}; 
     window.taskComments = {};
 
+    // Берем ключевые слова из ТЕКУЩЕГО шаблона + спец-правила для BA
+    let searchKeywords = [];
+    categoriesList.forEach(cat => {
+        let shortKey = cat.split(',')[0].replace(/\*/g, '').trim().toLowerCase();
+        searchKeywords.push({ key: shortKey, full: cat });
+    });
+
+    // Добавляем синонимы для Beautiful Answers на случай опечаток
+    if (currentTemplateKey === 'beautiful_answers') {
+        searchKeywords.push({ key: 'расчет', full: 'расчет по критериям оценки' });
+        searchKeywords.push({ key: 'критерия', full: 'расчет по критериям оценки' });
+    }
+
     lines.forEach((line, index) => {
         if (index === 0 && line.toLowerCase().includes('marker_id')) return;
         if (!line.trim()) return;
@@ -2206,79 +2219,52 @@ function processData() {
         let taskHasErrors = false;
 
         if (comment && comment.trim()) {
-            // Убираем служебные фразы
+            // Убираем "Исправлено валидатором"
             let cleanComment = comment.replace(/Исправлено валидатором/gi, ' ').trim();
             
-            // Приводим к одному виду (убираем звездочки, лишние пробелы)
+            // Очищаем от звездочек и лишних пробелов
             let normalizedText = cleanComment.replace(/\*|_|«|»|"/g, ' ').replace(/\s+/g, ' ');
-
-            // Список всех возможных ключевых слов (с учетом опечаток и регистра)
-            const keywords = [
-                // Beautiful Answers
-                { key: 'маркдаун', full: 'маркдаун' },
-                { key: 'ошибки рп', full: 'ошибки РП' },
-                { key: 'грамматика', full: 'грамматика, орфография, пунктуация, не те слова' },
-                { key: 'пропущенная ё', full: 'пропущенная ё, опечатка, потерянная точка' },
-                { key: 'систем', full: 'систем' },
-                { key: 'контекст', full: 'контекст, ты/вы' },
-                { key: 'комментарий', full: 'комментарий' },
-                { key: 'единообразие', full: 'единообразие' },
-                { key: 'расчет', full: 'расчет по критериям оценки' },
-                // SSU
-                { key: 'опечатка', full: 'Опечатка' },
-                { key: 'тип-оформление', full: 'Тип-оформление' },
-                { key: 'смысловая', full: 'Смысловая опечатка' },
-                { key: 'latex', full: 'LaTeX' },
-                { key: 'картинка', full: 'Картинка' },
-                { key: 'тег тематики', full: 'Тег тематики' },
-                { key: 'тег типа', full: 'Тег типа вопроса' },
-                { key: 'неправильный ответ', full: 'Неправильный ответ' }
-            ];
-
             let lowerText = normalizedText.toLowerCase();
             
-            // Находим все позиции, где встречаются ключевые слова с двоеточием
+            // Ищем позиции всех ключевых слов
             let matches = [];
-            keywords.forEach(kw => {
-                // Ищем "слово:" или "слово :" 
-                const regex = new RegExp(kw.key.replace(/\s/g, '\\s*') + '\\s*:', 'gi');
-                let match;
-                while ((match = regex.exec(lowerText)) !== null) {
-                    matches.push({ index: match.index, length: match[0].length, category: kw.full });
+            searchKeywords.forEach(kw => {
+                let pos = lowerText.indexOf(kw.key);
+                while (pos !== -1) {
+                    // Проверяем, что это начало слова (чтобы "систем" не находилось в "систематически")
+                    let prevChar = pos > 0 ? lowerText[pos - 1] : ' ';
+                    if (!/[а-яa-z0-9]/.test(prevChar)) {
+                        matches.push({ index: pos, length: kw.key.length, category: kw.full });
+                    }
+                    pos = lowerText.indexOf(kw.key, pos + 1);
                 }
             });
 
-            // Сортируем найденные категории по порядку их появления в тексте
+            // Сортируем по порядку появления и удаляем дубликаты
             matches.sort((a, b) => a.index - b.index);
-
-            // Удаляем дубликаты (если категория встретилась дважды)
             let uniqueMatches = [];
             matches.forEach(m => {
-                if (uniqueMatches.length === 0 || uniqueMatches[uniqueMatches.length - 1].category !== m.category) {
+                if (uniqueMatches.length === 0 || uniqueMatches[uniqueMatches.length - 1].index !== m.index) {
                     uniqueMatches.push(m);
                 }
             });
 
-            // Разбиваем текст на куски между категориями
+            // Разбиваем текст на блоки между категориями
             for (let i = 0; i < uniqueMatches.length; i++) {
                 let startIdx = uniqueMatches[i].index + uniqueMatches[i].length;
                 let endIdx = (i + 1 < uniqueMatches.length) ? uniqueMatches[i + 1].index : normalizedText.length;
                 
-                let blockText = normalizedText.slice(startIdx, endIdx).trim();
+                // Берем текст после слова категории (убираем двоеточие, если оно есть)
+                let blockText = normalizedText.slice(startIdx, endIdx).replace(/^[:\-\s]+/, '').trim();
                 let cat = uniqueMatches[i].category;
 
-                // Если в блоке написано "без ошибок" или это "рекомендация" — пропускаем
+                // Игнорируем, если ошибки нет
                 let lowerBlock = blockText.toLowerCase();
                 if (lowerBlock.includes('без ошиб') || lowerBlock === '-' || lowerBlock === '—' || lowerBlock === 'ок' || 
                     lowerBlock.includes('рекомендованное время') || lowerBlock.includes('допустимое время') || 
                     lowerBlock.includes('время допустимо') || lowerBlock.includes('время превышено') ||
                     lowerBlock.includes('исправлено') || lowerBlock === 'доработка' || cat.toLowerCase().includes('рекоменд')) {
                     continue;
-                }
-
-                // Если текст пустой, но это не "без ошибок" — возможно, ошибка была в заголовке
-                if (!blockText && lowerBlock !== 'без ошибок') {
-                    blockText = "Ошибка (подробности в комментарии)";
                 }
 
                 // Записываем ошибку
@@ -2394,7 +2380,7 @@ function getPaintCell(userId, cat) {
     if (!p || typeof p !== 'object') return '';
     return p[cat] ? 'paint-' + p[cat] : '';
 }
-    function renderReport(users) {
+       function renderReport(users) {
         const container = document.getElementById('output');
         if (!users || users.length === 0) {
             container.innerHTML = '<h3 style="text-align:center; color:var(--c-text-3); font-size:14px;">нет данных по выбранным фильтрам.</h3>';
@@ -2441,15 +2427,15 @@ function getPaintCell(userId, cat) {
 
         // Строки сотрудников
         users.forEach(u => {
-            const mark = userMarks[u.user_id] || '';
+            const mark = userMarks[u.id] || '';
             let markHtml = '';
             if (mark === 'newbie') markHtml = '<span style="color:var(--c-orange);">новичок</span>';
             else if (mark === 'experienced') markHtml = '<span style="color:var(--c-green);">опытный</span>';
             else markHtml = '—';
 
-            html += `<tr class="${getRowPaint(u.user_id)}" data-user-id="${u.user_id}">
-                <td class="name-col" onclick="openCard('${u.user_id}')">${u.name}</td>
-                <td><select class="status-select" onchange="setMark('${u.user_id}', this.value); event.stopPropagation();">
+            html += `<tr class="${getRowPaint(u.id)}" data-user-id="${u.id}">
+                <td class="name-col" onclick="openCard('${u.id}')">${u.name}</td>
+                <td><select class="status-select" onchange="setMark('${u.id}', this.value); event.stopPropagation();">
                     <option value="">—</option>
                     <option value="newbie" ${mark === 'newbie' ? 'selected' : ''}>новичок</option>
                     <option value="experienced" ${mark === 'experienced' ? 'selected' : ''}>опытный</option>
@@ -2458,13 +2444,12 @@ function getPaintCell(userId, cat) {
                 <td>${u.doneWithErrors}</td>`;
             
             categoriesList.forEach(cat => {
-                // Вот тут мы безопасно берем значение
                 const v = (u.cats && u.cats[cat]) || (u.catErrors && u.catErrors[cat]) || 0;
                 const cls = v === 0 ? 'zero-cell' : '';
-                html += `<td class="${cls} ${getPaintCell(u.user_id, cat)}" onclick="handleCellClick('${u.user_id}', '${cat}'); event.stopPropagation();">${v}</td>`;
+                html += `<td class="${cls} ${getPaintCell(u.id, cat)}" onclick="handleCellClick('${u.id}', '${cat}'); event.stopPropagation();">${v}</td>`;
             });
             
-            html += `<td class="id-col">${u.user_id}</td></tr>`;
+            html += `<td class="id-col">${u.id}</td></tr>`;
         });
 
         html += `</tbody></table>`;
