@@ -2157,22 +2157,20 @@ function processData() {
     const report = {}; 
     window.taskComments = {};
 
-    // Ключевые слова для поиска категорий
     const searchKeywords = [
         { key: 'маркдаун', full: 'маркдаун' },
         { key: 'ошибки рп', full: 'ошибки РП' },
         { key: 'грамматика', full: 'грамматика, орфография, пунктуация, не те слова' },
         { key: 'пропущенная ё', full: 'пропущенная ё, опечатка, потерянная точка' },
-        { key: 'пропущенная е', full: 'пропущенная ё, опечатка, потерянная точка' }, // Без ё
-        { key: 'опечатка', full: 'пропущенная ё, опечатка, потерянная точка' },      // Если написано просто "опечатка"
+        { key: 'пропущенная е', full: 'пропущенная ё, опечатка, потерянная точка' },
         { key: 'систем', full: 'систем' },
         { key: 'контекст', full: 'контекст, ты/вы' },
         { key: 'комментарий', full: 'комментарий' },
         { key: 'единообразие', full: 'единообразие' },
         { key: 'расчет', full: 'расчет по критериям оценки' },
-        { key: 'опечатка', full: 'Опечатка' },
-        { key: 'тип-оформление', full: 'Тип-оформление' },
         { key: 'смысловая', full: 'Смысловая опечатка' },
+        { key: 'опечатка', full: 'Опечатка' }, 
+        { key: 'тип-оформление', full: 'Тип-оформление' },
         { key: 'latex', full: 'LaTeX' },
         { key: 'картинка', full: 'Картинка' },
         { key: 'тег тематики', full: 'Тег тематики' },
@@ -2215,7 +2213,7 @@ function processData() {
         }
 
         const user = report[markerId];
-        const taskCats = {};
+        const taskCats = new Set(); // Уникальные категории для ЭТОЙ задачи
         let taskHasErrors = false;
 
         if (fullCommentText) {
@@ -2228,22 +2226,16 @@ function processData() {
             
             let matches = [];
             searchKeywords.forEach(kw => {
+                if (kw.key === 'опечатка' && lowerComment.includes('смысловая опечатка')) {
+                    return; 
+                }
+
                 let pos = lowerComment.indexOf(kw.key);
                 while (pos !== -1) {
                     let prevChar = pos > 0 ? lowerComment[pos - 1] : ' ';
                     // Проверяем, что это начало слова
                     if (!/[а-яa-z0-9]/.test(prevChar)) {
-                        // Проверяем, не является ли это словом внутри текста (а не названием категории)
-                        // Название категории обычно стоит в начале или после точки/новой строки
-                        let afterChar = pos + kw.key.length < lowerComment.length ? lowerComment[pos + kw.key.length] : ' ';
-                        let isCategoryName = /[:\-]/.test(afterChar) || pos === 0 || /[.!?]\s/.test(lowerComment.slice(Math.max(0, pos - 5), pos));
-                        
-                        // Если это "опечатка" и она не в начале, а просто в тексте — скорее всего, это не категория
-                        if (kw.key === 'опечатка' && !isCategoryName && currentTemplateKey === 'beautiful_answers') {
-                            // Пропускаем, если это не похоже на название категории
-                        } else {
-                            matches.push({ index: pos, length: kw.key.length, category: kw.full });
-                        }
+                        matches.push({ index: pos, length: kw.key.length, category: kw.full });
                     }
                     pos = lowerComment.indexOf(kw.key, pos + 1);
                 }
@@ -2266,6 +2258,7 @@ function processData() {
                 let cat = uniqueMatches[i].category;
 
                 let lowerBlock = blockText.toLowerCase();
+                // Игнорируем блок, если там нет ошибок
                 if (lowerBlock.includes('без ошиб') || lowerBlock === '-' || lowerBlock === '—' || lowerBlock === 'ок' || 
                     lowerBlock.includes('рекомендованное время') || lowerBlock.includes('допустимое время') || 
                     lowerBlock.includes('время допустимо') || lowerBlock.includes('время превышено') ||
@@ -2273,19 +2266,23 @@ function processData() {
                     continue;
                 }
 
+                // Если есть текст (хоть один символ), значит это ошибка
                 if (blockText) {
-                    taskCats[cat] = true;
+                    taskCats.add(cat); 
                     taskHasErrors = true;
                     if (!window.taskComments[markerId]) window.taskComments[markerId] = [];
-                    window.taskComments[markerId].push({ date: startDate || '', category: cat, text: blockText.slice(0, 500) });
+                    let alreadyHasCat = window.taskComments[markerId].some(c => c.category === cat && c.date === startDate);
+                    if (!alreadyHasCat) {
+                        window.taskComments[markerId].push({ date: startDate || '', category: cat, text: blockText.slice(0, 500) });
+                    }
                 }
             }
         }
 
         if (taskHasErrors) {
-            user.totalErrors++;
-            Object.keys(taskCats).forEach(cat => {
-                user.cats[cat] = (user.cats[cat] || 0) + 1;
+            user.totalErrors++; // Увеличиваем счетчик "С ошибками" на 1 для этой задачи
+            taskCats.forEach(cat => {
+                user.cats[cat] = (user.cats[cat] || 0) + 1; // Добавляем 1 в нужные категории
             });
         }
 
