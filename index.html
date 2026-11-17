@@ -2371,7 +2371,9 @@ function renderReport(users) {
     users.forEach(u => {
         totals.doneTotal += u.doneTotal;
         totals.doneWithErrors += u.doneWithErrors;
-        categoriesList.forEach(c => totals.catErrors[c] += u.catErrors[c]);
+                    categoriesList.forEach(c => {
+                        if (u.cats && u.cats[c]) totals.catErrors[c] += u.cats[c];
+                    });
     });
 
     let html = `<table class="summary-table"><thead><tr>
