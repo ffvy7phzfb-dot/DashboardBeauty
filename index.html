@@ -2142,7 +2142,216 @@ function parseNames(raw) {
     });
     return map;
 }
-processData
+function processData() {
+    const mainText = document.getElementById('mainData').value;
+    const namesText = document.getElementById('namesData').value;
+
+    if (!mainText.trim()) {
+        alert('Вставьте данные в первое поле');
+        return;
+    }
+
+    const namesMap = parseNames(namesText);
+    const rawLines = mainText.split(/\r?\n/);
+    
+    const report = {}; 
+    window.taskComments = {};
+
+    // Словарь: как искать -> в какую колонку записывать
+    const keywordMap = [
+        { search: 'маркдаун', full: 'маркдаун' },
+        { search: 'ошибки рп', full: 'ошибки РП' },
+        { search: 'грамматика', full: 'грамматика, орфография, пунктуация, не те слова' },
+        { search: 'пропущенная ё', full: 'пропущенная ё, опечатка, потерянная точка' },
+        { search: 'пропущенная е', full: 'пропущенная ё, опечатка, потерянная точка' },
+        { search: 'систем', full: 'систем' },
+        { search: 'контекст', full: 'контекст, ты/вы' },
+        { search: 'комментарий', full: 'комментарий' },
+        { search: 'единообразие', full: 'единообразие' },
+        { search: 'расчет', full: 'расчет по критериям оценки' },
+        { search: 'смысловая', full: 'Смысловая опечатка' },
+        { search: 'опечатка', full: 'Опечатка' },
+        { search: 'тип-оформление', full: 'Тип-оформление' },
+        { search: 'latex', full: 'LaTeX' },
+        { search: 'картинка', full: 'Картинка' },
+        { search: 'тег тематики', full: 'Тег тематики' },
+        { search: 'тег типа', full: 'Тег типа вопроса' },
+        { search: 'неправильный ответ', full: 'Неправильный ответ' }
+    ];
+
+    let currentTask = null;
+
+    const flushTask = () => {
+        if (!currentTask) return;
+
+        const headerParts = currentTask.header.split('\t');
+        const markerId = headerParts[0].trim(); 
+        
+        const startDate = headerParts[1] ? headerParts[1].trim().slice(0, 10) : '';
+        const endDate = headerParts[2] ? headerParts[2].trim().slice(0, 10) : '';
+        
+        let quality = null;
+        let firstCommentLine = '';
+
+        // Берем оценку из 4-й колонки
+        if (headerParts.length >= 4) {
+            const parsedQ = parseFloat((headerParts[3] || '').replace(',', '.'));
+            if (!isNaN(parsedQ) && parsedQ >= 0 && parsedQ <= 1.5) {
+                quality = parsedQ;
+                firstCommentLine = headerParts.slice(4).join(' ').trim();
+            } else {
+                firstCommentLine = headerParts.slice(3).join(' ').trim();
+            }
+        }
+
+        let allComments = [];
+        if (firstCommentLine) allComments.push(firstCommentLine);
+        allComments = allComments.concat(currentTask.comments);
+        let fullText = allComments.join(' ').replace(/\s+/g, ' ').trim();
+
+        if (!report[markerId]) {
+            report[markerId] = { id: markerId, name: namesMap[markerId] || 'Неизвестный', tasks: [], totalErrors: 0, cats: {} };
+            categoriesList.forEach(c => report[markerId].cats[c] = 0);
+        }
+
+        const user = report[markerId];
+        const taskCats = new Set();
+        let taskHasErrors = false;
+
+        if (fullText) {
+            // Очищаем от мусора и звездочек
+            let cleanText = fullText.replace(/Исправлено валидатором/gi, ' ')
+                                      .replace(/\*|_|«|»|"/g, ' ')
+                                      .replace(/\s+/g, ' ');
+            let lowerText = cleanText.toLowerCase();
+
+            // Проходим по каждой категории
+            keywordMap.forEach(kw => {
+                // Ищем категорию с двоеточием или пробелом после неё
+                let matchIndex = -1;
+                let matchLength = 0;
+
+                // Проверяем варианты: "маркдаун:", "маркдаун ", "маркдаун -"
+                let searchStr = kw.search + ':';
+                let pos = lowerText.indexOf(searchStr);
+                if (pos !== -1) {
+                    matchIndex = pos;
+                    matchLength = searchStr.length;
+                } else {
+                    searchStr = kw.search + ' ';
+                    pos = lowerText.indexOf(searchStr);
+                    if (pos !== -1) {
+                        matchIndex = pos;
+                        matchLength = searchStr.length;
+                    }
+                }
+
+                if (matchIndex !== -1) {
+                    // Защита от смысловой опечатки
+                    if (kw.search === 'опечатка' && lowerText.includes('смысловая опечатка')) return;
+
+                    // Определяем, где заканчивается эта категория (где начинается следующая)
+                    let nextPos = cleanText.length;
+                    keywordMap.forEach(otherKw => {
+                        if (otherKw.search === kw.search) return;
+                        
+                        let otherSearchColon = otherKw.search + ':';
+                        let otherSearchSpace = otherKw.search + ' ';
+                        
+                        let p1 = lowerText.indexOf(otherSearchColon, matchIndex + matchLength);
+                        let p2 = lowerText.indexOf(otherSearchSpace, matchIndex + matchLength);
+                        
+                        let p = Math.min(p1 === -1 ? Infinity : p1, p2 === -1 ? Infinity : p2);
+                        if (p < nextPos) nextPos = p;
+                    });
+
+                    // Вырезаем кусок
+                    let blockText = cleanText.slice(matchIndex + matchLength, nextPos).trim();
+                    // Убираем тире и дефисы в начале
+                    blockText = blockText.replace(/^[:\-\s]+/, '').trim();
+                    
+                    let lowerBlock = blockText.toLowerCase();
+
+                    // Проверяем, пустой ли это блок
+                    if (!blockText || blockText === '-' || blockText === '—' || 
+                        lowerBlock.includes('без ошиб') || lowerBlock.includes('рекомендованное время') || 
+                        lowerBlock.includes('допустимое время') || lowerBlock.includes('время допустимо') || 
+                        lowerBlock.includes('время превышено') || lowerBlock.includes('исправлено') || 
+                        lowerBlock === 'доработка' || kw.search.includes('рекоменд')) {
+                        return;
+                    }
+
+                    // Если есть текст — это ошибка
+                    let matchedCat = categoriesList.find(c => c.toLowerCase().includes(kw.search));
+                    if (!matchedCat) matchedCat = kw.full;
+
+                    taskCats.add(matchedCat);
+                    taskHasErrors = true;
+                    if (!window.taskComments[markerId]) window.taskComments[markerId] = [];
+                    window.taskComments[markerId].push({ date: startDate || '', category: matchedCat, text: blockText.slice(0, 500) });
+                }
+            });
+        }
+
+        if (taskHasErrors) {
+            user.totalErrors++;
+            taskCats.forEach(cat => {
+                user.cats[cat] = (user.cats[cat] || 0) + 1;
+            });
+        }
+
+        user.tasks.push({ 
+            id: markerId, 
+            date: startDate, 
+            startDate: startDate, 
+            endDate: endDate, 
+            projectId: window.currentProjectId, 
+            quality: quality, 
+            hasErrors: taskHasErrors, 
+            cats: taskCats 
+        });
+
+        currentTask = null;
+    };
+
+    rawLines.forEach(line => {
+        const trimmed = line.trim();
+        if (!trimmed) return;
+        if (trimmed.toLowerCase().includes('marker_id') && trimmed.toLowerCase().includes('start_date')) return;
+
+        const isUuidStart = /^[0-9a-f]{8}-[0-9a-f]{4}/i.test(trimmed);
+        
+        if (isUuidStart) {
+            flushTask(); 
+            currentTask = { header: trimmed, comments: [] };
+        } else {
+            if (currentTask) {
+                currentTask.comments.push(trimmed);
+            }
+        }
+    });
+    flushTask(); 
+
+    globalReport = Object.values(report);
+    window.globalReport = globalReport;
+    
+    renderReport(globalReport);
+    
+    document.getElementById('filtersPanel').style.display = 'block';
+    document.getElementById('marksPanel').style.display = 'flex';
+    document.getElementById('exportBtn').style.display = 'inline-block';
+    
+    const userSelect = document.getElementById('filterUser');
+    userSelect.innerHTML = '<option value="all">Все сотрудники</option>';
+    globalReport.sort((a,b) => a.name.localeCompare(b.name)).forEach(u => {
+        const opt = document.createElement('option');
+        opt.value = u.id;
+        opt.textContent = u.name;
+        userSelect.appendChild(opt);
+    });
+
+    showToast('Данные успешно обработаны!');
+}
     function populateFilters() {
     const userSelect = document.getElementById('filterUser');
     if (!userSelect) return;
