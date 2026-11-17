@@ -441,14 +441,6 @@ body.dark-theme tr.paint-gray { background-color: #2E2E2E !important; color: #A0
 </div>
 
 <div id="appScreen">
-        <div id="warningBanner" style="background: #FFF3CD; border: 1px solid #FFE69C; color: #856404; padding: 12px 20px; border-radius: 12px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; font-size: 14px; box-shadow: 0 2px 8px rgba(0,0,0,0.05);">
-        <div>
-            <b>⚠️ Внимание:</b> Дашборд находится в режиме обновления. Некоторые разделы (например, подсчёт ошибок в SSU или создание пулов) могут временно работать некорректно.
-        </div>
-        <div style="font-weight: 700; font-style: italic; color: #9A7B00; margin-left: 15px; white-space: nowrap;">
-            Дамы, пора спать 💤
-        </div>
-    </div>
     <div class="app-header">
         <div style="display:flex; align-items:center; gap:12px; flex:1; min-width:220px; flex-wrap:wrap;">
             <h1 style="margin:0; text-align:left; font-size:24px;">Дашборд</h1>
@@ -2142,202 +2134,138 @@ function parseNames(raw) {
     });
     return map;
 }
+
 function processData() {
-    const mainText = document.getElementById('mainData').value;
-    const namesText = document.getElementById('namesData').value;
+    const mainRaw = document.getElementById('mainData').value;
+    const namesRaw = document.getElementById('namesData').value;
+    const output = document.getElementById('output');
+    if (!mainRaw.trim()) { output.innerHTML = '<p style="color:var(--c-red); text-align:center;">вставь данные в первое окно.</p>'; return; }
+    const employees = parseNames(namesRaw);
 
-    if (!mainText.trim()) {
-        alert('Вставьте данные в первое поле');
-        return;
+    const lines = mainRaw.split(/\r?\n/);
+    const parsedRows = [];
+    let currentRow = [];
+    let startIndex = 0;
+    if (lines[0].toLowerCase().includes('marker_id')) startIndex = 1;
+
+    for (let i = startIndex; i < lines.length; i++) {
+        const cols = lines[i].split('\t');
+        if (cols.length >= 5) {
+            if (currentRow.length > 0) parsedRows.push(currentRow);
+            currentRow = [cols[0], cols[1], cols[2], cols[3], cols.slice(4).join('\t')];
+        } else if (currentRow.length > 0) {
+            currentRow[4] = (currentRow[4] || '') + '\n' + lines[i];
+        }
     }
+    if (currentRow.length > 0) parsedRows.push(currentRow);
 
-    const namesMap = parseNames(namesText);
-    const rawLines = mainText.split(/\r?\n/);
-    
-    const report = {}; 
-    window.taskComments = {};
+    const report = {};
+    taskComments = {};
 
-    // Жесткий список категорий
-    const keywords = [
-        { key: 'маркдаун', full: 'маркдаун' },
-        { key: 'ошибки рп', full: 'ошибки РП' },
-        { key: 'грамматика', full: 'грамматика, орфография, пунктуация, не те слова' },
-        { key: 'пропущенная ё', full: 'пропущенная ё, опечатка, потерянная точка' },
-        { key: 'пропущенная е', full: 'пропущенная ё, опечатка, потерянная точка' },
-        { key: 'систем', full: 'систем' },
-        { key: 'контекст', full: 'контекст, ты/вы' },
-        { key: 'комментарий', full: 'комментарий' },
-        { key: 'единообразие', full: 'единообразие' },
-        { key: 'расчет', full: 'расчет по критериям оценки' },
-        { key: 'смысловая', full: 'Смысловая опечатка' },
-        { key: 'опечатка', full: 'Опечатка' }, // Оставляем для SSU
-        { key: 'тип-оформление', full: 'Тип-оформление' },
-        { key: 'latex', full: 'LaTeX' },
-        { key: 'картинка', full: 'Картинка' },
-        { key: 'тег тематики', full: 'Тег тематики' },
-        { key: 'тег типа', full: 'Тег типа вопроса' },
-        { key: 'неправильный ответ', full: 'Неправильный ответ' }
-    ];
+    parsedRows.forEach(cols => {
+        const markerId = (cols[0] || '').trim();
+        if (!markerId) return;
+        const startDate = (cols[1] || '').trim();
+        const endDate   = (cols[2] || '').trim();
+        const quality   = (cols[3] || '').trim();
+        const comment   = (cols[4] || '').trim();
+        const qNum = parseFloat(quality.replace(',', '.'));
+        if (isNaN(qNum)) return;
 
-    let currentTask = null;
-
-    const flushTask = () => {
-        if (!currentTask) return;
-
-        const headerParts = currentTask.header.split('\t');
-        const markerId = headerParts[0].trim(); 
-        
-        const startDate = headerParts[1] ? headerParts[1].trim().slice(0, 10) : '';
-        const endDate = headerParts[2] ? headerParts[2].trim().slice(0, 10) : '';
-        
-        let quality = null;
-        let firstCommentLine = '';
-
-        if (headerParts.length >= 4) {
-            const parsedQ = parseFloat((headerParts[3] || '').replace(',', '.'));
-            if (!isNaN(parsedQ) && parsedQ >= 0 && parsedQ <= 1.5) {
-                quality = parsedQ;
-                firstCommentLine = headerParts.slice(4).join(' ').trim();
-            } else {
-                firstCommentLine = headerParts.slice(3).join(' ').trim();
-            }
-        }
-
-        let allComments = [];
-        if (firstCommentLine) allComments.push(firstCommentLine);
-        allComments = allComments.concat(currentTask.comments);
-        let fullText = allComments.join(' ').replace(/\s+/g, ' ').trim();
-
+        const name = employees[markerId] || 'фамилия не указана';
         if (!report[markerId]) {
-            report[markerId] = { id: markerId, name: namesMap[markerId] || 'Неизвестный', tasks: [], totalErrors: 0, cats: {} };
-            categoriesList.forEach(c => report[markerId].cats[c] = 0);
+            report[markerId] = { id: markerId, name: name, tasks: [] };
+            taskComments[markerId] = [];
         }
-
         const user = report[markerId];
-        const taskCats = new Set();
+        const startDateOnly = startDate.split('T')[0];
+        const endDateOnly   = endDate.split('T')[0];
+        const startFull = startDate.includes('T') ? startDate : (startDateOnly ? startDateOnly + 'T00:00:00' : '');
+
         let taskHasErrors = false;
+        const taskCats = {};
+        categoriesList.forEach(c => taskCats[c] = false);
 
-        if (fullText) {
-            let cleanText = fullText.replace(/Исправлено валидатором/gi, ' ')
-                                      .replace(/\*|_|«|»|"/g, ' ')
-                                      .replace(/\s+/g, ' ')
-                                      .trim();
-            let lowerText = cleanText.toLowerCase();
+       if (comment) {
+    // Очищаем от служебной фразы
+    const cleanComment = comment.replace(/Исправлено валидатором/gi, '').trim();
+    
+    // Разбиваем комментарий на строки (каждая категория обычно с новой строки)
+    const lines = cleanComment.split(/\r?\n/);
 
-            keywords.forEach(kw => {
-                // 👇 ЗАЩИТА: Для Beautiful Answers игнорируем "опечатка" и "пропущенная ё", 
-                // так как они дают ложные срабатывания
-                if (currentTemplateKey === 'beautiful_answers' && 
-                   (kw.key === 'опечатка' || kw.key === 'пропущенная ё' || kw.key === 'пропущенная е')) {
-                    return;
-                }
+    lines.forEach(line => {
+        const colonIndex = line.indexOf(':');
+        if (colonIndex === -1) return; // если нет двоеточия, пропускаем
 
-                let pos = lowerText.indexOf(kw.key);
-                
-                if (pos !== -1) {
-                    if (kw.key === 'опечатка' && lowerText.includes('смысловая опечатка')) return;
+        const catName = line.slice(0, colonIndex).trim();
+        const blockText = line.slice(colonIndex + 1).trim();
 
-                    let textAfter = lowerText.slice(pos + kw.key.length);
-                    let nextPos = textAfter.length;
-                    keywords.forEach(otherKw => {
-                        if (otherKw.key === kw.key) return;
-                        let p = textAfter.indexOf(otherKw.key);
-                        if (p !== -1 && p < nextPos) nextPos = p;
-                    });
+        // Ищем, есть ли такая категория в нашем списке
+        const actualCat = categoriesList.find(c => c.toLowerCase() === catName.toLowerCase());
 
-                    let blockText = cleanText.slice(pos + kw.key.length, pos + kw.key.length + nextPos).trim();
-                    blockText = blockText.replace(/^[:\-\s]+/, '').trim();
-                    
-                    let lowerBlock = blockText.toLowerCase();
+        if (actualCat) {
+            let isError = false;
+            
+if (currentTemplateKey === 'ssu') {
+    const val = blockText.trim().toLowerCase();
+    const lowerCat = catName.toLowerCase();
 
-                    if (!blockText || 
-                        blockText === '-' || 
-                        blockText === '—' || 
-                        lowerBlock.includes('без ошиб') || 
-                        lowerBlock.includes('рекомендованное время') || 
-                        lowerBlock.includes('допустимое время') || 
-                        lowerBlock.includes('время допустимо') || 
-                        lowerBlock.includes('время превышено') || 
-                        lowerBlock === 'ок' || 
-                        lowerBlock === 'доработка' || 
-                        kw.key.includes('рекоменд')) {
-                        return;
-                    }
-
-                    let matchedCat = categoriesList.find(c => c.toLowerCase().includes(kw.key));
-                    if (!matchedCat) matchedCat = kw.full;
-
-                    if (taskCats.has(matchedCat)) return;
-
-                    taskCats.add(matchedCat);
-                    taskHasErrors = true;
-                    if (!window.taskComments[markerId]) window.taskComments[markerId] = [];
-                    window.taskComments[markerId].push({ date: startDate || '', category: matchedCat, text: blockText.slice(0, 500) });
-                }
-            });
-
-        if (taskHasErrors) {
-            user.totalErrors++;
-            taskCats.forEach(cat => {
-                user.cats[cat] = (user.cats[cat] || 0) + 1;
-            });
-        }
-
-        user.tasks.push({ 
-            id: markerId, 
-            date: startDate, 
-            startDate: startDate, 
-            endDate: endDate, 
-            projectId: window.currentProjectId, 
-            quality: quality, 
-            hasErrors: taskHasErrors, 
-            cats: taskCats 
-        });
-
-        currentTask = null;
-    };
-
-    rawLines.forEach(line => {
-        const trimmed = line.trim();
-        if (!trimmed) return;
-        if (trimmed.toLowerCase().includes('marker_id') && trimmed.toLowerCase().includes('start_date')) return;
-
-        const isUuidStart = /^[0-9a-f]{8}-[0-9a-f]{4}/i.test(trimmed);
-        
-        if (isUuidStart) {
-            flushTask(); 
-            currentTask = { header: trimmed, comments: [] };
-        } else {
-            if (currentTask) {
-                currentTask.comments.push(trimmed);
+    // 1. Если это Рекомендация — это ВСЕГДА не ошибка (даже если там есть текст)
+    if (lowerCat.includes('рекомендация')) {
+        isError = false;
+    } 
+    // 2. Если написано "без ошибок" (с точкой или без) или стоит прочерк — это не ошибка
+ else if (val === '' || val.startsWith('без ошибок') || val === '-' || val === '—' || val === '–') {
+                    isError = false;
+    } 
+    // 3. Во всех остальных случаях — это ошибка
+    else {
+        isError = true;
+    }
+} 
+else {
+    // Для Beautiful Answers (оставляем без изменений)
+    if (blockText.length > 0) {
+        isError = true;
+    }
+}
+            if (isError) {
+                taskCats[actualCat] = true;
+                taskHasErrors = true;
+                taskComments[markerId].push({
+                    date: startDateOnly || endDateOnly || '',
+                    taskStart: startFull,
+                    category: actualCat,
+                    text: blockText.slice(0, 500)
+                });
             }
         }
     });
-    flushTask(); 
+}
+        user.tasks.push({
+            startDate: startDateOnly, endDate: endDateOnly,
+            startTime: startFull,
+            hasErrors: taskHasErrors, cats: taskCats, quality: qNum,
+            projectId: currentProjectId
+        });
+    });
 
     globalReport = Object.values(report);
     window.globalReport = globalReport;
-    
-    renderReport(globalReport);
-    
+    populateFilters();
+    populateCompareTargets();
+
     document.getElementById('filtersPanel').style.display = 'block';
     document.getElementById('marksPanel').style.display = 'flex';
     document.getElementById('exportBtn').style.display = 'inline-block';
-    
-    const userSelect = document.getElementById('filterUser');
-    userSelect.innerHTML = '<option value="all">Все сотрудники</option>';
-    globalReport.sort((a,b) => a.name.localeCompare(b.name)).forEach(u => {
-        const opt = document.createElement('option');
-        opt.value = u.id;
-        opt.textContent = u.name;
-        userSelect.appendChild(opt);
-    });
+    document.getElementById('tabsSection').style.display = 'block';
 
-    showToast('Данные успешно обработаны!');
+    applyFilters();
+    saveToCloud();
 }
-    function populateFilters() {
+
+function populateFilters() {
     const userSelect = document.getElementById('filterUser');
-    if (!userSelect) return;
     userSelect.innerHTML = '<option value="all">все сотрудники</option>';
     const map = new Map();
     globalReport.forEach(u => map.set(u.id, u.name));
@@ -2372,53 +2300,25 @@ function applyFilters() {
                 if (fDateTo   && t.startDate && t.startDate > fDateTo) return false;
                 return true;
             });
-            
             if (tasksInPeriod.length === 0) return null;
-
-            // Создаем копию категорий
-            const catsCopy = {};
-            categoriesList.forEach(c => catsCopy[c] = 0);
-
-            // Пробегаемся по всем ошибкам в user.cats
-            Object.keys(user.cats).forEach(catName => {
-                if (user.cats[catName] > 0) {
-                    let lowerCat = catName.toLowerCase();
-
-                    // 1. Пропускаем расчет
-                    if (lowerCat.includes('расчет')) return;
-
-                         // 2. Опечатку перенаправляем
-                    if (lowerCat === 'опечатка' && currentTemplateKey === 'beautiful_answers') {
-                        catsCopy['пропущенная ё, опечатка, потерянная точка'] = user.cats[catName]; // СТАЛО =
-                        return;
-                    }
-
-                    // 3. Ищем точное совпадение в списке колонок
-                    const matchedCol = categoriesList.find(c => c.toLowerCase() === lowerCat);
-                    if (matchedCol) {
-                        catsCopy[matchedCol] += user.cats[catName];
-                    }
-                }
+            const newCatErrors = {};
+            categoriesList.forEach(c => newCatErrors[c] = 0);
+            let doneTotal = 0, doneWithErrors = 0;
+            tasksInPeriod.forEach(t => {
+                doneTotal++;
+                if (t.hasErrors) doneWithErrors++;
+                categoriesList.forEach(c => { if (t.cats[c]) newCatErrors[c]++; });
             });
-
-            let doneTotal = tasksInPeriod.length;
-            let doneWithErrors = tasksInPeriod.filter(t => t.hasErrors).length;
-
-            return { 
-                id: user.id, 
-                name: user.name, 
-                doneTotal: doneTotal, 
-                doneWithErrors: doneWithErrors, 
-                catErrors: catsCopy 
-            };
+            return { id: user.id, name: user.name, doneTotal, doneWithErrors, catErrors: newCatErrors };
         })
         .filter(Boolean);
 
     renderReport(currentFilteredUsers);
     window.currentFilteredUsers = currentFilteredUsers;
     renderTabs();
-    if (typeof renderWeekProgress === 'function') renderWeekProgress();
+    renderWeekProgress();
 }
+
 function resetFilters() {
     document.getElementById('filterUser').value = 'all';
     document.getElementById('filterDateFrom').value = '';
@@ -2428,94 +2328,73 @@ function resetFilters() {
     applyFilters();
     debouncedSaveSettings();
 }
-function getRowPaint(userId) {
-    const p = userPaints[userId];
-    return (typeof p === 'string' && p && p !== 'none') ? 'paint-' + p : '';
-}
-function getPaintCell(userId, cat) {
-    const p = userPaints[userId];
-    if (!p || typeof p !== 'object') return '';
-    return p[cat] ? 'paint-' + p[cat] : '';
-}
-       function renderReport(users) {
-        const container = document.getElementById('output');
-        if (!users || users.length === 0) {
-            container.innerHTML = '<h3 style="text-align:center; color:var(--c-text-3); font-size:14px;">нет данных по выбранным фильтрам.</h3>';
-            return;
-        }
-        
-        users.sort((a,b)=>a.name.localeCompare(b.name));
-        const totals = { doneTotal: 0, doneWithErrors: 0, catErrors: {} };
-        categoriesList.forEach(c => totals.catErrors[c] = 0);
-        
-        users.forEach(u => {
-            totals.doneTotal += (u.doneTotal || 0);
-            totals.doneWithErrors += (u.doneWithErrors || 0);
-            categoriesList.forEach(c => {
-                const val = (u.cats && u.cats[c]) || (u.catErrors && u.catErrors[c]) || 0;
-                totals.catErrors[c] += val;
-            });
-        });
 
-        let html = `<table class="summary-table"><thead><tr>
-            <th style="text-align:left; min-width:120px;">сотрудник</th>
-            <th>пометка</th>
-            <th>всего</th>
-            <th>с ошибками</th>`;
-        
-        categoriesList.forEach(c => {
-            html += `<th>${CAT_SHORT_LABELS[c] || c}</th>`;
-        });
-        
-        html += `<th>marker_id</th></tr></thead><tbody>`;
-
-        // Строка ИТОГО
-        html += `<tr class="total-row">
-            <td style="text-align:left;">ИТОГО:</td>
-            <td></td>
-            <td>${totals.doneTotal}</td>
-            <td>${totals.doneWithErrors}</td>`;
-        
-        categoriesList.forEach(c => {
-            html += `<td>${totals.catErrors[c]}</td>`;
-        });
-        
-        html += `<td></td></tr>`;
-
-        // Строки сотрудников
-        users.forEach(u => {
-            const mark = userMarks[u.id] || '';
-            let markHtml = '';
-            if (mark === 'newbie') markHtml = '<span style="color:var(--c-orange);">новичок</span>';
-            else if (mark === 'experienced') markHtml = '<span style="color:var(--c-green);">опытный</span>';
-            else markHtml = '—';
-
-            html += `<tr class="${getRowPaint(u.id)}" data-user-id="${u.id}">
-                <td class="name-col" onclick="openCard('${u.id}')">${u.name}</td>
-                <td><select class="status-select" onchange="setMark('${u.id}', this.value); event.stopPropagation();">
-                    <option value="">—</option>
-                    <option value="newbie" ${mark === 'newbie' ? 'selected' : ''}>новичок</option>
-                    <option value="experienced" ${mark === 'experienced' ? 'selected' : ''}>опытный</option>
-                </select></td>
-                <td>${u.doneTotal}</td>
-                <td>${u.doneWithErrors}</td>`;
-            
-            categoriesList.forEach(cat => {
-                const v = (u.cats && u.cats[cat]) || (u.catErrors && u.catErrors[cat]) || 0;
-                const cls = v === 0 ? 'zero-cell' : '';
-                html += `<td class="${cls} ${getPaintCell(u.id, cat)}" onclick="handleCellClick('${u.id}', '${cat}'); event.stopPropagation();">${v}</td>`;
-            });
-            
-            html += `<td class="id-col">${u.id}</td></tr>`;
-        });
-
-        html += `</tbody></table>`;
-        container.innerHTML = html;
-        
-        document.querySelectorAll('.color-swatch').forEach(el => {
-            el.classList.toggle('active', el.dataset.paint === brushPaint);
-        });
+function renderReport(users) {
+    const container = document.getElementById('output');
+    if (users.length === 0) {
+        container.innerHTML = '<h3 style="text-align:center; color:var(--c-text-3); font-size:14px;">нет данных по выбранным фильтрам.</h3>';
+        return;
     }
+    users.sort((a,b)=>a.name.localeCompare(b.name));
+    const totals = { doneTotal:0, doneWithErrors:0, catErrors:{} };
+    categoriesList.forEach(c => totals.catErrors[c] = 0);
+    users.forEach(u => {
+        totals.doneTotal += u.doneTotal;
+        totals.doneWithErrors += u.doneWithErrors;
+        categoriesList.forEach(c => totals.catErrors[c] += u.catErrors[c]);
+    });
+
+    let html = `<table class="summary-table"><thead><tr>
+        <th style="text-align:left; min-width:120px;">сотрудник</th>
+        <th>пометка</th>
+        <th>всего</th>
+        <th>с ошибками</th>`;
+    categoriesList.forEach(cat => {
+        html += `<th title="${cat}">${CAT_SHORT_LABELS[cat] || cat}</th>`;
+    });
+    html += `<th>marker_id</th></tr></thead><tbody>`;
+
+    html += `<tr class="total-row">
+        <td style="text-align:right;">ИТОГО:</td><td></td>
+        <td>${totals.doneTotal}</td><td>${totals.doneWithErrors}</td>`;
+    categoriesList.forEach(cat => { html += `<td>${totals.catErrors[cat]}</td>`; });
+    html += `<td></td></tr>`;
+
+    users.forEach(user => {
+        const mark = userMarks[user.id] || null;
+        const paintObj = userPaints[user.id] || {};
+        const isOldFormat = typeof paintObj === 'string'; 
+        const getCellPaint = (key) => {
+            if (isOldFormat) return ''; 
+            return paintObj[key] ? `paint-${paintObj[key]}` : '';
+        };
+        const rowClass = isOldFormat ? `paint-${paintObj}` : ''; 
+
+        html += `<tr class="${rowClass}" data-user-id="${user.id}">
+            <td class="name-col ${getCellPaint('name')}" onclick="event.stopPropagation(); if(brushMode){handleCellClick('${user.id}', 'name')} else {openCard('${user.id}')}">${user.name}</td>
+            <td class="${getCellPaint('mark')}" onclick="handleCellClick('${user.id}', 'mark')">
+                <select class="status-select" onchange="setMark('${user.id}', this.value); event.stopPropagation();">
+                    <option value="" ${!mark ? 'selected' : ''}>—</option>
+                    <option value="newbie" ${mark==='newbie'?'selected':''}>новичок</option>
+                    <option value="experienced" ${mark==='experienced'?'selected':''}>опытный</option>
+                </select>
+            </td>
+            <td class="${getCellPaint('doneTotal')}" onclick="handleCellClick('${user.id}', 'doneTotal')"><b>${user.doneTotal}</b></td>
+            <td class="${getCellPaint('doneWithErrors')}" onclick="handleCellClick('${user.id}', 'doneWithErrors')"><b>${user.doneWithErrors}</b></td>`;
+        
+        categoriesList.forEach(cat => {
+            const v = user.catErrors[cat];
+            html += `<td class="${v===0?'zero-cell':''} ${getCellPaint(cat)}" onclick="handleCellClick('${user.id}', '${cat}')">${v}</td>`;
+        });
+        html += `<td class="id-col ${getCellPaint('id')}" onclick="handleCellClick('${user.id}', 'id')" title="${user.id}">${user.id}</td></tr>`;
+    });
+
+    html += `</tbody></table>`;
+    container.innerHTML = html;
+    document.querySelectorAll('.color-swatch').forEach(el => {
+        el.classList.toggle('active', el.dataset.paint === brushPaint);
+    });
+}
 
 function setMark(id, value) {
     if (value === '') delete userMarks[id];
@@ -4119,7 +3998,6 @@ async function exportManagerReport() {
                 ws.addRow(['Нет данных в выбранном диапазоне.']);
             }
         };
-
         if (showQErrors) {
             buildErrorsSheet(
                 'Ошибки (квартал)',
