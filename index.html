@@ -2225,8 +2225,12 @@ function processData() {
             let lowerText = cleanText.toLowerCase();
 
             keywords.forEach(kw => {
-                // 👇 ГЛАВНАЯ ЗАЩИТА: Для Beautiful Answers игнорируем "опечатка", чтобы не было дубля
-                if (currentTemplateKey === 'beautiful_answers' && kw.key === 'опечатка') return;
+                // 👇 ЗАЩИТА: Для Beautiful Answers игнорируем "опечатка" и "пропущенная ё", 
+                // так как они дают ложные срабатывания
+                if (currentTemplateKey === 'beautiful_answers' && 
+                   (kw.key === 'опечатка' || kw.key === 'пропущенная ё' || kw.key === 'пропущенная е')) {
+                    return;
+                }
 
                 let pos = lowerText.indexOf(kw.key);
                 
@@ -2271,7 +2275,6 @@ function processData() {
                     window.taskComments[markerId].push({ date: startDate || '', category: matchedCat, text: blockText.slice(0, 500) });
                 }
             });
-        }
 
         if (taskHasErrors) {
             user.totalErrors++;
