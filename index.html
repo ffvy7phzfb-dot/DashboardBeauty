@@ -2246,6 +2246,8 @@ function processData() {
                     if (!blockText || 
                         blockText === '-' || 
                         blockText === '—' || 
+                        lowerBlock === 'без ошибок' ||
+                        lowerBlock === 'без ошибки' ||
                         lowerBlock.includes('без ошиб') || 
                         lowerBlock.includes('рекомендованное время') || 
                         lowerBlock.includes('допустимое время') || 
@@ -2365,23 +2367,37 @@ function applyFilters() {
                 if (fDateTo   && t.startDate && t.startDate > fDateTo) return false;
                 return true;
             });
+            
             if (tasksInPeriod.length === 0) return null;
+
+            let doneTotal = 0, doneWithErrors = 0;
             const newCatErrors = {};
             categoriesList.forEach(c => newCatErrors[c] = 0);
-            let doneTotal = 0, doneWithErrors = 0;
+
             tasksInPeriod.forEach(t => {
                 doneTotal++;
-                if (t.hasErrors) doneWithErrors++;
-                categoriesList.forEach(c => { if (t.cats[c]) newCatErrors[c]++; });
+                if (t.hasErrors) {
+                    doneWithErrors++;
+                    Object.keys(t.cats).forEach(cat => {
+                        newCatErrors[cat] = (newCatErrors[cat] || 0) + 1;
+                    });
+                }
             });
-            return { id: user.id, name: user.name, doneTotal, doneWithErrors, catErrors: newCatErrors };
+
+            return { 
+                id: user.id, 
+                name: user.name, 
+                doneTotal: doneTotal, 
+                doneWithErrors: doneWithErrors, 
+                catErrors: newCatErrors
+            };
         })
         .filter(Boolean);
 
     renderReport(currentFilteredUsers);
     window.currentFilteredUsers = currentFilteredUsers;
     renderTabs();
-    renderWeekProgress();
+    if (typeof renderWeekProgress === 'function') renderWeekProgress();
 }
 
 function resetFilters() {
