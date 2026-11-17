@@ -2157,6 +2157,7 @@ function processData() {
     const report = {}; 
     window.taskComments = {};
 
+    // Ключевые слова для поиска категорий
     const searchKeywords = [
         { key: 'маркдаун', full: 'маркдаун' },
         { key: 'ошибки рп', full: 'ошибки РП' },
@@ -2178,15 +2179,13 @@ function processData() {
     ];
 
     let currentTask = null;
-    let totalTasksCount = 0;
 
-    // Функция для разбора скопившегося блока текста
+    // Функция обработки накопленной задачи
     const flushTask = () => {
         if (!currentTask) return;
-        totalTasksCount++;
 
         const headerParts = currentTask.header.split('\t');
-        const markerId = headerParts[0].trim();
+        const markerId = headerParts[0].trim(); // ЖЕСТКАЯ ПРИВЯЗКА К ID
         
         const startDate = headerParts[1] ? headerParts[1].trim().slice(0, 10) : '';
         const endDate = headerParts[2] ? headerParts[2].trim().slice(0, 10) : '';
@@ -2194,7 +2193,7 @@ function processData() {
         let quality = null;
         let firstCommentLine = '';
 
-        // 4-я колонка — оценка
+        // Парсим 4-ю колонку (оценку), если она есть
         if (headerParts.length >= 4) {
             const parsedQ = parseFloat((headerParts[3] || '').replace(',', '.'));
             if (!isNaN(parsedQ) && parsedQ >= 0 && parsedQ <= 1.5) {
@@ -2205,9 +2204,11 @@ function processData() {
             }
         }
 
-        let allCommentLines = [];
-        if (firstCommentLine) allCommentLines.push(firstCommentLine);
-        allCommentLines = allCommentLines.concat(currentTask.comments);
+        // Склеиваем весь текст комментария для ЭТОЙ задачи
+        let allComments = [];
+        if (firstCommentLine) allComments.push(firstCommentLine);
+        allComments = allComments.concat(currentTask.comments);
+        let fullCommentText = allComments.join(' ').replace(/\s+/g, ' ');
 
         if (!report[markerId]) {
             report[markerId] = { id: markerId, name: namesMap[markerId] || 'Неизвестный', tasks: [], totalErrors: 0, cats: {} };
@@ -2218,42 +2219,65 @@ function processData() {
         const taskCats = {};
         let taskHasErrors = false;
 
-        allCommentLines.forEach(cLine => {
-            let cleanLine = cLine.replace(/Исправлено валидатором/gi, ' ').trim();
-            let normalizedText = cleanLine.replace(/\*|_|«|»|"/g, ' ').replace(/\s+/g, ' ');
+        if (fullCommentText) {
+            // Очищаем текст от лишнего
+            let cleanComment = fullCommentText.replace(/Исправлено валидатором/gi, ' ')
+                                                .replace(/\*|_|«|»|"/g, ' ')
+                                                .replace(/\s+/g, ' ')
+                                                .trim();
+
+            let lowerComment = cleanComment.toLowerCase();
             
-            let lowerLine = normalizedText.toLowerCase();
-            if (lowerLine.includes('без ошиб') || lowerLine === '-' || lowerLine === '—' || lowerLine === 'ок' || 
-                lowerLine.includes('рекомендованное время') || lowerLine.includes('допустимое время') || 
-                lowerLine.includes('время допустимо') || lowerLine.includes('время превышено') ||
-                lowerLine.includes('исправлено') || lowerLine === 'доработка' || lowerLine.includes('рекоменд')) {
-                return;
-            }
-
-            let foundCat = null;
-            for (const kw of searchKeywords) {
-                if (lowerLine.includes(kw.key)) {
-                    const pos = lowerLine.indexOf(kw.key);
-                    if (pos < 20) { // Категория должна быть в начале строки
-                        foundCat = kw.full;
-                        break;
+            // Находим позиции всех категорий
+            let matches = [];
+            searchKeywords.forEach(kw => {
+                let pos = lowerComment.indexOf(kw.key);
+                while (pos !== -1) {
+                    let prevChar = pos > 0 ? lowerComment[pos - 1] : ' ';
+                    if (!/[а-яa-z0-9]/.test(prevChar)) {
+                        matches.push({ index: pos, length: kw.key.length, category: kw.full });
                     }
+                    pos = lowerComment.indexOf(kw.key, pos + 1);
                 }
-            }
+            });
 
-            if (foundCat) {
-                let blockText = normalizedText;
-                const colonIndex = normalizedText.indexOf(':');
-                if (colonIndex !== -1) blockText = normalizedText.slice(colonIndex + 1).trim();
+            // Сортируем по порядку в тексте
+            matches.sort((a, b) => a.index - b.index);
+            
+            let uniqueMatches = [];
+            matches.forEach(m => {
+                if (uniqueMatches.length === 0 || uniqueMatches[uniqueMatches.length - 1].index !== m.index) {
+                    uniqueMatches.push(m);
+                }
+            });
 
+            // Разбиваем текст на блоки по категориям
+            for (let i = 0; i < uniqueMatches.length; i++) {
+                let startIdx = uniqueMatches[i].index + uniqueMatches[i].length;
+                let endIdx = (i + 1 < uniqueMatches.length) ? uniqueMatches[i + 1].index : cleanComment.length;
+                
+                let blockText = cleanComment.slice(startIdx, endIdx).replace(/^[:\-\s]+/, '').trim();
+                let cat = uniqueMatches[i].category;
+
+                let lowerBlock = blockText.toLowerCase();
+                
+                // Если ошибки нет — пропускаем
+                if (lowerBlock.includes('без ошиб') || lowerBlock === '-' || lowerBlock === '—' || lowerBlock === 'ок' || 
+                    lowerBlock.includes('рекомендованное время') || lowerBlock.includes('допустимое время') || 
+                    lowerBlock.includes('время допустимо') || lowerBlock.includes('время превышено') ||
+                    lowerBlock.includes('исправлено') || lowerBlock === 'доработка' || cat.toLowerCase().includes('рекоменд')) {
+                    continue;
+                }
+
+                // Если ошибка есть — записываем её СТРОГО для текущего ID
                 if (blockText) {
-                    taskCats[foundCat] = true;
+                    taskCats[cat] = true;
                     taskHasErrors = true;
                     if (!window.taskComments[markerId]) window.taskComments[markerId] = [];
-                    window.taskComments[markerId].push({ date: startDate || '', category: foundCat, text: blockText.slice(0, 500) });
+                    window.taskComments[markerId].push({ date: startDate || '', category: cat, text: blockText.slice(0, 500) });
                 }
             }
-        });
+        }
 
         if (taskHasErrors) {
             user.totalErrors++;
@@ -2276,26 +2300,26 @@ function processData() {
         currentTask = null;
     };
 
+    // Идем по строкам и собираем задачи
     rawLines.forEach(line => {
         const trimmed = line.trim();
         if (!trimmed) return;
         if (trimmed.toLowerCase().includes('marker_id') && trimmed.toLowerCase().includes('start_date')) return;
 
-        // Если строка начинается с UUID — это НОВАЯ задача
         const isUuidStart = /^[0-9a-f]{8}-[0-9a-f]{4}/i.test(trimmed);
         
         if (isUuidStart) {
-            flushTask(); // Сохраняем предыдущую
+            // Встретили нового человека или новую задачу — сохраняем предыдущую
+            flushTask(); 
             currentTask = { header: trimmed, comments: [] };
         } else {
+            // Это продолжение комментария текущего человека
             if (currentTask) {
                 currentTask.comments.push(trimmed);
             }
         }
     });
-    flushTask(); // Сохраняем последнюю
-
-    console.log(`Обработано всего заданий: ${totalTasksCount}`);
+    flushTask(); // Сохраняем последнюю задачу
 
     globalReport = Object.values(report);
     window.globalReport = globalReport;
@@ -2316,18 +2340,6 @@ function processData() {
     });
 
     showToast('Данные успешно обработаны!');
-}
-function populateFilters() {
-    const userSelect = document.getElementById('filterUser');
-    userSelect.innerHTML = '<option value="all">все сотрудники</option>';
-    const map = new Map();
-    globalReport.forEach(u => map.set(u.id, u.name));
-    Array.from(map.entries()).sort((a,b)=>a[1].localeCompare(b[1]))
-        .forEach(([id,name]) => {
-            const opt = document.createElement('option');
-            opt.value = id; opt.textContent = name;
-            userSelect.appendChild(opt);
-        });
 }
 
 function applyFilters() {
