@@ -2215,19 +2215,21 @@ function processData() {
                 const cleanCatName = catName.toLowerCase().replace(/[\s_]/g, '');
                 const actualCat = categoriesList.find(c => c.toLowerCase().replace(/[\s_]/g, '') === cleanCatName);
 
-                if (actualCat) {
+                               if (actualCat) {
                     let isError = false;
-                    const val = blockText.toLowerCase();
-
-                    // Общие правила (и для BA, и для SSU)
-                    if (val.trim() === '' || val === '-' || val === '—' || val === '–' || val.includes('без ошиб')) {
+                    
+                    // Приводим текст к нижнему регистру
+                    const lowerText = blockText.toLowerCase().trim();
+                    
+                    // 1. Если пусто или есть слова "без ошиб" или прочерк — НЕ ошибка
+                    if (lowerText === '' || lowerText === '-' || lowerText === '—' || lowerText === '–' || lowerText.includes('без ошиб')) {
                         isError = false;
                     } 
-                    // Для SSU: Рекомендации не считаем ошибкой
-                    else if (currentTemplateKey === 'ssu' && catName.toLowerCase().includes('рекомендация')) {
+                    // 2. Если это Рекомендация — НЕ ошибка
+                    else if (catName.toLowerCase().includes('рекомендация')) {
                         isError = false;
-                    }
-                    // Остальное — ошибка
+                    } 
+                    // 3. Всё остальное — ОШИБКА
                     else {
                         isError = true;
                     }
