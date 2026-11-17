@@ -2221,7 +2221,7 @@ function processData() {
 
         // --- ПАРСИНГ КОММЕНТАРИЕВ ---
         if (comment && comment.trim()) {
-            const cleanComment = comment.replace(/Исправлено валидатором/gi, '').trim();
+            const cleanComment = comment.replace(/Исправлено валидатором/gi, ' ').trim();
             
             // Если это Beautiful Answers — используем новый умный парсер
             if (currentTemplateKey === 'beautiful_answers') {
