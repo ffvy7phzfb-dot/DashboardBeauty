@@ -2157,6 +2157,7 @@ function processData() {
     
     const report = {}; 
     let totalRows = 0;
+    taskComments = {};
 
     // Читаем данные из сводки
     lines.forEach((line, index) => {
@@ -2184,7 +2185,6 @@ function processData() {
                 cats: {}
             };
             categoriesList.forEach(c => report[markerId].cats[c] = 0);
-            taskComments[markerId] = [];
         }
 
         const user = report[markerId];
@@ -2242,8 +2242,9 @@ function processData() {
                     if (isError) {
                         taskCats[actualCat] = true;
                         taskHasErrors = true;
+                        if (!taskComments[markerId]) taskComments[markerId] = [];
                         taskComments[markerId].push({
-                            date: startDate,
+                            date: startDate || '',
                             category: actualCat,
                             text: blockText.slice(0, 500)
                         });
@@ -2404,7 +2405,7 @@ function resetFilters() {
 
         // Строки сотрудников
         users.forEach(u => {
-            const mark = uMarks[u.user_id] || '';
+            const mark = userMarks[u.user_id] || '';
             let markHtml = '';
             if (mark === 'newbie') markHtml = '<span style="color:var(--c-orange);">новичок</span>';
             else if (mark === 'experienced') markHtml = '<span style="color:var(--c-green);">опытный</span>';
