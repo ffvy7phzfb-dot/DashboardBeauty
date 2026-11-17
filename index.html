@@ -2359,74 +2359,86 @@ function resetFilters() {
     debouncedSaveSettings();
 }
 
-function renderReport(users) {
-    const container = document.getElementById('output');
-    if (users.length === 0) {
-        container.innerHTML = '<h3 style="text-align:center; color:var(--c-text-3); font-size:14px;">нет данных по выбранным фильтрам.</h3>';
-        return;
-    }
-    users.sort((a,b)=>a.name.localeCompare(b.name));
-    const totals = { doneTotal:0, doneWithErrors:0, catErrors:{} };
-    categoriesList.forEach(c => totals.catErrors[c] = 0);
-    users.forEach(u => {
-        totals.doneTotal += u.doneTotal;
-        totals.doneWithErrors += u.doneWithErrors;
-                    categoriesList.forEach(c => {
-                        if (u.cats && u.cats[c]) totals.catErrors[c] += u.cats[c];
-                    });
-    });
-
-    let html = `<table class="summary-table"><thead><tr>
-        <th style="text-align:left; min-width:120px;">сотрудник</th>
-        <th>пометка</th>
-        <th>всего</th>
-        <th>с ошибками</th>`;
-    categoriesList.forEach(cat => {
-        html += `<th title="${cat}">${CAT_SHORT_LABELS[cat] || cat}</th>`;
-    });
-    html += `<th>marker_id</th></tr></thead><tbody>`;
-
-    html += `<tr class="total-row">
-        <td style="text-align:right;">ИТОГО:</td><td></td>
-        <td>${totals.doneTotal}</td><td>${totals.doneWithErrors}</td>`;
-    categoriesList.forEach(cat => { html += `<td>${totals.catErrors[cat]}</td>`; });
-    html += `<td></td></tr>`;
-
-    users.forEach(user => {
-        const mark = userMarks[user.id] || null;
-        const paintObj = userPaints[user.id] || {};
-        const isOldFormat = typeof paintObj === 'string'; 
-        const getCellPaint = (key) => {
-            if (isOldFormat) return ''; 
-            return paintObj[key] ? `paint-${paintObj[key]}` : '';
-        };
-        const rowClass = isOldFormat ? `paint-${paintObj}` : ''; 
-
-        html += `<tr class="${rowClass}" data-user-id="${user.id}">
-            <td class="name-col ${getCellPaint('name')}" onclick="event.stopPropagation(); if(brushMode){handleCellClick('${user.id}', 'name')} else {openCard('${user.id}')}">${user.name}</td>
-            <td class="${getCellPaint('mark')}" onclick="handleCellClick('${user.id}', 'mark')">
-                <select class="status-select" onchange="setMark('${user.id}', this.value); event.stopPropagation();">
-                    <option value="" ${!mark ? 'selected' : ''}>—</option>
-                    <option value="newbie" ${mark==='newbie'?'selected':''}>новичок</option>
-                    <option value="experienced" ${mark==='experienced'?'selected':''}>опытный</option>
-                </select>
-            </td>
-            <td class="${getCellPaint('doneTotal')}" onclick="handleCellClick('${user.id}', 'doneTotal')"><b>${user.doneTotal}</b></td>
-            <td class="${getCellPaint('doneWithErrors')}" onclick="handleCellClick('${user.id}', 'doneWithErrors')"><b>${user.doneWithErrors}</b></td>`;
+    function renderReport(users) {
+        const container = document.getElementById('output');
+        if (!users || users.length === 0) {
+            container.innerHTML = '<h3 style="text-align:center; color:var(--c-text-3); font-size:14px;">нет данных по выбранным фильтрам.</h3>';
+            return;
+        }
         
-        categoriesList.forEach(cat => {
-                         const v = (u.cats && u.cats[cat]) || (u.catErrors && u.catErrors[cat]) || 0;
-            html += `<td class="${v===0?'zero-cell':''} ${getCellPaint(cat)}" onclick="handleCellClick('${user.id}', '${cat}')">${v}</td>`;
+        users.sort((a,b)=>a.name.localeCompare(b.name));
+        const totals = { doneTotal: 0, doneWithErrors: 0, catErrors: {} };
+        categoriesList.forEach(c => totals.catErrors[c] = 0);
+        
+        users.forEach(u => {
+            totals.doneTotal += (u.doneTotal || 0);
+            totals.doneWithErrors += (u.doneWithErrors || 0);
+            categoriesList.forEach(c => {
+                const val = (u.cats && u.cats[c]) || (u.catErrors && u.catErrors[c]) || 0;
+                totals.catErrors[c] += val;
+            });
         });
-        html += `<td class="id-col ${getCellPaint('id')}" onclick="handleCellClick('${user.id}', 'id')" title="${user.id}">${user.id}</td></tr>`;
-    });
 
-    html += `</tbody></table>`;
-    container.innerHTML = html;
-    document.querySelectorAll('.color-swatch').forEach(el => {
-        el.classList.toggle('active', el.dataset.paint === brushPaint);
-    });
-}
+        let html = `<table class="summary-table"><thead><tr>
+            <th style="text-align:left; min-width:120px;">сотрудник</th>
+            <th>пометка</th>
+            <th>всего</th>
+            <th>с ошибками</th>`;
+        
+        categoriesList.forEach(c => {
+            html += `<th>${CAT_SHORT_LABELS[c] || c}</th>`;
+        });
+        
+        html += `<th>marker_id</th></tr></thead><tbody>`;
+
+        // Строка ИТОГО
+        html += `<tr class="total-row">
+            <td style="text-align:left;">ИТОГО:</td>
+            <td></td>
+            <td>${totals.doneTotal}</td>
+            <td>${totals.doneWithErrors}</td>`;
+        
+        categoriesList.forEach(c => {
+            html += `<td>${totals.catErrors[c]}</td>`;
+        });
+        
+        html += `<td></td></tr>`;
+
+        // Строки сотрудников
+        users.forEach(u => {
+            const mark = uMarks[u.user_id] || '';
+            let markHtml = '';
+            if (mark === 'newbie') markHtml = '<span style="color:var(--c-orange);">новичок</span>';
+            else if (mark === 'experienced') markHtml = '<span style="color:var(--c-green);">опытный</span>';
+            else markHtml = '—';
+
+            html += `<tr class="${getRowPaint(u.user_id)}" data-user-id="${u.user_id}">
+                <td class="name-col" onclick="openCard('${u.user_id}')">${u.name}</td>
+                <td><select class="status-select" onchange="setMark('${u.user_id}', this.value); event.stopPropagation();">
+                    <option value="">—</option>
+                    <option value="newbie" ${mark === 'newbie' ? 'selected' : ''}>новичок</option>
+                    <option value="experienced" ${mark === 'experienced' ? 'selected' : ''}>опытный</option>
+                </select></td>
+                <td>${u.doneTotal}</td>
+                <td>${u.doneWithErrors}</td>`;
+            
+            categoriesList.forEach(cat => {
+                // Вот тут мы безопасно берем значение
+                const v = (u.cats && u.cats[cat]) || (u.catErrors && u.catErrors[cat]) || 0;
+                const cls = v === 0 ? 'zero-cell' : '';
+                html += `<td class="${cls} ${getPaintCell(u.user_id, cat)}" onclick="handleCellClick('${u.user_id}', '${cat}'); event.stopPropagation();">${v}</td>`;
+            });
+            
+            html += `<td class="id-col">${u.user_id}</td></tr>`;
+        });
+
+        html += `</tbody></table>`;
+        container.innerHTML = html;
+        
+        document.querySelectorAll('.color-swatch').forEach(el => {
+            el.classList.toggle('active', el.dataset.paint === currentBrushPaint);
+        });
+    }
 
 function setMark(id, value) {
     if (value === '') delete userMarks[id];
