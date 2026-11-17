@@ -2157,7 +2157,7 @@ function processData() {
     const report = {}; 
     window.taskComments = {};
 
-    // Список категорий для поиска
+    // Жесткий список категорий
     const keywords = [
         { key: 'маркдаун', full: 'маркдаун' },
         { key: 'ошибки рп', full: 'ошибки РП' },
@@ -2170,7 +2170,7 @@ function processData() {
         { key: 'единообразие', full: 'единообразие' },
         { key: 'расчет', full: 'расчет по критериям оценки' },
         { key: 'смысловая', full: 'Смысловая опечатка' },
-        { key: 'опечатка', full: 'Опечатка' },
+        { key: 'опечатка', full: 'Опечатка' }, // Оставляем для SSU
         { key: 'тип-оформление', full: 'Тип-оформление' },
         { key: 'latex', full: 'LaTeX' },
         { key: 'картинка', full: 'Картинка' },
@@ -2214,7 +2214,7 @@ function processData() {
         }
 
         const user = report[markerId];
-        const taskCats = new Set(); // Используем Set для уникальности в рамках ОДНОЙ задачи
+        const taskCats = new Set();
         let taskHasErrors = false;
 
         if (fullText) {
@@ -2225,14 +2225,15 @@ function processData() {
             let lowerText = cleanText.toLowerCase();
 
             keywords.forEach(kw => {
-                 if (currentTemplateKey === 'beautiful_answers' && kw.key === 'опечатка') return;
+                // 👇 ГЛАВНАЯ ЗАЩИТА: Для Beautiful Answers игнорируем "опечатка", чтобы не было дубля
+                if (currentTemplateKey === 'beautiful_answers' && kw.key === 'опечатка') return;
+
                 let pos = lowerText.indexOf(kw.key);
                 
                 if (pos !== -1) {
                     if (kw.key === 'опечатка' && lowerText.includes('смысловая опечатка')) return;
 
                     let textAfter = lowerText.slice(pos + kw.key.length);
-                    
                     let nextPos = textAfter.length;
                     keywords.forEach(otherKw => {
                         if (otherKw.key === kw.key) return;
@@ -2259,11 +2260,9 @@ function processData() {
                         return;
                     }
 
-                    // Ищем правильное название колонки в списке
                     let matchedCat = categoriesList.find(c => c.toLowerCase().includes(kw.key));
                     if (!matchedCat) matchedCat = kw.full;
 
-                    // ГЛАВНАЯ ЗАЩИТА: если такая ошибка уже была в этой задаче — не считаем её второй раз
                     if (taskCats.has(matchedCat)) return;
 
                     taskCats.add(matchedCat);
