@@ -2157,26 +2157,12 @@ function processData() {
     const report = {}; 
     window.taskComments = {};
 
-    // Словарь: как искать -> в какую колонку записывать
-    const keywordMap = [
-        { search: 'маркдаун', full: 'маркдаун' },
-        { search: 'ошибки рп', full: 'ошибки РП' },
-        { search: 'грамматика', full: 'грамматика, орфография, пунктуация, не те слова' },
-        { search: 'пропущенная ё', full: 'пропущенная ё, опечатка, потерянная точка' },
-        { search: 'пропущенная е', full: 'пропущенная ё, опечатка, потерянная точка' },
-        { search: 'систем', full: 'систем' },
-        { search: 'контекст', full: 'контекст, ты/вы' },
-        { search: 'комментарий', full: 'комментарий' },
-        { search: 'единообразие', full: 'единообразие' },
-        { search: 'расчет', full: 'расчет по критериям оценки' },
-        { search: 'смысловая', full: 'Смысловая опечатка' },
-        { search: 'опечатка', full: 'Опечатка' },
-        { search: 'тип-оформление', full: 'Тип-оформление' },
-        { search: 'latex', full: 'LaTeX' },
-        { search: 'картинка', full: 'Картинка' },
-        { search: 'тег тематики', full: 'Тег тематики' },
-        { search: 'тег типа', full: 'Тег типа вопроса' },
-        { search: 'неправильный ответ', full: 'Неправильный ответ' }
+    // Список категорий (с учетом разных вариантов написания)
+    const keywords = [
+        'маркдаун', 'ошибки рп', 'грамматика', 'пропущенная ё', 'пропущенная е', 
+        'систем', 'контекст', 'комментарий', 'единообразие', 'расчет', 
+        'смысловая', 'опечатка', 'тип-оформление', 'latex', 'картинка', 
+        'тег тематики', 'тег типа', 'неправильный ответ'
     ];
 
     let currentTask = null;
@@ -2193,7 +2179,7 @@ function processData() {
         let quality = null;
         let firstCommentLine = '';
 
-        // Берем оценку из 4-й колонки
+        // Парсим 4-ю колонку (оценку)
         if (headerParts.length >= 4) {
             const parsedQ = parseFloat((headerParts[3] || '').replace(',', '.'));
             if (!isNaN(parsedQ) && parsedQ >= 0 && parsedQ <= 1.5) {
@@ -2204,6 +2190,7 @@ function processData() {
             }
         }
 
+        // Собираем весь текст комментария в одну строку
         let allComments = [];
         if (firstCommentLine) allComments.push(firstCommentLine);
         allComments = allComments.concat(currentTask.comments);
@@ -2219,78 +2206,72 @@ function processData() {
         let taskHasErrors = false;
 
         if (fullText) {
-            // Очищаем от мусора и звездочек
+            // 1. Очищаем текст
             let cleanText = fullText.replace(/Исправлено валидатором/gi, ' ')
                                       .replace(/\*|_|«|»|"/g, ' ')
-                                      .replace(/\s+/g, ' ');
+                                      .replace(/\s+/g, ' ')
+                                      .trim();
             let lowerText = cleanText.toLowerCase();
 
-            // Проходим по каждой категории
-            keywordMap.forEach(kw => {
-                // Ищем категорию с двоеточием или пробелом после неё
-                let matchIndex = -1;
-                let matchLength = 0;
-
-                // Проверяем варианты: "маркдаун:", "маркдаун ", "маркдаун -"
-                let searchStr = kw.search + ':';
-                let pos = lowerText.indexOf(searchStr);
-                if (pos !== -1) {
-                    matchIndex = pos;
-                    matchLength = searchStr.length;
-                } else {
-                    searchStr = kw.search + ' ';
-                    pos = lowerText.indexOf(searchStr);
-                    if (pos !== -1) {
-                        matchIndex = pos;
-                        matchLength = searchStr.length;
+            // 2. Находим ВСЕ категории в тексте и их позиции
+            let matches = [];
+            keywords.forEach(kw => {
+                let pos = lowerText.indexOf(kw);
+                while (pos !== -1) {
+                    // Проверяем, что это начало слова (чтобы "систем" не находилось в "систематически")
+                    let prevChar = pos > 0 ? lowerText[pos - 1] : ' ';
+                    if (!/[а-яa-z0-9]/.test(prevChar)) {
+                        matches.push({ index: pos, length: kw.length, cat: kw });
                     }
-                }
-
-                if (matchIndex !== -1) {
-                    // Защита от смысловой опечатки
-                    if (kw.search === 'опечатка' && lowerText.includes('смысловая опечатка')) return;
-
-                    // Определяем, где заканчивается эта категория (где начинается следующая)
-                    let nextPos = cleanText.length;
-                    keywordMap.forEach(otherKw => {
-                        if (otherKw.search === kw.search) return;
-                        
-                        let otherSearchColon = otherKw.search + ':';
-                        let otherSearchSpace = otherKw.search + ' ';
-                        
-                        let p1 = lowerText.indexOf(otherSearchColon, matchIndex + matchLength);
-                        let p2 = lowerText.indexOf(otherSearchSpace, matchIndex + matchLength);
-                        
-                        let p = Math.min(p1 === -1 ? Infinity : p1, p2 === -1 ? Infinity : p2);
-                        if (p < nextPos) nextPos = p;
-                    });
-
-                    // Вырезаем кусок
-                    let blockText = cleanText.slice(matchIndex + matchLength, nextPos).trim();
-                    // Убираем тире и дефисы в начале
-                    blockText = blockText.replace(/^[:\-\s]+/, '').trim();
-                    
-                    let lowerBlock = blockText.toLowerCase();
-
-                    // Проверяем, пустой ли это блок
-                    if (!blockText || blockText === '-' || blockText === '—' || 
-                        lowerBlock.includes('без ошиб') || lowerBlock.includes('рекомендованное время') || 
-                        lowerBlock.includes('допустимое время') || lowerBlock.includes('время допустимо') || 
-                        lowerBlock.includes('время превышено') || lowerBlock.includes('исправлено') || 
-                        lowerBlock === 'доработка' || kw.search.includes('рекоменд')) {
-                        return;
-                    }
-
-                    // Если есть текст — это ошибка
-                    let matchedCat = categoriesList.find(c => c.toLowerCase().includes(kw.search));
-                    if (!matchedCat) matchedCat = kw.full;
-
-                    taskCats.add(matchedCat);
-                    taskHasErrors = true;
-                    if (!window.taskComments[markerId]) window.taskComments[markerId] = [];
-                    window.taskComments[markerId].push({ date: startDate || '', category: matchedCat, text: blockText.slice(0, 500) });
+                    pos = lowerText.indexOf(kw, pos + 1);
                 }
             });
+
+            // 3. Сортируем по порядку появления в тексте
+            matches.sort((a, b) => a.index - b.index);
+
+            // 4. Удаляем дубликаты (если категория встретилась дважды подряд)
+            let uniqueMatches = [];
+            matches.forEach(m => {
+                if (uniqueMatches.length === 0 || uniqueMatches[uniqueMatches.length - 1].index !== m.index) {
+                    uniqueMatches.push(m);
+                }
+            });
+
+            // 5. Разбиваем текст на куски между категориями
+            for (let i = 0; i < uniqueMatches.length; i++) {
+                let startIdx = uniqueMatches[i].index + uniqueMatches[i].length;
+                let endIdx = (i + 1 < uniqueMatches.length) ? uniqueMatches[i + 1].index : cleanText.length;
+                
+                // Берем текст после названия категории
+                let blockText = cleanText.slice(startIdx, endIdx).trim();
+                // Убираем двоеточия, тире и дефисы в начале
+                blockText = blockText.replace(/^[:\-\s]+/, '').trim();
+                
+                let cat = uniqueMatches[i].cat;
+                let lowerBlock = blockText.toLowerCase();
+
+                // Если это "опечатка", но есть "смысловая", пропускаем
+                if (cat === 'опечатка' && lowerText.includes('смысловая опечатка')) continue;
+
+                // 6. Проверяем, есть ли реальная ошибка в этом куске
+                if (!blockText || blockText === '-' || blockText === '—' || 
+                    lowerBlock.includes('без ошиб') || lowerBlock.includes('рекомендованное время') || 
+                    lowerBlock.includes('допустимое время') || lowerBlock.includes('время допустимо') || 
+                    lowerBlock.includes('время превышено') || lowerBlock.includes('исправлено') || 
+                    lowerBlock === 'доработка' || cat.includes('рекоменд')) {
+                    continue;
+                }
+
+                // 7. Записываем ошибку
+                let matchedCat = categoriesList.find(c => c.toLowerCase().includes(cat));
+                if (!matchedCat) matchedCat = cat;
+
+                taskCats.add(matchedCat);
+                taskHasErrors = true;
+                if (!window.taskComments[markerId]) window.taskComments[markerId] = [];
+                window.taskComments[markerId].push({ date: startDate || '', category: matchedCat, text: blockText.slice(0, 500) });
+            }
         }
 
         if (taskHasErrors) {
