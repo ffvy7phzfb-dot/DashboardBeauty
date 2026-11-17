@@ -2214,14 +2214,10 @@ let catName = line.slice(0, colonIndex).replace(/\*/g, '').trim();
                 const cleanCatName = catName.toLowerCase().replace(/[\s_]/g, '');
                 const actualCat = categoriesList.find(c => c.toLowerCase().replace(/[\s_]/g, '') === cleanCatName);
 
-        if (actualCat) {
-            let isError = false;
-                // Универсальная проверка для ОБОИХ шаблонов (BA и SSU)
-                const lowerText = blockText.toLowerCase();
-                const lowerCat = catName.toLowerCase();
-
-                // 1. Если пусто, прочерк или есть корень "без ошиб" (ловит "без ошибок", "без ошибки" и т.д.)
-                                    // Универсальная проверка для обоих шаблонов (BA и SSU)
+                        if (actualCat) {
+                    let isError = false;
+                    
+                    // Универсальная проверка для обоих шаблонов (BA и SSU)
                     const lowerText = blockText.toLowerCase();
                     const lowerCat = catName.toLowerCase();
 
@@ -2241,24 +2237,18 @@ let catName = line.slice(0, colonIndex).replace(/\*/g, '').trim();
                     else {
                         isError = true;
                     }
-                // 2. Если это Рекомендация — НЕ ошибка
-                else if (lowerCat.includes('рекомендация')) {
-                    isError = false;
-                } 
-                // 3. Во всех остальных случаях — ЭТО ОШИБКА
-                else {
-                    isError = true;
+
+                    if (isError) {
+                        taskCats[actualCat] = true;
+                        taskHasErrors = true;
+                        taskComments[markerId].push({
+                            date: startDateOnly || endDateOnly || '',
+                            taskStart: startFull,
+                            category: actualCat,
+                            text: blockText.slice(0, 500)
+                        });
+                    }
                 }
-            if (isError) {
-                taskCats[actualCat] = true;
-                taskHasErrors = true;
-                taskComments[markerId].push({
-                    date: startDateOnly || endDateOnly || '',
-                    taskStart: startFull,
-                    category: actualCat,
-                    text: blockText.slice(0, 500)
-                });
-            }
         }
     });
 }
