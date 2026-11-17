@@ -2152,60 +2152,63 @@ function processData() {
     }
 
     const namesMap = parseNames(namesText);
+    // Разбиваем текст на строки. Если Excel вставил переносы внутри ячейки, мы это починим ниже.
     const rawLines = mainText.split(/\r?\n/);
     
-    // Склейка рваных строк из Excel
-    const lines = [];
-    for (let i = 0; i < rawLines.length; i++) {
-        let l = rawLines[i];
-        if (!l.trim()) { lines.push(l); continue; }
-        let guard = 0;
-        while (l.split('\t').length < 5 && i + 1 < rawLines.length && guard < 20) {
-            i++;
-            const next = rawLines[i];
-            if (next.split('\t').length >= 5) { i--; break; }
-            l = l + ' ' + next; 
-            guard++;
-        }
-        lines.push(l);
-    }
-
     const report = {}; 
     window.taskComments = {};
 
-    // Берем ключевые слова из ТЕКУЩЕГО шаблона + спец-правила для BA
-    let searchKeywords = [];
-    categoriesList.forEach(cat => {
-        let shortKey = cat.split(',')[0].replace(/\*/g, '').trim().toLowerCase();
-        searchKeywords.push({ key: shortKey, full: cat });
-    });
+    // Словарь синонимов для надежности
+    const searchKeywords = [
+        { key: 'маркдаун', full: 'маркдаун' },
+        { key: 'ошибки рп', full: 'ошибки РП' },
+        { key: 'грамматика', full: 'грамматика, орфография, пунктуация, не те слова' },
+        { key: 'пропущенная ё', full: 'пропущенная ё, опечатка, потерянная точка' },
+        { key: 'систем', full: 'систем' },
+        { key: 'контекст', full: 'контекст, ты/вы' },
+        { key: 'комментарий', full: 'комментарий' },
+        { key: 'единообразие', full: 'единообразие' },
+        { key: 'расчет', full: 'расчет по критериям оценки' },
+        { key: 'опечатка', full: 'Опечатка' },
+        { key: 'тип-оформление', full: 'Тип-оформление' },
+        { key: 'смысловая', full: 'Смысловая опечатка' },
+        { key: 'latex', full: 'LaTeX' },
+        { key: 'картинка', full: 'Картинка' },
+        { key: 'тег тематики', full: 'Тег тематики' },
+        { key: 'тег типа', full: 'Тег типа вопроса' },
+        { key: 'неправильный ответ', full: 'Неправильный ответ' }
+    ];
 
-    // Добавляем синонимы для Beautiful Answers на случай опечаток
-    if (currentTemplateKey === 'beautiful_answers') {
-        searchKeywords.push({ key: 'расчет', full: 'расчет по критериям оценки' });
-        searchKeywords.push({ key: 'критерия', full: 'расчет по критериям оценки' });
-    }
+    // Функция для обработки одной целой строки данных
+    const processRow = (rowStr) => {
+        rowStr = rowStr.trim();
+        if (!rowStr) return;
+        
+        // Пропускаем заголовок
+        if (rowStr.toLowerCase().includes('marker_id') && rowStr.toLowerCase().includes('start_date')) return;
 
-    lines.forEach((line, index) => {
-        if (index === 0 && line.toLowerCase().includes('marker_id')) return;
-        if (!line.trim()) return;
-
-        const parts = line.split('\t');
-        if (parts.length < 4) return; 
+        // Разбиваем на колонки. Если меньше 4 - значит это обрывок, игнорируем.
+        const parts = rowStr.split('\t');
+        if (parts.length < 4) return;
 
         const markerId = parts[0].trim();
-        const startDate = parts[1].trim().slice(0, 10);
-        const endDate = parts[2].trim().slice(0, 10);
-        
+        const startDate = parts[1] ? parts[1].trim().slice(0, 10) : '';
+        const endDate = parts[2] ? parts[2].trim().slice(0, 10) : '';
         let quality = null;
-        let comment = '';
         
+        // Ищем качество и комментарий
+        let commentIndex = 3;
         if (parts.length >= 5) {
-            quality = parseFloat((parts[3] || '').replace(',', '.')) || null;
-            comment = parts.slice(4).join('\t');
-        } else {
-            comment = parts.slice(3).join('\t');
+            const parsedQ = parseFloat((parts[3] || '').replace(',', '.'));
+            if (!isNaN(parsedQ)) {
+                quality = parsedQ;
+                commentIndex = 4;
+            } else {
+                commentIndex = 3;
+            }
         }
+        
+        const comment = parts.slice(commentIndex).join('\t').trim();
 
         if (!markerId) return;
 
@@ -2218,7 +2221,7 @@ function processData() {
         const taskCats = {};
         let taskHasErrors = false;
 
-        if (comment && comment.trim()) {
+        if (comment) {
             // Убираем "Исправлено валидатором"
             let cleanComment = comment.replace(/Исправлено валидатором/gi, ' ').trim();
             
@@ -2231,7 +2234,7 @@ function processData() {
             searchKeywords.forEach(kw => {
                 let pos = lowerText.indexOf(kw.key);
                 while (pos !== -1) {
-                    // Проверяем, что это начало слова (чтобы "систем" не находилось в "систематически")
+                    // Проверяем, что это начало слова
                     let prevChar = pos > 0 ? lowerText[pos - 1] : ' ';
                     if (!/[а-яa-z0-9]/.test(prevChar)) {
                         matches.push({ index: pos, length: kw.key.length, category: kw.full });
@@ -2240,8 +2243,10 @@ function processData() {
                 }
             });
 
-            // Сортируем по порядку появления и удаляем дубликаты
+            // Сортируем по порядку появления
             matches.sort((a, b) => a.index - b.index);
+            
+            // Удаляем дубликаты
             let uniqueMatches = [];
             matches.forEach(m => {
                 if (uniqueMatches.length === 0 || uniqueMatches[uniqueMatches.length - 1].index !== m.index) {
@@ -2254,7 +2259,6 @@ function processData() {
                 let startIdx = uniqueMatches[i].index + uniqueMatches[i].length;
                 let endIdx = (i + 1 < uniqueMatches.length) ? uniqueMatches[i + 1].index : normalizedText.length;
                 
-                // Берем текст после слова категории (убираем двоеточие, если оно есть)
                 let blockText = normalizedText.slice(startIdx, endIdx).replace(/^[:\-\s]+/, '').trim();
                 let cat = uniqueMatches[i].category;
 
@@ -2284,8 +2288,38 @@ function processData() {
             });
         }
 
-        user.tasks.push({ id: markerId, date: startDate, startDate: startDate, endDate: endDate, projectId: window.currentProjectId, quality: quality, hasErrors: taskHasErrors, cats: taskCats });
+        user.tasks.push({ 
+            id: markerId, 
+            date: startDate, 
+            startDate: startDate, 
+            endDate: endDate, 
+            projectId: window.currentProjectId, 
+            quality: quality, 
+            hasErrors: taskHasErrors, 
+            cats: taskCats 
+        });
+    };
+
+    // УМНАЯ СБОРКА СТРОК
+    let currentRow = '';
+    rawLines.forEach(line => {
+        // Считаем, сколько колонок (табов) в строке
+        const tabCount = (line.match(/\t/g) || []).length;
+        
+        if (tabCount >= 3) {
+            // Если в строке 3 и больше табов, это начало новой записи
+            // Сначала обрабатываем то, что накопили
+            if (currentRow) processRow(currentRow);
+            currentRow = line; 
+        } else {
+            // Если табов мало, это продолжение комментария. Приклеиваем к текущей строке.
+            if (currentRow) {
+                currentRow += ' ' + line; // Склеиваем через пробел, чтобы не ломать табы
+            }
+        }
     });
+    // Обрабатываем последнюю накопленную строку
+    if (currentRow) processRow(currentRow);
 
     globalReport = Object.values(report);
     window.globalReport = globalReport;
