@@ -2197,7 +2197,8 @@ function processData() {
                 const colonIndex = line.indexOf(':');
                 if (colonIndex === -1) return; // если нет двоеточия, пропускаем
 
-                const catName = line.slice(0, colonIndex).trim();
+                // Убираем все звездочки (для BA) и лишние пробелы
+let catName = line.slice(0, colonIndex).replace(/\*/g, '').trim();
                 let blockText = line.slice(colonIndex + 1).trim();
 
                 // ЕСЛИ ПОСЛЕ ДВОЕТОЧИЯ ПУСТО, БЕРЕМ ТЕКСТ ИЗ СЛЕДУЮЩЕЙ СТРОКИ
@@ -2209,7 +2210,9 @@ function processData() {
                     }
                 }
         // Ищем, есть ли такая категория в нашем списке
-        const actualCat = categoriesList.find(c => c.toLowerCase() === catName.toLowerCase());
+                        // Умный поиск категории (игнорирует пробелы и регистр)
+                const cleanCatName = catName.toLowerCase().replace(/[\s_]/g, '');
+                const actualCat = categoriesList.find(c => c.toLowerCase().replace(/[\s_]/g, '') === cleanCatName);
 
         if (actualCat) {
             let isError = false;
