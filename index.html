@@ -2384,9 +2384,9 @@ function applyFilters() {
                     // 1. Пропускаем расчет
                     if (lowerCat.includes('расчет')) return;
 
-                    // 2. Опечатку перенаправляем
+                         // 2. Опечатку перенаправляем
                     if (lowerCat === 'опечатка' && currentTemplateKey === 'beautiful_answers') {
-                        catsCopy['пропущенная ё, опечатка, потерянная точка'] += user.cats[catName];
+                        catsCopy['пропущенная ё, опечатка, потерянная точка'] = user.cats[catName]; // СТАЛО =
                         return;
                     }
 
