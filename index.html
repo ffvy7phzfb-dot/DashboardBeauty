@@ -2154,7 +2154,7 @@ function processData() {
     const namesMap = parseNames(namesText);
     const rawLines = mainText.split(/\r?\n/);
     
-    // Склейка рваных строк
+    // Склейка рваных строк (для Excel)
     const lines = [];
     for (let i = 0; i < rawLines.length; i++) {
         let l = rawLines[i];
@@ -2214,71 +2214,90 @@ function processData() {
         let taskHasErrors = false;
 
         if (comment && comment.trim()) {
-            // Заменяем "Исправлено валидатором" на пробел
             const cleanComment = comment.replace(/Исправлено валидатором/gi, ' ').trim();
-            const commentLines = cleanComment.split(/\r?\n/);
+            const cLines = cleanComment.split(/\r?\n/);
+            
+            let currentCat = null;
+            let currentText = '';
 
-            commentLines.forEach((cLine) => {
-                cLine = cLine.trim();
-                if (!cLine) return;
+            // Автоматически берем категории из текущего шаблона
+            const catKeywords = {};
+            categoriesList.forEach(c => {
+                const shortName = c.toLowerCase().split(',')[0].replace(/\*/g, '').trim();
+                catKeywords[shortName] = c;
+            });
 
-                // Игнорируем пустые и "без ошибок" строки целиком
-                if (cLine.toLowerCase().includes('без ошиб')) return;
-                if (cLine.toLowerCase().includes('рекоменд') || cLine.toLowerCase().includes('рекомед')) return;
+            cLines.forEach(cLine => {
+                let text = cLine.replace(/\*|_|«|»|"/g, '').trim();
+                if (!text) return;
 
-                const colonIndex = cLine.indexOf(':');
-                let catName = '';
-                let blockText = cLine;
+                const lowerText = text.toLowerCase();
 
-                // Если есть двоеточие, разделяем
-                if (colonIndex !== -1) {
-                    catName = cLine.slice(0, colonIndex).replace(/\*|_|«|»|"/g, '').trim();
-                    blockText = cLine.slice(colonIndex + 1).trim();
+                // 1. Игнорируем то, что не является ошибкой
+                if (lowerText.includes('без ошиб') || lowerText.includes('рекомендованное время') || 
+                    lowerText.includes('допустимое время') || lowerText.includes('рекомендация') || 
+                    lowerText.includes('время допустимо') || lowerText.includes('время превышено') ||
+                    lowerText.includes('исправлено') || lowerText === 'ок' || lowerText === 'доработка') {
+                    return;
                 }
 
-                // Проверяем, есть ли в строке название категории (даже без двоеточия)
-                let foundCat = null;
-                const searchStr = (catName + ' ' + blockText).toLowerCase();
-
-                // Ищем категорию по всему шаблону
-                for (const cat of categoriesList) {
-                    const catLower = cat.toLowerCase();
-                    // Если в строке есть название категории или его корень
-                    if (searchStr.includes(catLower) || (catLower.includes('опечатка') && searchStr.includes('опечатк'))) {
-                        foundCat = cat;
+                // 2. Ищем, не начинается ли строка с новой категории
+                let foundNewCat = null;
+                for (const [shortName, fullCat] of Object.entries(catKeywords)) {
+                    if (lowerText.startsWith(shortName)) {
+                        foundNewCat = fullCat;
                         break;
                     }
                 }
-
-                // Для Beautiful Answers добавляем спец-правила
-                if (!foundCat && currentTemplateKey === 'beautiful_answers') {
-                    if (searchStr.includes('расчет') || searchStr.includes('критерия')) {
-                        foundCat = categoriesList.find(c => c.toLowerCase().includes('расчет по критериям'));
-                    } else if (searchStr.includes('маркдаун') || searchStr.includes('разметка')) {
-                        foundCat = categoriesList.find(c => c.toLowerCase().includes('маркдаун'));
-                    } else if (searchStr.includes('орфограф') || searchStr.includes('пунктуац') || searchStr.includes('грамматик')) {
-                        foundCat = categoriesList.find(c => c.toLowerCase().includes('грамматика'));
-                    } else if (searchStr.includes('ё') || searchStr.includes('опечатк')) {
-                        foundCat = categoriesList.find(c => c.toLowerCase().includes('пропущенная ё'));
+                
+                // Дополнительные синонимы для Beautiful Answers
+                if (!foundNewCat && currentTemplateKey === 'beautiful_answers') {
+                    if (lowerText.startsWith('расчет') || lowerText.startsWith('критерия')) {
+                        foundNewCat = categoriesList.find(c => c.toLowerCase().includes('расчет по критериям'));
+                    } else if (lowerText.startsWith('грамматика') || lowerText.startsWith('орфография')) {
+                        foundNewCat = categoriesList.find(c => c.toLowerCase().includes('грамматика'));
+                    } else if (lowerText.startsWith('ё') || lowerText.startsWith('опечатка')) {
+                        foundNewCat = categoriesList.find(c => c.toLowerCase().includes('пропущенная ё'));
+                    } else if (lowerText.includes('маркдаун')) {
+                        foundNewCat = categoriesList.find(c => c.toLowerCase().includes('маркдаун'));
                     }
                 }
 
-                // Если категория найдена в тексте, но это просто фраза "Ошибка: нет ошибок" - игнорируем
-                if (foundCat && blockText.toLowerCase().includes('без ошиб')) {
-                    foundCat = null;
-                }
-
-                if (foundCat) {
-                    taskCats[foundCat] = true;
-                    taskHasErrors = true;
-                    if (!window.taskComments[markerId]) window.taskComments[markerId] = [];
-                    window.taskComments[markerId].push({ 
-                        date: startDate || '', 
-                        category: foundCat, 
-                        text: blockText.slice(0, 500) 
-                    });
+                if (foundNewCat) {
+                    // Сохраняем предыдущую категорию
+                    if (currentCat && currentText && !currentText.toLowerCase().includes('без ошиб')) {
+                        taskCats[currentCat] = true;
+                        taskHasErrors = true;
+                        if (!window.taskComments[markerId]) window.taskComments[markerId] = [];
+                        window.taskComments[markerId].push({ 
+                            date: startDate || '', 
+                            category: currentCat, 
+                            text: currentText.slice(0, 500) 
+                        });
+                    }
+                    
+                    currentCat = foundNewCat;
+                    const colonIndex = text.indexOf(':');
+                    currentText = colonIndex !== -1 ? text.slice(colonIndex + 1).trim() : '';
+                } else if (currentCat) {
+                    // Дописываем текст к текущей категории
+                    if (!lowerText.includes('без ошиб')) {
+                        currentText += ' ' + text;
+                    }
                 }
             });
+
+            // Сохраняем последнюю категорию
+            if (currentCat && currentText && !currentText.toLowerCase().includes('без ошиб')) {
+                taskCats[currentCat] = true;
+                taskHasErrors = true;
+                if (!window.taskComments[markerId]) window.taskComments[markerId] = [];
+                window.taskComments[markerId].push({ 
+                    date: startDate || '', 
+                    category: currentCat, 
+                    text: currentText.slice(0, 500) 
+                });
+            }
         }
 
         if (taskHasErrors) {
