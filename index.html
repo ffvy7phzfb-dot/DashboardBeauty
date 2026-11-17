@@ -2201,12 +2201,20 @@ function processData() {
 let catName = line.slice(0, colonIndex).replace(/\*/g, '').trim();
                 let blockText = line.slice(colonIndex + 1).trim();
 
-                // ЕСЛИ ПОСЛЕ ДВОЕТОЧИЯ ПУСТО, БЕРЕМ ТЕКСТ ИЗ СЛЕДУЮЩЕЙ СТРОКИ
-                if (blockText === '' && index + 1 < lines.length) {
-                    const nextLine = lines[index + 1].trim();
-                    // Берем следующую строку, если она не начинается с новой категории
-                    if (nextLine.indexOf(':') === -1 || nextLine.indexOf(':') > 15) { 
-                        blockText = nextLine;
+                // Если после двоеточия пусто, ищем текст в следующих строках (пропускаем пустые)
+                if (blockText === '') {
+                    let j = index + 1;
+                    // Ищем вплоть до 3-х строк вперед
+                    while (j < lines.length && j <= index + 3) {
+                        const nextLine = lines[j].trim();
+                        if (nextLine !== '') {
+                            // Если это не заголовок новой категории (нет двоеточия или оно далеко)
+                            if (nextLine.indexOf(':') === -1 || nextLine.indexOf(':') > 15) {
+                                blockText = nextLine;
+                                break;
+                            }
+                        }
+                        j++;
                     }
                 }
         // Ищем, есть ли такая категория в нашем списке
