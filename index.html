@@ -2182,26 +2182,30 @@ function processData() {
         if (!rowStr) return;
         if (rowStr.toLowerCase().includes('marker_id') && rowStr.toLowerCase().includes('start_date')) return;
 
+        // Разбиваем строго по табам
         const parts = rowStr.split('\t');
         if (parts.length < 4) return;
 
         const markerId = parts[0].trim();
         const startDate = parts[1] ? parts[1].trim().slice(0, 10) : '';
         const endDate = parts[2] ? parts[2].trim().slice(0, 10) : '';
-        let quality = null;
         
-        let commentIndex = 3;
+        let quality = null;
+        let comment = '';
+
+        // Если колонок 5 и больше, значит 4-я колонка - это качество, а 5-я и далее - комментарий
         if (parts.length >= 5) {
             const parsedQ = parseFloat((parts[3] || '').replace(',', '.'));
             if (!isNaN(parsedQ)) {
                 quality = parsedQ;
-                commentIndex = 4;
+                comment = parts.slice(4).join(' ').trim();
             } else {
-                commentIndex = 3;
+                // Если 4-я колонка не число, значит это комментарий (оценка пустая)
+                comment = parts.slice(3).join(' ').trim();
             }
+        } else {
+            comment = parts.slice(3).join(' ').trim();
         }
-        
-        const comment = parts.slice(commentIndex).join('\t').trim();
 
         if (!markerId) return;
 
@@ -2283,19 +2287,14 @@ function processData() {
         });
     };
 
-    // УМНАЯ СБОРКА СТРОК (проверка на UUID)
+    // СБОРКА: склеиваем только если строка не начинается с UUID
     let currentRow = '';
     rawLines.forEach(line => {
-        // Если строка начинается с UUID (длинный ID с дефисами) или содержит 4+ таба (полная строка данных)
         const isUuidStart = /^[0-9a-f]{8}-[0-9a-f]{4}/i.test(line.trim());
-        const tabCount = (line.match(/\t/g) || []).length;
-        
-        if (isUuidStart || tabCount >= 3) {
-            // Это 100% НОВАЯ задача. Сохраняем предыдущую.
+        if (isUuidStart) {
             if (currentRow) processRow(currentRow);
             currentRow = line; 
         } else {
-            // Это продолжение комментария.
             if (currentRow) {
                 currentRow += ' ' + line.trim(); 
             }
