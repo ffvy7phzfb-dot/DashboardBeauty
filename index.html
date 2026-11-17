@@ -2200,44 +2200,40 @@ function processData() {
                 const colonIndex = line.indexOf(':');
                 if (colonIndex === -1) return;
 
-                // Название категории (убираем звездочки для BA)
+                // 1. Очищаем название от звездочек и лишних пробелов
                 let catName = line.slice(0, colonIndex).replace(/\*/g, '').trim();
                 let blockText = line.slice(colonIndex + 1).trim();
 
-                // Умный поиск текста на следующей строке (если после двоеточия пусто)
-                if (blockText === '') {
-                    let j = i + 1;
-                    while (j < commentLines.length && j <= i + 3) {
-                        const nextLine = commentLines[j].trim();
-                        if (nextLine !== '') {
-                            if (nextLine.indexOf(':') === -1 || nextLine.indexOf(':') > 15) {
-                                blockText = nextLine;
-                                break;
-                            }
-                        }
-                        j++;
+                // 2. Если после двоеточия пусто, берем следующую строку
+                if (blockText === '' && index + 1 < lines.length) {
+                    const nextLine = lines[index + 1].trim();
+                    if (nextLine.indexOf(':') === -1 || nextLine.indexOf(':') > 15) { 
+                        blockText = nextLine;
                     }
                 }
 
-                // Ищем категорию (игнорируем пробелы и регистр)
-                const cleanCatName = catName.toLowerCase().replace(/[\s_]/g, '');
-                const actualCat = categoriesList.find(c => c.toLowerCase().replace(/[\s_]/g, '') === cleanCatName);
+                // 3. Ищем категорию (без учета регистра, но с учетом пробелов, чтобы не ломать длинные названия)
+                // Используем хитрый метод: если категория в списке содержится в названии из комментария
+                const cleanCatName = catName.toLowerCase().trim();
+                const actualCat = categoriesList.find(c => {
+                    const cLower = c.toLowerCase().trim();
+                    // Идеальное совпадение или вхождение (например "грамматика" в "грамматика, орфография...")
+                    return cLower === cleanCatName || cleanCatName.includes(cLower) || cLower.includes(cleanCatName);
+                });
 
-                               if (actualCat) {
+                if (actualCat) {
                     let isError = false;
-                    
-                    // Приводим текст к нижнему регистру
-                    const lowerText = blockText.toLowerCase().trim();
-                    
-                    // 1. Если пусто или есть слова "без ошиб" или прочерк — НЕ ошибка
-                    if (lowerText === '' || lowerText === '-' || lowerText === '—' || lowerText === '–' || lowerText.includes('без ошиб')) {
+                    const val = blockText.toLowerCase().trim();
+
+                    // Проверяем только базовые вещи: пусто, прочерк, "без ошиб"
+                    if (val === '' || val === '-' || val === '—' || val === '–' || val.includes('без ошиб')) {
                         isError = false;
                     } 
-                    // 2. Если это Рекомендация — НЕ ошибка
+                    // Рекомендации не считаем ошибкой
                     else if (catName.toLowerCase().includes('рекомендация')) {
                         isError = false;
                     } 
-                    // 3. Всё остальное — ОШИБКА
+                    // Всё остальное - ошибка
                     else {
                         isError = true;
                     }
@@ -2245,10 +2241,11 @@ function processData() {
                     if (isError) {
                         taskCats[actualCat] = true;
                         taskHasErrors = true;
-                        if (!taskComments[actualCat]) taskComments[actualCat] = [];
-                        taskComments[actualCat].push({
-                            date: startDate,
-                            text: blockText.slice(0, 300)
+                        taskComments[markerId].push({
+                            date: startDateOnly || endDateOnly || '',
+                            taskStart: startFull,
+                            category: actualCat,
+                            text: blockText.slice(0, 500)
                         });
                     }
                 }
