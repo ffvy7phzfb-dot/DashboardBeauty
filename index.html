@@ -2177,37 +2177,54 @@ function processData() {
         { key: 'неправильный ответ', full: 'Неправильный ответ' }
     ];
 
-    const processRow = (rowStr) => {
-        rowStr = rowStr.trim();
-        if (!rowStr) return;
-        if (rowStr.toLowerCase().includes('marker_id') && rowStr.toLowerCase().includes('start_date')) return;
+    // 1. Собираем данные в структуру, где комментарий - это массив строк
+    const tasksRaw = [];
+    let currentTask = null;
 
-        // Разбиваем строго по табам
-        const parts = rowStr.split('\t');
-        if (parts.length < 4) return;
+    rawLines.forEach(line => {
+        const trimmed = line.trim();
+        if (!trimmed) return;
+        
+        if (trimmed.toLowerCase().includes('marker_id') && trimmed.toLowerCase().includes('start_date')) return;
+
+        const isUuidStart = /^[0-9a-f]{8}-[0-9a-f]{4}/i.test(trimmed);
+        
+        if (isUuidStart) {
+            if (currentTask) tasksRaw.push(currentTask);
+            currentTask = { header: trimmed, commentLines: [] };
+        } else {
+            if (currentTask) {
+                currentTask.commentLines.push(trimmed);
+            }
+        }
+    });
+    if (currentTask) tasksRaw.push(currentTask);
+
+    // 2. Обрабатываем каждую задачу
+    tasksRaw.forEach(task => {
+        const parts = task.header.split('\t');
+        if (parts.length < 4) return; // Страховка от битых строк
 
         const markerId = parts[0].trim();
         const startDate = parts[1] ? parts[1].trim().slice(0, 10) : '';
         const endDate = parts[2] ? parts[2].trim().slice(0, 10) : '';
         
         let quality = null;
-        let comment = '';
+        let firstCommentLine = '';
 
-        // Если колонок 5 и больше, значит 4-я колонка - это качество, а 5-я и далее - комментарий
-        if (parts.length >= 5) {
-            const parsedQ = parseFloat((parts[3] || '').replace(',', '.'));
-            if (!isNaN(parsedQ)) {
-                quality = parsedQ;
-                comment = parts.slice(4).join(' ').trim();
-            } else {
-                // Если 4-я колонка не число, значит это комментарий (оценка пустая)
-                comment = parts.slice(3).join(' ').trim();
-            }
+        // 4-я колонка — оценка. Если её нет (пустая), то там начинается текст.
+        const parsedQ = parseFloat((parts[3] || '').replace(',', '.'));
+        if (!isNaN(parsedQ) && parsedQ >= 0 && parsedQ <= 1.5) {
+            quality = parsedQ;
+            firstCommentLine = parts.slice(4).join(' ').trim();
         } else {
-            comment = parts.slice(3).join(' ').trim();
+            firstCommentLine = parts.slice(3).join(' ').trim();
         }
 
-        if (!markerId) return;
+        // Объединяем первую строку комментария с остальными
+        let allCommentLines = [];
+        if (firstCommentLine) allCommentLines.push(firstCommentLine);
+        allCommentLines = allCommentLines.concat(task.commentLines);
 
         if (!report[markerId]) {
             report[markerId] = { id: markerId, name: namesMap[markerId] || 'Неизвестный', tasks: [], totalErrors: 0, cats: {} };
@@ -2218,55 +2235,47 @@ function processData() {
         const taskCats = {};
         let taskHasErrors = false;
 
-        if (comment) {
-            let cleanComment = comment.replace(/Исправлено валидатором/gi, ' ').trim();
-            let normalizedText = cleanComment.replace(/\*|_|«|»|"/g, ' ').replace(/\s+/g, ' ');
-            let lowerText = normalizedText.toLowerCase();
+        // 3. Ищем ошибки в каждой строке комментария ОТДЕЛЬНО
+        allCommentLines.forEach(cLine => {
+            let cleanLine = cLine.replace(/Исправлено валидатором/gi, ' ').trim();
+            let normalizedText = cleanLine.replace(/\*|_|«|»|"/g, ' ').replace(/\s+/g, ' ');
             
-            let matches = [];
-            searchKeywords.forEach(kw => {
-                let pos = lowerText.indexOf(kw.key);
-                while (pos !== -1) {
-                    let prevChar = pos > 0 ? lowerText[pos - 1] : ' ';
-                    if (!/[а-яa-z0-9]/.test(prevChar)) {
-                        matches.push({ index: pos, length: kw.key.length, category: kw.full });
+            // Если в строке есть "без ошибок" или "рекомендация", пропускаем её целиком
+            let lowerLine = normalizedText.toLowerCase();
+            if (lowerLine.includes('без ошиб') || lowerLine === '-' || lowerLine === '—' || lowerLine === 'ок' || 
+                lowerLine.includes('рекомендованное время') || lowerLine.includes('допустимое время') || 
+                lowerLine.includes('время допустимо') || lowerLine.includes('время превышено') ||
+                lowerLine.includes('исправлено') || lowerLine === 'доработка' || lowerLine.includes('рекоменд')) {
+                return;
+            }
+
+            // Ищем, с какой категории начинается строка
+            let foundCat = null;
+            for (const kw of searchKeywords) {
+                if (lowerLine.includes(kw.key)) {
+                    // Проверяем, что категория стоит в начале (чтобы не ловить слова в тексте)
+                    const pos = lowerLine.indexOf(kw.key);
+                    if (pos < 15) { // Если слово в первых 15 символах
+                        foundCat = kw.full;
+                        break;
                     }
-                    pos = lowerText.indexOf(kw.key, pos + 1);
-                }
-            });
-
-            matches.sort((a, b) => a.index - b.index);
-            
-            let uniqueMatches = [];
-            matches.forEach(m => {
-                if (uniqueMatches.length === 0 || uniqueMatches[uniqueMatches.length - 1].index !== m.index) {
-                    uniqueMatches.push(m);
-                }
-            });
-
-            for (let i = 0; i < uniqueMatches.length; i++) {
-                let startIdx = uniqueMatches[i].index + uniqueMatches[i].length;
-                let endIdx = (i + 1 < uniqueMatches.length) ? uniqueMatches[i + 1].index : normalizedText.length;
-                
-                let blockText = normalizedText.slice(startIdx, endIdx).replace(/^[:\-\s]+/, '').trim();
-                let cat = uniqueMatches[i].category;
-
-                let lowerBlock = blockText.toLowerCase();
-                if (lowerBlock.includes('без ошиб') || lowerBlock === '-' || lowerBlock === '—' || lowerBlock === 'ок' || 
-                    lowerBlock.includes('рекомендованное время') || lowerBlock.includes('допустимое время') || 
-                    lowerBlock.includes('время допустимо') || lowerBlock.includes('время превышено') ||
-                    lowerBlock.includes('исправлено') || lowerBlock === 'доработка' || cat.toLowerCase().includes('рекоменд')) {
-                    continue;
-                }
-
-                if (blockText) {
-                    taskCats[cat] = true;
-                    taskHasErrors = true;
-                    if (!window.taskComments[markerId]) window.taskComments[markerId] = [];
-                    window.taskComments[markerId].push({ date: startDate || '', category: cat, text: blockText.slice(0, 500) });
                 }
             }
-        }
+
+            // Если нашли категорию, значит вся эта строка (или часть после двоеточия) — это ошибка
+            if (foundCat) {
+                let blockText = normalizedText;
+                const colonIndex = normalizedText.indexOf(':');
+                if (colonIndex !== -1) blockText = normalizedText.slice(colonIndex + 1).trim();
+
+                if (blockText) {
+                    taskCats[foundCat] = true;
+                    taskHasErrors = true;
+                    if (!window.taskComments[markerId]) window.taskComments[markerId] = [];
+                    window.taskComments[markerId].push({ date: startDate || '', category: foundCat, text: blockText.slice(0, 500) });
+                }
+            }
+        });
 
         if (taskHasErrors) {
             user.totalErrors++;
@@ -2285,22 +2294,7 @@ function processData() {
             hasErrors: taskHasErrors, 
             cats: taskCats 
         });
-    };
-
-    // СБОРКА: склеиваем только если строка не начинается с UUID
-    let currentRow = '';
-    rawLines.forEach(line => {
-        const isUuidStart = /^[0-9a-f]{8}-[0-9a-f]{4}/i.test(line.trim());
-        if (isUuidStart) {
-            if (currentRow) processRow(currentRow);
-            currentRow = line; 
-        } else {
-            if (currentRow) {
-                currentRow += ' ' + line.trim(); 
-            }
-        }
     });
-    if (currentRow) processRow(currentRow);
 
     globalReport = Object.values(report);
     window.globalReport = globalReport;
