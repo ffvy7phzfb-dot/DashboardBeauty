@@ -2163,6 +2163,8 @@ function processData() {
         { key: 'ошибки рп', full: 'ошибки РП' },
         { key: 'грамматика', full: 'грамматика, орфография, пунктуация, не те слова' },
         { key: 'пропущенная ё', full: 'пропущенная ё, опечатка, потерянная точка' },
+        { key: 'пропущенная е', full: 'пропущенная ё, опечатка, потерянная точка' }, // Без ё
+        { key: 'опечатка', full: 'пропущенная ё, опечатка, потерянная точка' },      // Если написано просто "опечатка"
         { key: 'систем', full: 'систем' },
         { key: 'контекст', full: 'контекст, ты/вы' },
         { key: 'комментарий', full: 'комментарий' },
@@ -2180,12 +2182,11 @@ function processData() {
 
     let currentTask = null;
 
-    // Функция обработки накопленной задачи
     const flushTask = () => {
         if (!currentTask) return;
 
         const headerParts = currentTask.header.split('\t');
-        const markerId = headerParts[0].trim(); // ЖЕСТКАЯ ПРИВЯЗКА К ID
+        const markerId = headerParts[0].trim(); 
         
         const startDate = headerParts[1] ? headerParts[1].trim().slice(0, 10) : '';
         const endDate = headerParts[2] ? headerParts[2].trim().slice(0, 10) : '';
@@ -2193,7 +2194,6 @@ function processData() {
         let quality = null;
         let firstCommentLine = '';
 
-        // Парсим 4-ю колонку (оценку), если она есть
         if (headerParts.length >= 4) {
             const parsedQ = parseFloat((headerParts[3] || '').replace(',', '.'));
             if (!isNaN(parsedQ) && parsedQ >= 0 && parsedQ <= 1.5) {
@@ -2204,7 +2204,6 @@ function processData() {
             }
         }
 
-        // Склеиваем весь текст комментария для ЭТОЙ задачи
         let allComments = [];
         if (firstCommentLine) allComments.push(firstCommentLine);
         allComments = allComments.concat(currentTask.comments);
@@ -2220,7 +2219,6 @@ function processData() {
         let taskHasErrors = false;
 
         if (fullCommentText) {
-            // Очищаем текст от лишнего
             let cleanComment = fullCommentText.replace(/Исправлено валидатором/gi, ' ')
                                                 .replace(/\*|_|«|»|"/g, ' ')
                                                 .replace(/\s+/g, ' ')
@@ -2228,20 +2226,29 @@ function processData() {
 
             let lowerComment = cleanComment.toLowerCase();
             
-            // Находим позиции всех категорий
             let matches = [];
             searchKeywords.forEach(kw => {
                 let pos = lowerComment.indexOf(kw.key);
                 while (pos !== -1) {
                     let prevChar = pos > 0 ? lowerComment[pos - 1] : ' ';
+                    // Проверяем, что это начало слова
                     if (!/[а-яa-z0-9]/.test(prevChar)) {
-                        matches.push({ index: pos, length: kw.key.length, category: kw.full });
+                        // Проверяем, не является ли это словом внутри текста (а не названием категории)
+                        // Название категории обычно стоит в начале или после точки/новой строки
+                        let afterChar = pos + kw.key.length < lowerComment.length ? lowerComment[pos + kw.key.length] : ' ';
+                        let isCategoryName = /[:\-]/.test(afterChar) || pos === 0 || /[.!?]\s/.test(lowerComment.slice(Math.max(0, pos - 5), pos));
+                        
+                        // Если это "опечатка" и она не в начале, а просто в тексте — скорее всего, это не категория
+                        if (kw.key === 'опечатка' && !isCategoryName && currentTemplateKey === 'beautiful_answers') {
+                            // Пропускаем, если это не похоже на название категории
+                        } else {
+                            matches.push({ index: pos, length: kw.key.length, category: kw.full });
+                        }
                     }
                     pos = lowerComment.indexOf(kw.key, pos + 1);
                 }
             });
 
-            // Сортируем по порядку в тексте
             matches.sort((a, b) => a.index - b.index);
             
             let uniqueMatches = [];
@@ -2251,7 +2258,6 @@ function processData() {
                 }
             });
 
-            // Разбиваем текст на блоки по категориям
             for (let i = 0; i < uniqueMatches.length; i++) {
                 let startIdx = uniqueMatches[i].index + uniqueMatches[i].length;
                 let endIdx = (i + 1 < uniqueMatches.length) ? uniqueMatches[i + 1].index : cleanComment.length;
@@ -2260,8 +2266,6 @@ function processData() {
                 let cat = uniqueMatches[i].category;
 
                 let lowerBlock = blockText.toLowerCase();
-                
-                // Если ошибки нет — пропускаем
                 if (lowerBlock.includes('без ошиб') || lowerBlock === '-' || lowerBlock === '—' || lowerBlock === 'ок' || 
                     lowerBlock.includes('рекомендованное время') || lowerBlock.includes('допустимое время') || 
                     lowerBlock.includes('время допустимо') || lowerBlock.includes('время превышено') ||
@@ -2269,7 +2273,6 @@ function processData() {
                     continue;
                 }
 
-                // Если ошибка есть — записываем её СТРОГО для текущего ID
                 if (blockText) {
                     taskCats[cat] = true;
                     taskHasErrors = true;
@@ -2300,7 +2303,6 @@ function processData() {
         currentTask = null;
     };
 
-    // Идем по строкам и собираем задачи
     rawLines.forEach(line => {
         const trimmed = line.trim();
         if (!trimmed) return;
@@ -2309,17 +2311,15 @@ function processData() {
         const isUuidStart = /^[0-9a-f]{8}-[0-9a-f]{4}/i.test(trimmed);
         
         if (isUuidStart) {
-            // Встретили нового человека или новую задачу — сохраняем предыдущую
             flushTask(); 
             currentTask = { header: trimmed, comments: [] };
         } else {
-            // Это продолжение комментария текущего человека
             if (currentTask) {
                 currentTask.comments.push(trimmed);
             }
         }
     });
-    flushTask(); // Сохраняем последнюю задачу
+    flushTask(); 
 
     globalReport = Object.values(report);
     window.globalReport = globalReport;
