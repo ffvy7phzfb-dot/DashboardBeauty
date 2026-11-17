@@ -2162,11 +2162,9 @@ function processData() {
         if (!l.trim()) { lines.push(l); continue; }
 
         let guard = 0;
-        // Пока в строке меньше 5 столбцов и есть следующая — склеиваем
         while (l.split('\t').length < 5 && i + 1 < rawLines.length && guard < 20) {
             i++;
             const next = rawLines[i];
-            // Если следующая строка уже полноценная (5+ столбцов) — не склеиваем
             if (next.split('\t').length >= 5) {
                 i--; 
                 break;
@@ -2181,19 +2179,36 @@ function processData() {
     let totalRows = 0;
     taskComments = {};
 
-    // Читаем данные из сводки (теперь уже склеенные)
+    const CATEGORY_SYNONYMS = {
+        'расчет по критериям оценки': ['расчет по критериям', 'расчет по критерия', 'критерии', 'расчет'],
+        'маркдаун': ['мд', 'markdown', 'разметка'],
+        'ошибки рп': ['рп', 'редакторская правка', 'редактура'],
+        'грамматика, орфография, пунктуация, не те слова': ['грамматика', 'орфография', 'пунктуация', 'грамматика, орфография, пунктуация'],
+        'пропущенная ё, опечатка, потерянная точка': ['ё', 'е', 'опечатка', 'буква ё', 'пропущенная ё'],
+        'контекст, ты/вы': ['контекст', 'ты/вы', 'обращение'],
+        'опечатка': ['опечатки', 'пропущенная буква', 'буква'],
+        'тип-оформление': ['оформление', 'тип'],
+        'смысловая опечатка': ['смысл', 'смысловые'],
+        'latex': ['латех', 'формула'],
+        'картинка': ['картинки', 'изображение'],
+        'тег тематики': ['тематика', 'теги тематики'],
+        'тег типа вопроса': ['тип вопроса', 'теги типа'],
+        'неправильный ответ': ['ответ', 'неверный ответ'],
+        'рекомендация': ['рекомендации', 'рекомендация']
+    };
+
     lines.forEach((line, index) => {
         if (index === 0 && line.toLowerCase().includes('marker_id')) return;
         if (!line.trim()) return;
 
         const parts = line.split('\t');
-        if (parts.length < 5) return;
+        if (parts.length < 4) return;
 
         const markerId = parts[0].trim();
         const startDate = parts[1].trim().slice(0, 10);
         const endDate = parts[2].trim().slice(0, 10);
-        const quality = parseFloat(parts[3].replace(',', '.'));
-        const comment = parts[4] || '';
+        const quality = parseFloat((parts[3] || '').replace(',', '.')) || null;
+        const comment = parts.slice(4).join('\t') || '';
 
         if (!markerId) return;
         totalRows++;
@@ -2213,43 +2228,50 @@ function processData() {
         const taskCats = {};
         let taskHasErrors = false;
 
-        // --- РАЗБОР КОММЕНТАРИЕВ ---
-        if (comment) {
+        if (comment && comment.trim()) {
             const cleanComment = comment.replace(/Исправлено валидатором/gi, '').trim();
             const commentLines = cleanComment.split(/\r?\n/);
 
-            commentLines.forEach((line, i) => {
-                const colonIndex = line.indexOf(':');
+            commentLines.forEach((cLine) => {
+                cLine = cLine.trim();
+                if (!cLine) return;
+
+                const colonIndex = cLine.indexOf(':');
                 if (colonIndex === -1) return;
 
-                // 1. Очищаем название от звездочек и лишних пробелов
-                let catName = line.slice(0, colonIndex).replace(/\*/g, '').trim();
-                                console.log("🔎 Проверяю категорию:", catName, "| Ищу в списке:", categoriesList);
-                let blockText = line.slice(colonIndex + 1).trim();
+                let catName = cLine.slice(0, colonIndex).replace(/\*|_|«|»|"/g, '').trim();
+                let blockText = cLine.slice(colonIndex + 1).trim();
 
-                // 2. Если после двоеточия пусто, берем следующую строку
-                if (blockText === '' && index + 1 < lines.length) {
-                    const nextLine = lines[index + 1].trim();
-                    if (nextLine.indexOf(':') === -1 || nextLine.indexOf(':') > 15) { 
-                        blockText = nextLine;
+                if (!catName) return;
+
+                const lowerCat = catName.toLowerCase();
+                let finalCat = null;
+
+                // 1. Прямое совпадение
+                finalCat = categoriesList.find(c => {
+                    const cLower = c.toLowerCase();
+                    return cLower === lowerCat || lowerCat.includes(cLower) || cLower.includes(lowerCat);
+                });
+
+                // 2. Синонимы
+                if (!finalCat) {
+                    for (const [realCategory, synonyms] of Object.entries(CATEGORY_SYNONYMS)) {
+                        const catInTemplate = categoriesList.find(c => c.toLowerCase() === realCategory.toLowerCase());
+                        if (catInTemplate) {
+                            const matchedSynonym = synonyms.some(syn => lowerCat.includes(syn));
+                            if (matchedSynonym) {
+                                finalCat = catInTemplate;
+                                break;
+                            }
+                        }
                     }
                 }
 
-                              // 3. Ищем категорию. Если не нашли — создаем "Другое"
-                const cleanCatName = catName.toLowerCase().trim();
-                const actualCat = categoriesList.find(c => {
-                    const cLower = c.toLowerCase().trim();
-                    return cLower === cleanCatName || cleanCatName.includes(cLower) || cLower.includes(cleanCatName);
-                });
-
-                let finalCat = actualCat;
-
-                // Если категория не найдена в списке, но текст содержит что-то кроме "без ошиб"
+                // 3. Другое (если текст похож на ошибку)
                 if (!finalCat) {
-                    const val = blockText.toLowerCase().trim();
+                    const val = blockText.toLowerCase();
                     const isBadText = val !== '' && val !== '-' && val !== '—' && val !== '1' && val !== '0' && !val.includes('без ошиб');
-                    
-                    if (isBadText && !catName.toLowerCase().includes('рекомендация')) {
+                    if (isBadText && !lowerCat.includes('рекомендация')) {
                         finalCat = 'Другое (не в списке)';
                     }
                 }
@@ -2258,10 +2280,10 @@ function processData() {
                     let isError = false;
                     const val = blockText.toLowerCase().trim();
 
-                    if (val === '' || val === '-' || val === '—' || val === '–' || val.includes('без ошиб')) {
+                    if (val === '' || val === '-' || val === '—' || val === '–' || val.includes('без ошиб') || val === 'ок') {
                         isError = false;
                     } 
-                    else if (catName.toLowerCase().includes('рекомендация')) {
+                    else if (lowerCat.includes('рекомендация')) {
                         isError = false;
                     } 
                     else {
@@ -2269,7 +2291,6 @@ function processData() {
                     }
 
                     if (isError) {
-                        // Если категории нет в списке (это "Другое"), добавляем её на лету
                         if (!categoriesList.includes(finalCat)) {
                             categoriesList.push(finalCat);
                             CAT_SHORT_LABELS[finalCat] = finalCat;
@@ -2289,17 +2310,19 @@ function processData() {
             });
         }
 
-        // Считаем ошибки для этой задачи
         if (taskHasErrors) {
             user.totalErrors++;
             Object.keys(taskCats).forEach(cat => {
-                user.cats[cat]++;
+                user.cats[cat] = (user.cats[cat] || 0) + 1;
             });
         }
 
         user.tasks.push({
             id: markerId,
             date: startDate,
+            startDate: startDate,
+            endDate: endDate,
+            projectId: window.currentProjectId,
             quality: quality,
             hasErrors: taskHasErrors,
             cats: taskCats
@@ -2309,15 +2332,12 @@ function processData() {
     globalReport = Object.values(report);
     window.globalReport = globalReport;
     
-    // Отрисовка таблицы
     renderReport(globalReport);
     
-    // Показываем фильтры и кисти
     document.getElementById('filtersPanel').style.display = 'block';
     document.getElementById('marksPanel').style.display = 'flex';
     document.getElementById('exportBtn').style.display = 'inline-block';
     
-    // Обновляем выпадающий список сотрудников
     const userSelect = document.getElementById('filterUser');
     userSelect.innerHTML = '<option value="all">Все сотрудники</option>';
     globalReport.sort((a,b) => a.name.localeCompare(b.name)).forEach(u => {
