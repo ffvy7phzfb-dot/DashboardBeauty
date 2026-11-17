@@ -2157,26 +2157,26 @@ function processData() {
     const report = {}; 
     window.taskComments = {};
 
-    // Жесткий список категорий
+    // Список категорий для поиска
     const keywords = [
-        { key: 'маркдаун', col: 'маркдаун' },
-        { key: 'ошибки рп', col: 'ошибки РП' },
-        { key: 'грамматика', col: 'грамматика, орфография, пунктуация, не те слова' },
-        { key: 'пропущенная ё', col: 'пропущенная ё, опечатка, потерянная точка' },
-        { key: 'пропущенная е', col: 'пропущенная ё, опечатка, потерянная точка' },
-        { key: 'систем', col: 'систем' },
-        { key: 'контекст', col: 'контекст, ты/вы' },
-        { key: 'комментарий', col: 'комментарий' },
-        { key: 'единообразие', col: 'единообразие' },
-        { key: 'расчет', col: 'расчет по критериям оценки' },
-        { key: 'смысловая', col: 'Смысловая опечатка' },
-        { key: 'опечатка', col: 'Опечатка' },
-        { key: 'тип-оформление', col: 'Тип-оформление' },
-        { key: 'latex', col: 'LaTeX' },
-        { key: 'картинка', col: 'Картинка' },
-        { key: 'тег тематики', col: 'Тег тематики' },
-        { key: 'тег типа', col: 'Тег типа вопроса' },
-        { key: 'неправильный ответ', col: 'Неправильный ответ' }
+        { key: 'маркдаун', full: 'маркдаун' },
+        { key: 'ошибки рп', full: 'ошибки РП' },
+        { key: 'грамматика', full: 'грамматика, орфография, пунктуация, не те слова' },
+        { key: 'пропущенная ё', full: 'пропущенная ё, опечатка, потерянная точка' },
+        { key: 'пропущенная е', full: 'пропущенная ё, опечатка, потерянная точка' },
+        { key: 'систем', full: 'систем' },
+        { key: 'контекст', full: 'контекст, ты/вы' },
+        { key: 'комментарий', full: 'комментарий' },
+        { key: 'единообразие', full: 'единообразие' },
+        { key: 'расчет', full: 'расчет по критериям оценки' },
+        { key: 'смысловая', full: 'Смысловая опечатка' },
+        { key: 'опечатка', full: 'Опечатка' },
+        { key: 'тип-оформление', full: 'Тип-оформление' },
+        { key: 'latex', full: 'LaTeX' },
+        { key: 'картинка', full: 'Картинка' },
+        { key: 'тег тематики', full: 'Тег тематики' },
+        { key: 'тег типа', full: 'Тег типа вопроса' },
+        { key: 'неправильный ответ', full: 'Неправильный ответ' }
     ];
 
     let currentTask = null;
@@ -2214,7 +2214,7 @@ function processData() {
         }
 
         const user = report[markerId];
-        const taskCats = new Set();
+        const taskCats = new Set(); // Используем Set для уникальности в рамках ОДНОЙ задачи
         let taskHasErrors = false;
 
         if (fullText) {
@@ -2231,6 +2231,7 @@ function processData() {
                     if (kw.key === 'опечатка' && lowerText.includes('смысловая опечатка')) return;
 
                     let textAfter = lowerText.slice(pos + kw.key.length);
+                    
                     let nextPos = textAfter.length;
                     keywords.forEach(otherKw => {
                         if (otherKw.key === kw.key) return;
@@ -2246,8 +2247,6 @@ function processData() {
                     if (!blockText || 
                         blockText === '-' || 
                         blockText === '—' || 
-                        lowerBlock === 'без ошибок' ||
-                        lowerBlock === 'без ошибки' ||
                         lowerBlock.includes('без ошиб') || 
                         lowerBlock.includes('рекомендованное время') || 
                         lowerBlock.includes('допустимое время') || 
@@ -2259,9 +2258,12 @@ function processData() {
                         return;
                     }
 
-                    // ВОТ ЗДЕСЬ ГЛАВНОЕ ИЗМЕНЕНИЕ:
-                    // Мы не ищем в categoriesList, а берем колонку напрямую из словаря
-                    let matchedCat = kw.col;
+                    // Ищем правильное название колонки в списке
+                    let matchedCat = categoriesList.find(c => c.toLowerCase().includes(kw.key));
+                    if (!matchedCat) matchedCat = kw.full;
+
+                    // ГЛАВНАЯ ЗАЩИТА: если такая ошибка уже была в этой задаче — не считаем её второй раз
+                    if (taskCats.has(matchedCat)) return;
 
                     taskCats.add(matchedCat);
                     taskHasErrors = true;
