@@ -2153,15 +2153,37 @@ function processData() {
     }
 
     const namesMap = parseNames(namesText);
-    const lines = mainText.split(/\r?\n/);
+    const rawLines = mainText.split(/\r?\n/);
     
+    // --- Склейка "рваных" строк из Excel ---
+    const lines = [];
+    for (let i = 0; i < rawLines.length; i++) {
+        let l = rawLines[i];
+        if (!l.trim()) { lines.push(l); continue; }
+
+        let guard = 0;
+        // Пока в строке меньше 5 столбцов и есть следующая — склеиваем
+        while (l.split('\t').length < 5 && i + 1 < rawLines.length && guard < 20) {
+            i++;
+            const next = rawLines[i];
+            // Если следующая строка уже полноценная (5+ столбцов) — не склеиваем
+            if (next.split('\t').length >= 5) {
+                i--; 
+                break;
+            }
+            l = l + ' ' + next; 
+            guard++;
+        }
+        lines.push(l);
+    }
+
     const report = {}; 
     let totalRows = 0;
     taskComments = {};
 
-    // Читаем данные из сводки
+    // Читаем данные из сводки (теперь уже склеенные)
     lines.forEach((line, index) => {
-        if (index === 0 && line.toLowerCase().includes('marker_id')) return; // пропускаем заголовок
+        if (index === 0 && line.toLowerCase().includes('marker_id')) return;
         if (!line.trim()) return;
 
         const parts = line.split('\t');
@@ -2357,7 +2379,15 @@ function resetFilters() {
     applyFilters();
     debouncedSaveSettings();
 }
-
+function getRowPaint(userId) {
+    const p = userPaints[userId];
+    return (typeof p === 'string' && p && p !== 'none') ? 'paint-' + p : '';
+}
+function getPaintCell(userId, cat) {
+    const p = userPaints[userId];
+    if (!p || typeof p !== 'object') return '';
+    return p[cat] ? 'paint-' + p[cat] : '';
+}
     function renderReport(users) {
         const container = document.getElementById('output');
         if (!users || users.length === 0) {
@@ -2435,7 +2465,7 @@ function resetFilters() {
         container.innerHTML = html;
         
         document.querySelectorAll('.color-swatch').forEach(el => {
-            el.classList.toggle('active', el.dataset.paint === currentBrushPaint);
+            el.classList.toggle('active', el.dataset.paint === BrushPaint);
         });
     }
 
