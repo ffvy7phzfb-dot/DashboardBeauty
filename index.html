@@ -2207,21 +2207,22 @@ function processData() {
             let isError = false;
             
 if (currentTemplateKey === 'ssu') {
-    const lowerText = blockText.toLowerCase();
-    
-    // Если в тексте есть "без ошибок" (с точкой или без) или стоит прочерк — это НЕ ошибка
-    if (lowerText.includes('без ошибок') || lowerText === '-' || lowerText === '—' || lowerText === '–' || blockText.trim() === '') {
+    const val = blockText.trim().toLowerCase();
+    const lowerCat = catName.toLowerCase();
+
+    // 1. Если это Рекомендация — это ВСЕГДА не ошибка (даже если там есть текст)
+    if (lowerCat.includes('рекомендация')) {
         isError = false;
     } 
-    // Если это рекомендация — это тоже НЕ ошибка (совет)
-    else if (catName.toLowerCase().includes('рекомендация')) {
-        isError = false;
+    // 2. Если написано "без ошибок" (с точкой или без) или стоит прочерк — это не ошибка
+ else if (val === '' || val.startsWith('без ошибок') || val === '-' || val === '—' || val === '–') {
+                    isError = false;
     } 
-    // Во всех остальных случаях — это ОШИБКА (как в BA)
+    // 3. Во всех остальных случаях — это ошибка
     else {
         isError = true;
     }
-}
+} 
 else {
     // Для Beautiful Answers (оставляем без изменений)
     if (blockText.length > 0) {
