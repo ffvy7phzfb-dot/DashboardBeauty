@@ -2136,79 +2136,72 @@ function parseNames(raw) {
 }
 
 function processData() {
-    const mainRaw = document.getElementById('mainData').value;
-    const namesRaw = document.getElementById('namesData').value;
-    const output = document.getElementById('output');
-    if (!mainRaw.trim()) { output.innerHTML = '<p style="color:var(--c-red); text-align:center;">вставь данные в первое окно.</p>'; return; }
-    const employees = parseNames(namesRaw);
+    const mainText = document.getElementById('mainData').value;
+    const namesText = document.getElementById('namesData').value;
 
-    const lines = mainRaw.split(/\r?\n/);
-    const parsedRows = [];
-    let currentRow = [];
-    let startIndex = 0;
-    if (lines[0].toLowerCase().includes('marker_id')) startIndex = 1;
-
-    for (let i = startIndex; i < lines.length; i++) {
-        const cols = lines[i].split('\t');
-        if (cols.length >= 5) {
-            if (currentRow.length > 0) parsedRows.push(currentRow);
-            currentRow = [cols[0], cols[1], cols[2], cols[3], cols.slice(4).join('\t')];
-        } else if (currentRow.length > 0) {
-            currentRow[4] = (currentRow[4] || '') + '\n' + lines[i];
-        }
+    if (!mainText.trim()) {
+        alert('Вставьте данные в первое поле');
+        return;
     }
-    if (currentRow.length > 0) parsedRows.push(currentRow);
 
-    const report = {};
-    taskComments = {};
-
-    parsedRows.forEach(cols => {
-        const markerId = (cols[0] || '').trim();
-        if (!markerId) return;
-        const startDate = (cols[1] || '').trim();
-        const endDate   = (cols[2] || '').trim();
-        const quality   = (cols[3] || '').trim();
-        const comment   = (cols[4] || '').trim();
-        const qNum = parseFloat(quality.replace(',', '.'));
-        if (isNaN(qNum)) return;
-
-        const name = employees[markerId] || 'фамилия не указана';
-        if (!report[markerId]) {
-            report[markerId] = { id: markerId, name: name, tasks: [] };
-            taskComments[markerId] = [];
-        }
-        const user = report[markerId];
-        const startDateOnly = startDate.split('T')[0];
-        const endDateOnly   = endDate.split('T')[0];
-        const startFull = startDate.includes('T') ? startDate : (startDateOnly ? startDateOnly + 'T00:00:00' : '');
-
-        let taskHasErrors = false;
-        const taskCats = {};
-        categoriesList.forEach(c => taskCats[c] = false);
-
-       if (comment) {
-    // Очищаем от служебной фразы
-    const cleanComment = comment.replace(/Исправлено валидатором/gi, '').trim();
+    const namesMap = parseNames(namesText);
+    const lines = mainText.split(/\r?\n/);
     
-    // Разбиваем комментарий на строки (каждая категория обычно с новой строки)
-    const lines = cleanComment.split(/\r?\n/);
+    const report = {}; 
+    let totalRows = 0;
 
-                lines.forEach((line, index) => {
+    // Читаем данные из сводки
+    lines.forEach((line, index) => {
+        if (index === 0 && line.toLowerCase().includes('marker_id')) return; // пропускаем заголовок
+        if (!line.trim()) return;
+
+        const parts = line.split('\t');
+        if (parts.length < 5) return;
+
+        const markerId = parts[0].trim();
+        const startDate = parts[1].trim().slice(0, 10);
+        const endDate = parts[2].trim().slice(0, 10);
+        const quality = parseFloat(parts[3].replace(',', '.'));
+        const comment = parts[4] || '';
+
+        if (!markerId) return;
+        totalRows++;
+
+        if (!report[markerId]) {
+            report[markerId] = {
+                id: markerId,
+                name: namesMap[markerId] || 'Неизвестный',
+                tasks: [],
+                totalErrors: 0,
+                cats: {}
+            };
+            categoriesList.forEach(c => report[markerId].cats[c] = 0);
+        }
+
+        const user = report[markerId];
+        const taskCats = {};
+        let taskHasErrors = false;
+        const taskComments = {};
+
+        // --- РАЗБОР КОММЕНТАРИЕВ ---
+        if (comment) {
+            const cleanComment = comment.replace(/Исправлено валидатором/gi, '').trim();
+            const commentLines = cleanComment.split(/\r?\n/);
+
+            commentLines.forEach((line, i) => {
                 const colonIndex = line.indexOf(':');
-                if (colonIndex === -1) return; // если нет двоеточия, пропускаем
+                if (colonIndex === -1) return;
 
-                // Убираем все звездочки (для BA) и лишние пробелы
-let catName = line.slice(0, colonIndex).replace(/\*/g, '').trim();
+                // Название категории (убираем звездочки для BA)
+                let catName = line.slice(0, colonIndex).replace(/\*/g, '').trim();
                 let blockText = line.slice(colonIndex + 1).trim();
 
-                // Если после двоеточия пусто, ищем текст в следующих строках (пропускаем пустые)
+                // Умный поиск текста на следующей строке (если после двоеточия пусто)
                 if (blockText === '') {
-                    let j = index + 1;
-                    // Ищем вплоть до 3-х строк вперед
-                    while (j < lines.length && j <= index + 3) {
-                        const nextLine = lines[j].trim();
+                    let j = i + 1;
+                    while (j < commentLines.length && j <= i + 3) {
+                        const nextLine = commentLines[j].trim();
                         if (nextLine !== '') {
-                            // Если это не заголовок новой категории (нет двоеточия или оно далеко)
                             if (nextLine.indexOf(':') === -1 || nextLine.indexOf(':') > 15) {
                                 blockText = nextLine;
                                 break;
@@ -2217,78 +2210,82 @@ let catName = line.slice(0, colonIndex).replace(/\*/g, '').trim();
                         j++;
                     }
                 }
-        // Ищем, есть ли такая категория в нашем списке
-                        // Умный поиск категории (игнорирует пробелы и регистр)
+
+                // Ищем категорию (игнорируем пробелы и регистр)
                 const cleanCatName = catName.toLowerCase().replace(/[\s_]/g, '');
                 const actualCat = categoriesList.find(c => c.toLowerCase().replace(/[\s_]/g, '') === cleanCatName);
 
                 if (actualCat) {
                     let isError = false;
-                    
-                    if (currentTemplateKey === 'ssu') {
-                        // --- ЛОГИКА ДЛЯ SSU ---
-                        const val = blockText.trim().toLowerCase();
-                        const lowerCat = catName.toLowerCase();
+                    const val = blockText.toLowerCase();
 
-                        // 1. Рекомендации не считаем
-                        if (lowerCat.includes('рекомендация')) {
-                            isError = false;
-                        } 
-                        // 2. Если пусто, прочерк или "без ошиб" — не считаем
-                        else if (val === '' || val === '-' || val === '—' || val === '–' || val.includes('без ошиб')) {
-                            isError = false;
-                        } 
-                        // 3. Всё остальное — ошибка
-                        else {
-                            isError = true;
-                        }
-                    } else {
-                        // --- ЛОГИКА ДЛЯ BEAUTIFUL ANSWERS ---
-                        const val = blockText.trim().toLowerCase();
-                        
-                        // В BA тоже могут быть "без ошибок" и прочерки
-                        if (val === '' || val === '-' || val === '—' || val === '–' || val.includes('без ошиб')) {
-                            isError = false;
-                        } else {
-                            isError = true;
-                        }
+                    // Общие правила (и для BA, и для SSU)
+                    if (val.trim() === '' || val === '-' || val === '—' || val === '–' || val.includes('без ошиб')) {
+                        isError = false;
+                    } 
+                    // Для SSU: Рекомендации не считаем ошибкой
+                    else if (currentTemplateKey === 'ssu' && catName.toLowerCase().includes('рекомендация')) {
+                        isError = false;
+                    }
+                    // Остальное — ошибка
+                    else {
+                        isError = true;
                     }
 
                     if (isError) {
                         taskCats[actualCat] = true;
                         taskHasErrors = true;
-                        taskComments[markerId].push({
-                            date: startDateOnly || endDateOnly || '',
-                            taskStart: startFull,
-                            category: actualCat,
-                            text: blockText.slice(0, 500)
+                        if (!taskComments[actualCat]) taskComments[actualCat] = [];
+                        taskComments[actualCat].push({
+                            date: startDate,
+                            text: blockText.slice(0, 300)
                         });
                     }
                 }
-    });
-}
+            });
+        }
+
+        // Считаем ошибки для этой задачи
+        if (taskHasErrors) {
+            user.totalErrors++;
+            Object.keys(taskCats).forEach(cat => {
+                user.cats[cat]++;
+            });
+        }
+
         user.tasks.push({
-            startDate: startDateOnly, endDate: endDateOnly,
-            startTime: startFull,
-            hasErrors: taskHasErrors, cats: taskCats, quality: qNum,
-            projectId: currentProjectId
+            id: markerId,
+            date: startDate,
+            quality: quality,
+            hasErrors: taskHasErrors,
+            cats: taskCats,
+            comments: taskComments
         });
     });
 
     globalReport = Object.values(report);
     window.globalReport = globalReport;
-    populateFilters();
-    populateCompareTargets();
-
+    
+    // Отрисовка таблицы
+    renderReport(globalReport);
+    
+    // Показываем фильтры и кисти
     document.getElementById('filtersPanel').style.display = 'block';
     document.getElementById('marksPanel').style.display = 'flex';
     document.getElementById('exportBtn').style.display = 'inline-block';
-    document.getElementById('tabsSection').style.display = 'block';
+    
+    // Обновляем выпадающий список сотрудников
+    const userSelect = document.getElementById('filterUser');
+    userSelect.innerHTML = '<option value="all">Все сотрудники</option>';
+    globalReport.sort((a,b) => a.name.localeCompare(b.name)).forEach(u => {
+        const opt = document.createElement('option');
+        opt.value = u.id;
+        opt.textContent = u.name;
+        userSelect.appendChild(opt);
+    });
 
-    applyFilters();
-    saveToCloud();
+    showToast('Данные успешно обработаны!');
 }
-
 function populateFilters() {
     const userSelect = document.getElementById('filterUser');
     userSelect.innerHTML = '<option value="all">все сотрудники</option>';
