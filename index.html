@@ -2205,30 +2205,22 @@ function processData() {
 
         if (actualCat) {
             let isError = false;
-            
-if (currentTemplateKey === 'ssu') {
-    const val = blockText.trim().toLowerCase();
-    const lowerCat = catName.toLowerCase();
+                // Универсальная проверка для ОБОИХ шаблонов (BA и SSU)
+                const lowerText = blockText.toLowerCase();
+                const lowerCat = catName.toLowerCase();
 
-    // 1. Если это Рекомендация — это ВСЕГДА не ошибка (даже если там есть текст)
-    if (lowerCat.includes('рекомендация')) {
-        isError = false;
-    } 
-    // 2. Если написано "без ошибок" (с точкой или без) или стоит прочерк — это не ошибка
- else if (val === '' || val.startsWith('без ошибок') || val === '-' || val === '—' || val === '–') {
+                // 1. Если пусто, прочерк или есть корень "без ошиб" (ловит "без ошибок", "без ошибки" и т.д.)
+                if (lowerText.trim() === '' || lowerText === '-' || lowerText === '—' || lowerText === '–' || lowerText.includes('без ошиб')) {
                     isError = false;
-    } 
-    // 3. Во всех остальных случаях — это ошибка
-    else {
-        isError = true;
-    }
-} 
-else {
-    // Для Beautiful Answers (оставляем без изменений)
-    if (blockText.length > 0) {
-        isError = true;
-    }
-}
+                } 
+                // 2. Если это Рекомендация — НЕ ошибка
+                else if (lowerCat.includes('рекомендация')) {
+                    isError = false;
+                } 
+                // 3. Во всех остальных случаях — ЭТО ОШИБКА
+                else {
+                    isError = true;
+                }
             if (isError) {
                 taskCats[actualCat] = true;
                 taskHasErrors = true;
