@@ -2184,12 +2184,12 @@ function processData() {
                 cats: {}
             };
             categoriesList.forEach(c => report[markerId].cats[c] = 0);
+            taskComments[markerId] = [];
         }
 
         const user = report[markerId];
         const taskCats = {};
         let taskHasErrors = false;
-        const taskComments = {};
 
         // --- РАЗБОР КОММЕНТАРИЕВ ---
         if (comment) {
@@ -2243,8 +2243,7 @@ function processData() {
                         taskCats[actualCat] = true;
                         taskHasErrors = true;
                         taskComments[markerId].push({
-                            date: startDateOnly || endDateOnly || '',
-                            taskStart: startFull,
+                            date: startDate,
                             category: actualCat,
                             text: blockText.slice(0, 500)
                         });
@@ -2266,8 +2265,7 @@ function processData() {
             date: startDate,
             quality: quality,
             hasErrors: taskHasErrors,
-            cats: taskCats,
-            comments: taskComments
+            cats: taskCats
         });
     });
 
