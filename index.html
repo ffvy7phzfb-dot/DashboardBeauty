@@ -2222,28 +2222,36 @@ let catName = line.slice(0, colonIndex).replace(/\*/g, '').trim();
                 const cleanCatName = catName.toLowerCase().replace(/[\s_]/g, '');
                 const actualCat = categoriesList.find(c => c.toLowerCase().replace(/[\s_]/g, '') === cleanCatName);
 
-                        if (actualCat) {
+                if (actualCat) {
                     let isError = false;
                     
-                    // Универсальная проверка для обоих шаблонов (BA и SSU)
-                    const lowerText = blockText.toLowerCase();
-                    const lowerCat = catName.toLowerCase();
+                    if (currentTemplateKey === 'ssu') {
+                        // --- ЛОГИКА ДЛЯ SSU ---
+                        const val = blockText.trim().toLowerCase();
+                        const lowerCat = catName.toLowerCase();
 
-                    // 1. Если это СЛУЖЕБНАЯ строка (типа "Расчет по критериям") — пропускаем
-                    if (lowerCat.includes('расчет') || lowerCat.includes('качество') || lowerCat.includes('рекомендованное время')) {
-                        isError = false;
-                    }
-                    // 2. Если пусто, прочерк или есть корень "без ошиб" — НЕ ошибка
-                    else if (lowerText.trim() === '' || lowerText === '-' || lowerText === '—' || lowerText === '–' || lowerText.includes('без ошиб')) {
-                        isError = false;
-                    } 
-                    // 3. Если это Рекомендация — НЕ ошибка (даже если там есть текст)
-                    else if (lowerCat.includes('рекомендация')) {
-                        isError = false;
-                    } 
-                    // 4. Во всех остальных случаях — ЭТО ОШИБКА
-                    else {
-                        isError = true;
+                        // 1. Рекомендации не считаем
+                        if (lowerCat.includes('рекомендация')) {
+                            isError = false;
+                        } 
+                        // 2. Если пусто, прочерк или "без ошиб" — не считаем
+                        else if (val === '' || val === '-' || val === '—' || val === '–' || val.includes('без ошиб')) {
+                            isError = false;
+                        } 
+                        // 3. Всё остальное — ошибка
+                        else {
+                            isError = true;
+                        }
+                    } else {
+                        // --- ЛОГИКА ДЛЯ BEAUTIFUL ANSWERS ---
+                        const val = blockText.trim().toLowerCase();
+                        
+                        // В BA тоже могут быть "без ошибок" и прочерки
+                        if (val === '' || val === '-' || val === '—' || val === '–' || val.includes('без ошиб')) {
+                            isError = false;
+                        } else {
+                            isError = true;
+                        }
                     }
 
                     if (isError) {
