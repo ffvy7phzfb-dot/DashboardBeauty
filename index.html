@@ -2235,39 +2235,53 @@ function processData() {
                     }
                 }
 
-                // 3. Ищем категорию (без учета регистра, но с учетом пробелов, чтобы не ломать длинные названия)
-                // Используем хитрый метод: если категория в списке содержится в названии из комментария
+                              // 3. Ищем категорию. Если не нашли — создаем "Другое"
                 const cleanCatName = catName.toLowerCase().trim();
                 const actualCat = categoriesList.find(c => {
                     const cLower = c.toLowerCase().trim();
-                    // Идеальное совпадение или вхождение (например "грамматика" в "грамматика, орфография...")
                     return cLower === cleanCatName || cleanCatName.includes(cLower) || cLower.includes(cleanCatName);
                 });
 
-                if (actualCat) {
+                let finalCat = actualCat;
+
+                // Если категория не найдена в списке, но текст содержит что-то кроме "без ошиб"
+                if (!finalCat) {
+                    const val = blockText.toLowerCase().trim();
+                    const isBadText = val !== '' && val !== '-' && val !== '—' && val !== '1' && val !== '0' && !val.includes('без ошиб');
+                    
+                    if (isBadText && !catName.toLowerCase().includes('рекомендация')) {
+                        finalCat = 'Другое (не в списке)';
+                    }
+                }
+
+                if (finalCat) {
                     let isError = false;
                     const val = blockText.toLowerCase().trim();
 
-                    // Проверяем только базовые вещи: пусто, прочерк, "без ошиб"
                     if (val === '' || val === '-' || val === '—' || val === '–' || val.includes('без ошиб')) {
                         isError = false;
                     } 
-                    // Рекомендации не считаем ошибкой
                     else if (catName.toLowerCase().includes('рекомендация')) {
                         isError = false;
                     } 
-                    // Всё остальное - ошибка
                     else {
                         isError = true;
                     }
 
                     if (isError) {
-                        taskCats[actualCat] = true;
+                        // Если категории нет в списке (это "Другое"), добавляем её на лету
+                        if (!categoriesList.includes(finalCat)) {
+                            categoriesList.push(finalCat);
+                            CAT_SHORT_LABELS[finalCat] = finalCat;
+                        }
+                        
+                        taskCats[finalCat] = true;
                         taskHasErrors = true;
+                        
                         if (!taskComments[markerId]) taskComments[markerId] = [];
                         taskComments[markerId].push({
                             date: startDate || '',
-                            category: actualCat,
+                            category: finalCat,
                             text: blockText.slice(0, 500)
                         });
                     }
