@@ -2465,7 +2465,7 @@ function getPaintCell(userId, cat) {
         container.innerHTML = html;
         
         document.querySelectorAll('.color-swatch').forEach(el => {
-            el.classList.toggle('active', el.dataset.paint === BrushPaint);
+            el.classList.toggle('active', el.dataset.paint === brushPaint);
         });
     }
 
