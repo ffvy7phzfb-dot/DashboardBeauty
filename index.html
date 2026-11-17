@@ -2225,6 +2225,7 @@ function processData() {
             let lowerText = cleanText.toLowerCase();
 
             keywords.forEach(kw => {
+                 if (currentTemplateKey === 'beautiful_answers' && kw.key === 'опечатка') return;
                 let pos = lowerText.indexOf(kw.key);
                 
                 if (pos !== -1) {
