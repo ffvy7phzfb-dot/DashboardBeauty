@@ -2154,7 +2154,7 @@ function processData() {
     const namesMap = parseNames(namesText);
     const rawLines = mainText.split(/\r?\n/);
     
-    // Склейка рваных строк (для Excel)
+    // Склейка рваных строк из Excel
     const lines = [];
     for (let i = 0; i < rawLines.length; i++) {
         let l = rawLines[i];
@@ -2171,7 +2171,6 @@ function processData() {
     }
 
     const report = {}; 
-    let totalRows = 0;
     window.taskComments = {};
 
     lines.forEach((line, index) => {
@@ -2196,16 +2195,9 @@ function processData() {
         }
 
         if (!markerId) return;
-        totalRows++;
 
         if (!report[markerId]) {
-            report[markerId] = {
-                id: markerId,
-                name: namesMap[markerId] || 'Неизвестный',
-                tasks: [],
-                totalErrors: 0,
-                cats: {}
-            };
+            report[markerId] = { id: markerId, name: namesMap[markerId] || 'Неизвестный', tasks: [], totalErrors: 0, cats: {} };
             categoriesList.forEach(c => report[markerId].cats[c] = 0);
         }
 
@@ -2214,89 +2206,88 @@ function processData() {
         let taskHasErrors = false;
 
         if (comment && comment.trim()) {
-            const cleanComment = comment.replace(/Исправлено валидатором/gi, ' ').trim();
-            const cLines = cleanComment.split(/\r?\n/);
+            // Убираем служебные фразы
+            let cleanComment = comment.replace(/Исправлено валидатором/gi, ' ').trim();
             
-            let currentCat = null;
-            let currentText = '';
+            // Приводим к одному виду (убираем звездочки, лишние пробелы)
+            let normalizedText = cleanComment.replace(/\*|_|«|»|"/g, ' ').replace(/\s+/g, ' ');
 
-            // Автоматически берем категории из текущего шаблона
-            const catKeywords = {};
-            categoriesList.forEach(c => {
-                const shortName = c.toLowerCase().split(',')[0].replace(/\*/g, '').trim();
-                catKeywords[shortName] = c;
+            // Список всех возможных ключевых слов (с учетом опечаток и регистра)
+            const keywords = [
+                // Beautiful Answers
+                { key: 'маркдаун', full: 'маркдаун' },
+                { key: 'ошибки рп', full: 'ошибки РП' },
+                { key: 'грамматика', full: 'грамматика, орфография, пунктуация, не те слова' },
+                { key: 'пропущенная ё', full: 'пропущенная ё, опечатка, потерянная точка' },
+                { key: 'систем', full: 'систем' },
+                { key: 'контекст', full: 'контекст, ты/вы' },
+                { key: 'комментарий', full: 'комментарий' },
+                { key: 'единообразие', full: 'единообразие' },
+                { key: 'расчет', full: 'расчет по критериям оценки' },
+                // SSU
+                { key: 'опечатка', full: 'Опечатка' },
+                { key: 'тип-оформление', full: 'Тип-оформление' },
+                { key: 'смысловая', full: 'Смысловая опечатка' },
+                { key: 'latex', full: 'LaTeX' },
+                { key: 'картинка', full: 'Картинка' },
+                { key: 'тег тематики', full: 'Тег тематики' },
+                { key: 'тег типа', full: 'Тег типа вопроса' },
+                { key: 'неправильный ответ', full: 'Неправильный ответ' }
+            ];
+
+            let lowerText = normalizedText.toLowerCase();
+            
+            // Находим все позиции, где встречаются ключевые слова с двоеточием
+            let matches = [];
+            keywords.forEach(kw => {
+                // Ищем "слово:" или "слово :" 
+                const regex = new RegExp(kw.key.replace(/\s/g, '\\s*') + '\\s*:', 'gi');
+                let match;
+                while ((match = regex.exec(lowerText)) !== null) {
+                    matches.push({ index: match.index, length: match[0].length, category: kw.full });
+                }
             });
 
-            cLines.forEach(cLine => {
-                let text = cLine.replace(/\*|_|«|»|"/g, '').trim();
-                if (!text) return;
+            // Сортируем найденные категории по порядку их появления в тексте
+            matches.sort((a, b) => a.index - b.index);
 
-                const lowerText = text.toLowerCase();
-
-                // 1. Игнорируем то, что не является ошибкой
-                if (lowerText.includes('без ошиб') || lowerText.includes('рекомендованное время') || 
-                    lowerText.includes('допустимое время') || lowerText.includes('рекомендация') || 
-                    lowerText.includes('время допустимо') || lowerText.includes('время превышено') ||
-                    lowerText.includes('исправлено') || lowerText === 'ок' || lowerText === 'доработка') {
-                    return;
+            // Удаляем дубликаты (если категория встретилась дважды)
+            let uniqueMatches = [];
+            matches.forEach(m => {
+                if (uniqueMatches.length === 0 || uniqueMatches[uniqueMatches.length - 1].category !== m.category) {
+                    uniqueMatches.push(m);
                 }
+            });
 
-                // 2. Ищем, не начинается ли строка с новой категории
-                let foundNewCat = null;
-                for (const [shortName, fullCat] of Object.entries(catKeywords)) {
-                    if (lowerText.startsWith(shortName)) {
-                        foundNewCat = fullCat;
-                        break;
-                    }
-                }
+            // Разбиваем текст на куски между категориями
+            for (let i = 0; i < uniqueMatches.length; i++) {
+                let startIdx = uniqueMatches[i].index + uniqueMatches[i].length;
+                let endIdx = (i + 1 < uniqueMatches.length) ? uniqueMatches[i + 1].index : normalizedText.length;
                 
-                // Дополнительные синонимы для Beautiful Answers
-                if (!foundNewCat && currentTemplateKey === 'beautiful_answers') {
-                    if (lowerText.startsWith('расчет') || lowerText.startsWith('критерия')) {
-                        foundNewCat = categoriesList.find(c => c.toLowerCase().includes('расчет по критериям'));
-                    } else if (lowerText.startsWith('грамматика') || lowerText.startsWith('орфография')) {
-                        foundNewCat = categoriesList.find(c => c.toLowerCase().includes('грамматика'));
-                    } else if (lowerText.startsWith('ё') || lowerText.startsWith('опечатка')) {
-                        foundNewCat = categoriesList.find(c => c.toLowerCase().includes('пропущенная ё'));
-                    } else if (lowerText.includes('маркдаун')) {
-                        foundNewCat = categoriesList.find(c => c.toLowerCase().includes('маркдаун'));
-                    }
+                let blockText = normalizedText.slice(startIdx, endIdx).trim();
+                let cat = uniqueMatches[i].category;
+
+                // Если в блоке написано "без ошибок" или это "рекомендация" — пропускаем
+                let lowerBlock = blockText.toLowerCase();
+                if (lowerBlock.includes('без ошиб') || lowerBlock === '-' || lowerBlock === '—' || lowerBlock === 'ок' || 
+                    lowerBlock.includes('рекомендованное время') || lowerBlock.includes('допустимое время') || 
+                    lowerBlock.includes('время допустимо') || lowerBlock.includes('время превышено') ||
+                    lowerBlock.includes('исправлено') || lowerBlock === 'доработка' || cat.toLowerCase().includes('рекоменд')) {
+                    continue;
                 }
 
-                if (foundNewCat) {
-                    // Сохраняем предыдущую категорию
-                    if (currentCat && currentText && !currentText.toLowerCase().includes('без ошиб')) {
-                        taskCats[currentCat] = true;
-                        taskHasErrors = true;
-                        if (!window.taskComments[markerId]) window.taskComments[markerId] = [];
-                        window.taskComments[markerId].push({ 
-                            date: startDate || '', 
-                            category: currentCat, 
-                            text: currentText.slice(0, 500) 
-                        });
-                    }
-                    
-                    currentCat = foundNewCat;
-                    const colonIndex = text.indexOf(':');
-                    currentText = colonIndex !== -1 ? text.slice(colonIndex + 1).trim() : '';
-                } else if (currentCat) {
-                    // Дописываем текст к текущей категории
-                    if (!lowerText.includes('без ошиб')) {
-                        currentText += ' ' + text;
-                    }
+                // Если текст пустой, но это не "без ошибок" — возможно, ошибка была в заголовке
+                if (!blockText && lowerBlock !== 'без ошибок') {
+                    blockText = "Ошибка (подробности в комментарии)";
                 }
-            });
 
-            // Сохраняем последнюю категорию
-            if (currentCat && currentText && !currentText.toLowerCase().includes('без ошиб')) {
-                taskCats[currentCat] = true;
-                taskHasErrors = true;
-                if (!window.taskComments[markerId]) window.taskComments[markerId] = [];
-                window.taskComments[markerId].push({ 
-                    date: startDate || '', 
-                    category: currentCat, 
-                    text: currentText.slice(0, 500) 
-                });
+                // Записываем ошибку
+                if (blockText) {
+                    taskCats[cat] = true;
+                    taskHasErrors = true;
+                    if (!window.taskComments[markerId]) window.taskComments[markerId] = [];
+                    window.taskComments[markerId].push({ date: startDate || '', category: cat, text: blockText.slice(0, 500) });
+                }
             }
         }
 
@@ -2307,16 +2298,7 @@ function processData() {
             });
         }
 
-        user.tasks.push({
-            id: markerId,
-            date: startDate,
-            startDate: startDate,
-            endDate: endDate,
-            projectId: window.currentProjectId,
-            quality: quality,
-            hasErrors: taskHasErrors,
-            cats: taskCats
-        });
+        user.tasks.push({ id: markerId, date: startDate, startDate: startDate, endDate: endDate, projectId: window.currentProjectId, quality: quality, hasErrors: taskHasErrors, cats: taskCats });
     });
 
     globalReport = Object.values(report);
