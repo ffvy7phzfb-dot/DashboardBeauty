@@ -2341,6 +2341,19 @@ function processData() {
 
     showToast('Данные успешно обработаны!');
 }
+    function populateFilters() {
+    const userSelect = document.getElementById('filterUser');
+    if (!userSelect) return;
+    userSelect.innerHTML = '<option value="all">все сотрудники</option>';
+    const map = new Map();
+    globalReport.forEach(u => map.set(u.id, u.name));
+    Array.from(map.entries()).sort((a,b)=>a[1].localeCompare(b[1]))
+        .forEach(([id,name]) => {
+            const opt = document.createElement('option');
+            opt.value = id; opt.textContent = name;
+            userSelect.appendChild(opt);
+        });
+}
 
 function applyFilters() {
     if (globalReport.length === 0) return;
