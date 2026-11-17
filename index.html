@@ -2177,54 +2177,37 @@ function processData() {
         { key: 'неправильный ответ', full: 'Неправильный ответ' }
     ];
 
-    // 1. Собираем данные в структуру, где комментарий - это массив строк
-    const tasksRaw = [];
     let currentTask = null;
+    let totalTasksCount = 0;
 
-    rawLines.forEach(line => {
-        const trimmed = line.trim();
-        if (!trimmed) return;
+    // Функция для разбора скопившегося блока текста
+    const flushTask = () => {
+        if (!currentTask) return;
+        totalTasksCount++;
+
+        const headerParts = currentTask.header.split('\t');
+        const markerId = headerParts[0].trim();
         
-        if (trimmed.toLowerCase().includes('marker_id') && trimmed.toLowerCase().includes('start_date')) return;
-
-        const isUuidStart = /^[0-9a-f]{8}-[0-9a-f]{4}/i.test(trimmed);
-        
-        if (isUuidStart) {
-            if (currentTask) tasksRaw.push(currentTask);
-            currentTask = { header: trimmed, commentLines: [] };
-        } else {
-            if (currentTask) {
-                currentTask.commentLines.push(trimmed);
-            }
-        }
-    });
-    if (currentTask) tasksRaw.push(currentTask);
-
-    // 2. Обрабатываем каждую задачу
-    tasksRaw.forEach(task => {
-        const parts = task.header.split('\t');
-        if (parts.length < 4) return; // Страховка от битых строк
-
-        const markerId = parts[0].trim();
-        const startDate = parts[1] ? parts[1].trim().slice(0, 10) : '';
-        const endDate = parts[2] ? parts[2].trim().slice(0, 10) : '';
+        const startDate = headerParts[1] ? headerParts[1].trim().slice(0, 10) : '';
+        const endDate = headerParts[2] ? headerParts[2].trim().slice(0, 10) : '';
         
         let quality = null;
         let firstCommentLine = '';
 
-        // 4-я колонка — оценка. Если её нет (пустая), то там начинается текст.
-        const parsedQ = parseFloat((parts[3] || '').replace(',', '.'));
-        if (!isNaN(parsedQ) && parsedQ >= 0 && parsedQ <= 1.5) {
-            quality = parsedQ;
-            firstCommentLine = parts.slice(4).join(' ').trim();
-        } else {
-            firstCommentLine = parts.slice(3).join(' ').trim();
+        // 4-я колонка — оценка
+        if (headerParts.length >= 4) {
+            const parsedQ = parseFloat((headerParts[3] || '').replace(',', '.'));
+            if (!isNaN(parsedQ) && parsedQ >= 0 && parsedQ <= 1.5) {
+                quality = parsedQ;
+                firstCommentLine = headerParts.slice(4).join(' ').trim();
+            } else {
+                firstCommentLine = headerParts.slice(3).join(' ').trim();
+            }
         }
 
-        // Объединяем первую строку комментария с остальными
         let allCommentLines = [];
         if (firstCommentLine) allCommentLines.push(firstCommentLine);
-        allCommentLines = allCommentLines.concat(task.commentLines);
+        allCommentLines = allCommentLines.concat(currentTask.comments);
 
         if (!report[markerId]) {
             report[markerId] = { id: markerId, name: namesMap[markerId] || 'Неизвестный', tasks: [], totalErrors: 0, cats: {} };
@@ -2235,12 +2218,10 @@ function processData() {
         const taskCats = {};
         let taskHasErrors = false;
 
-        // 3. Ищем ошибки в каждой строке комментария ОТДЕЛЬНО
         allCommentLines.forEach(cLine => {
             let cleanLine = cLine.replace(/Исправлено валидатором/gi, ' ').trim();
             let normalizedText = cleanLine.replace(/\*|_|«|»|"/g, ' ').replace(/\s+/g, ' ');
             
-            // Если в строке есть "без ошибок" или "рекомендация", пропускаем её целиком
             let lowerLine = normalizedText.toLowerCase();
             if (lowerLine.includes('без ошиб') || lowerLine === '-' || lowerLine === '—' || lowerLine === 'ок' || 
                 lowerLine.includes('рекомендованное время') || lowerLine.includes('допустимое время') || 
@@ -2249,20 +2230,17 @@ function processData() {
                 return;
             }
 
-            // Ищем, с какой категории начинается строка
             let foundCat = null;
             for (const kw of searchKeywords) {
                 if (lowerLine.includes(kw.key)) {
-                    // Проверяем, что категория стоит в начале (чтобы не ловить слова в тексте)
                     const pos = lowerLine.indexOf(kw.key);
-                    if (pos < 15) { // Если слово в первых 15 символах
+                    if (pos < 20) { // Категория должна быть в начале строки
                         foundCat = kw.full;
                         break;
                     }
                 }
             }
 
-            // Если нашли категорию, значит вся эта строка (или часть после двоеточия) — это ошибка
             if (foundCat) {
                 let blockText = normalizedText;
                 const colonIndex = normalizedText.indexOf(':');
@@ -2294,7 +2272,30 @@ function processData() {
             hasErrors: taskHasErrors, 
             cats: taskCats 
         });
+
+        currentTask = null;
+    };
+
+    rawLines.forEach(line => {
+        const trimmed = line.trim();
+        if (!trimmed) return;
+        if (trimmed.toLowerCase().includes('marker_id') && trimmed.toLowerCase().includes('start_date')) return;
+
+        // Если строка начинается с UUID — это НОВАЯ задача
+        const isUuidStart = /^[0-9a-f]{8}-[0-9a-f]{4}/i.test(trimmed);
+        
+        if (isUuidStart) {
+            flushTask(); // Сохраняем предыдущую
+            currentTask = { header: trimmed, comments: [] };
+        } else {
+            if (currentTask) {
+                currentTask.comments.push(trimmed);
+            }
+        }
     });
+    flushTask(); // Сохраняем последнюю
+
+    console.log(`Обработано всего заданий: ${totalTasksCount}`);
 
     globalReport = Object.values(report);
     window.globalReport = globalReport;
