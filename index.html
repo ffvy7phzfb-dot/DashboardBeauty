@@ -2372,14 +2372,28 @@ function applyFilters() {
 
             let doneTotal = 0, doneWithErrors = 0;
             const newCatErrors = {};
-            categoriesList.forEach(c => newCatErrors[c] = 0);
+            
+            // Инициализируем нулями строго по categoriesList
+            categoriesList.forEach(c => newCatErrors[c.toLowerCase()] = 0);
 
             tasksInPeriod.forEach(t => {
                 doneTotal++;
                 if (t.hasErrors) {
                     doneWithErrors++;
+                    
+                    // Перебираем ошибки в задаче
                     Object.keys(t.cats).forEach(cat => {
-                        newCatErrors[cat] = (newCatErrors[cat] || 0) + 1;
+                        // Ищем, есть ли такая категория в нашем официальном списке (без учета регистра)
+                        const officialCat = categoriesList.find(c => c.toLowerCase() === cat.toLowerCase());
+                        if (officialCat) {
+                            newCatErrors[officialCat.toLowerCase()] = (newCatErrors[officialCat.toLowerCase()] || 0) + 1;
+                        } else {
+                            // Если это "Опечатка", но в списке есть "Пропущенная ё...", то пишем туда
+                            if (cat.toLowerCase() === 'опечатка') {
+                                const target = categoriesList.find(c => c.toLowerCase().includes('пропущенная ё'));
+                                if (target) newCatErrors[target.toLowerCase()] = (newCatErrors[target.toLowerCase()] || 0) + 1;
+                            }
+                        }
                     });
                 }
             });
