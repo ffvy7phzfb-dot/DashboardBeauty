@@ -2157,26 +2157,26 @@ function processData() {
     const report = {}; 
     window.taskComments = {};
 
-    // Берем ВСЕ возможные названия категорий
+    // Жесткий список категорий
     const keywords = [
-        { search: 'маркдаун', full: 'маркдаун' },
-        { search: 'ошибки рп', full: 'ошибки РП' },
-        { search: 'грамматика', full: 'грамматика, орфография, пунктуация, не те слова' },
-        { search: 'пропущенная ё', full: 'пропущенная ё, опечатка, потерянная точка' },
-        { search: 'пропущенная е', full: 'пропущенная ё, опечатка, потерянная точка' },
-        { search: 'систем', full: 'систем' },
-        { search: 'контекст', full: 'контекст, ты/вы' },
-        { search: 'комментарий', full: 'комментарий' },
-        { search: 'единообразие', full: 'единообразие' },
-        { search: 'расчет', full: 'расчет по критериям оценки' },
-        { search: 'смысловая', full: 'Смысловая опечатка' },
-        { search: 'опечатка', full: 'Опечатка' },
-        { search: 'тип-оформление', full: 'Тип-оформление' },
-        { search: 'latex', full: 'LaTeX' },
-        { search: 'картинка', full: 'Картинка' },
-        { search: 'тег тематики', full: 'Тег тематики' },
-        { search: 'тег типа', full: 'Тег типа вопроса' },
-        { search: 'неправильный ответ', full: 'Неправильный ответ' }
+        { key: 'маркдаун', col: 'маркдаун' },
+        { key: 'ошибки рп', col: 'ошибки РП' },
+        { key: 'грамматика', col: 'грамматика, орфография, пунктуация, не те слова' },
+        { key: 'пропущенная ё', col: 'пропущенная ё, опечатка, потерянная точка' },
+        { key: 'пропущенная е', col: 'пропущенная ё, опечатка, потерянная точка' },
+        { key: 'систем', col: 'систем' },
+        { key: 'контекст', col: 'контекст, ты/вы' },
+        { key: 'комментарий', col: 'комментарий' },
+        { key: 'единообразие', col: 'единообразие' },
+        { key: 'расчет', col: 'расчет по критериям оценки' },
+        { key: 'смысловая', col: 'Смысловая опечатка' },
+        { key: 'опечатка', col: 'Опечатка' },
+        { key: 'тип-оформление', col: 'Тип-оформление' },
+        { key: 'latex', col: 'LaTeX' },
+        { key: 'картинка', col: 'Картинка' },
+        { key: 'тег тематики', col: 'Тег тематики' },
+        { key: 'тег типа', col: 'Тег типа вопроса' },
+        { key: 'неправильный ответ', col: 'Неправильный ответ' }
     ];
 
     let currentTask = null;
@@ -2218,59 +2218,48 @@ function processData() {
         let taskHasErrors = false;
 
         if (fullText) {
-            // Очищаем текст от звездочек и мусора
             let cleanText = fullText.replace(/Исправлено валидатором/gi, ' ')
                                       .replace(/\*|_|«|»|"/g, ' ')
                                       .replace(/\s+/g, ' ')
                                       .trim();
             let lowerText = cleanText.toLowerCase();
 
-            // Проходим по каждой категории из списка
             keywords.forEach(kw => {
-                // Ищем категорию в тексте (без учета регистра)
-                let pos = lowerText.indexOf(kw.search);
+                let pos = lowerText.indexOf(kw.key);
                 
                 if (pos !== -1) {
-                    // Если это "опечатка", но есть "смысловая", пропускаем
-                    if (kw.search === 'опечатка' && lowerText.includes('смысловая опечатка')) return;
+                    if (kw.key === 'опечатка' && lowerText.includes('смысловая опечатка')) return;
 
-                    // Берем кусок текста после категории
-                    let textAfter = lowerText.slice(pos + kw.search.length);
-                    
-                    // Ищем, где начинается СЛЕДУЮЩАЯ категория, чтобы отрезать кусок
+                    let textAfter = lowerText.slice(pos + kw.key.length);
                     let nextPos = textAfter.length;
                     keywords.forEach(otherKw => {
-                        if (otherKw.search === kw.search) return;
-                        let p = textAfter.indexOf(otherKw.search);
+                        if (otherKw.key === kw.key) return;
+                        let p = textAfter.indexOf(otherKw.key);
                         if (p !== -1 && p < nextPos) nextPos = p;
                     });
 
-                    // Вырезаем текст ошибки (от конца категории до начала следующей)
-                    let blockText = cleanText.slice(pos + kw.search.length, pos + kw.search.length + nextPos).trim();
-                    
-                    // Убираем двоеточия, тире и дефисы в начале
+                    let blockText = cleanText.slice(pos + kw.key.length, pos + kw.key.length + nextPos).trim();
                     blockText = blockText.replace(/^[:\-\s]+/, '').trim();
+                    
                     let lowerBlock = blockText.toLowerCase();
 
-                    // Если там нет ошибки — пропускаем
                     if (!blockText || 
                         blockText === '-' || 
                         blockText === '—' || 
-                        lowerBlock === 'ок' || 
                         lowerBlock.includes('без ошиб') || 
                         lowerBlock.includes('рекомендованное время') || 
                         lowerBlock.includes('допустимое время') || 
                         lowerBlock.includes('время допустимо') || 
                         lowerBlock.includes('время превышено') || 
-                        lowerBlock.includes('исправлено') || 
+                        lowerBlock === 'ок' || 
                         lowerBlock === 'доработка' || 
-                        kw.search.includes('рекоменд')) {
+                        kw.key.includes('рекоменд')) {
                         return;
                     }
 
-                    // Если ошибка есть — записываем в нужную колонку
-                    let matchedCat = categoriesList.find(c => c.toLowerCase().includes(kw.search));
-                    if (!matchedCat) matchedCat = kw.full;
+                    // ВОТ ЗДЕСЬ ГЛАВНОЕ ИЗМЕНЕНИЕ:
+                    // Мы не ищем в categoriesList, а берем колонку напрямую из словаря
+                    let matchedCat = kw.col;
 
                     taskCats.add(matchedCat);
                     taskHasErrors = true;
