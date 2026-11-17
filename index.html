@@ -2157,7 +2157,8 @@ function processData() {
     const report = {}; 
     window.taskComments = {};
 
-    const searchKeywords = [
+    // Список категорий (с учетом возможных вариантов написания)
+    const keywords = [
         { key: 'маркдаун', full: 'маркдаун' },
         { key: 'ошибки рп', full: 'ошибки РП' },
         { key: 'грамматика', full: 'грамматика, орфография, пунктуация, не те слова' },
@@ -2169,7 +2170,7 @@ function processData() {
         { key: 'единообразие', full: 'единообразие' },
         { key: 'расчет', full: 'расчет по критериям оценки' },
         { key: 'смысловая', full: 'Смысловая опечатка' },
-        { key: 'опечатка', full: 'Опечатка' }, 
+        { key: 'опечатка', full: 'Опечатка' },
         { key: 'тип-оформление', full: 'Тип-оформление' },
         { key: 'latex', full: 'LaTeX' },
         { key: 'картинка', full: 'Картинка' },
@@ -2192,6 +2193,7 @@ function processData() {
         let quality = null;
         let firstCommentLine = '';
 
+        // Парсим 4-ю колонку (оценку)
         if (headerParts.length >= 4) {
             const parsedQ = parseFloat((headerParts[3] || '').replace(',', '.'));
             if (!isNaN(parsedQ) && parsedQ >= 0 && parsedQ <= 1.5) {
@@ -2205,7 +2207,6 @@ function processData() {
         let allComments = [];
         if (firstCommentLine) allComments.push(firstCommentLine);
         allComments = allComments.concat(currentTask.comments);
-        let fullCommentText = allComments.join(' ').replace(/\s+/g, ' ');
 
         if (!report[markerId]) {
             report[markerId] = { id: markerId, name: namesMap[markerId] || 'Неизвестный', tasks: [], totalErrors: 0, cats: {} };
@@ -2213,76 +2214,68 @@ function processData() {
         }
 
         const user = report[markerId];
-        const taskCats = new Set(); // Уникальные категории для ЭТОЙ задачи
+        const taskCats = new Set();
         let taskHasErrors = false;
 
-        if (fullCommentText) {
-            let cleanComment = fullCommentText.replace(/Исправлено валидатором/gi, ' ')
-                                                .replace(/\*|_|«|»|"/g, ' ')
-                                                .replace(/\s+/g, ' ')
-                                                .trim();
+        // Идем по каждой строке комментария ОТДЕЛЬНО
+        allComments.forEach(line => {
+            // Очищаем от лишних символов
+            let cleanLine = line.replace(/Исправлено валидатором/gi, ' ')
+                                .replace(/\*|_|«|»|"/g, ' ')
+                                .replace(/\s+/g, ' ')
+                                .trim();
 
-            let lowerComment = cleanComment.toLowerCase();
-            
-            let matches = [];
-            searchKeywords.forEach(kw => {
-                if (kw.key === 'опечатка' && lowerComment.includes('смысловая опечатка')) {
-                    return; 
-                }
+            if (!cleanLine) return;
 
-                let pos = lowerComment.indexOf(kw.key);
-                while (pos !== -1) {
-                    let prevChar = pos > 0 ? lowerComment[pos - 1] : ' ';
-                    // Проверяем, что это начало слова
-                    if (!/[а-яa-z0-9]/.test(prevChar)) {
-                        matches.push({ index: pos, length: kw.key.length, category: kw.full });
-                    }
-                    pos = lowerComment.indexOf(kw.key, pos + 1);
-                }
-            });
+            let lowerLine = cleanLine.toLowerCase();
 
-            matches.sort((a, b) => a.index - b.index);
-            
-            let uniqueMatches = [];
-            matches.forEach(m => {
-                if (uniqueMatches.length === 0 || uniqueMatches[uniqueMatches.length - 1].index !== m.index) {
-                    uniqueMatches.push(m);
-                }
-            });
+            // Игнорируем пустые/хорошие фразы
+            if (lowerLine.includes('без ошиб') || lowerLine === '-' || lowerLine === '—' || lowerLine === 'ок' || 
+                lowerLine.includes('рекомендованное время') || lowerLine.includes('допустимое время') || 
+                lowerLine.includes('время допустимо') || lowerLine.includes('время превышено') ||
+                lowerLine.includes('исправлено') || lowerLine === 'доработка' || lowerLine.includes('рекоменд')) {
+                return;
+            }
 
-            for (let i = 0; i < uniqueMatches.length; i++) {
-                let startIdx = uniqueMatches[i].index + uniqueMatches[i].length;
-                let endIdx = (i + 1 < uniqueMatches.length) ? uniqueMatches[i + 1].index : cleanComment.length;
-                
-                let blockText = cleanComment.slice(startIdx, endIdx).replace(/^[:\-\s]+/, '').trim();
-                let cat = uniqueMatches[i].category;
-
-                let lowerBlock = blockText.toLowerCase();
-                // Игнорируем блок, если там нет ошибок
-                if (lowerBlock.includes('без ошиб') || lowerBlock === '-' || lowerBlock === '—' || lowerBlock === 'ок' || 
-                    lowerBlock.includes('рекомендованное время') || lowerBlock.includes('допустимое время') || 
-                    lowerBlock.includes('время допустимо') || lowerBlock.includes('время превышено') ||
-                    lowerBlock.includes('исправлено') || lowerBlock === 'доработка' || cat.toLowerCase().includes('рекоменд')) {
-                    continue;
-                }
-
-                // Если есть текст (хоть один символ), значит это ошибка
-                if (blockText) {
-                    taskCats.add(cat); 
-                    taskHasErrors = true;
-                    if (!window.taskComments[markerId]) window.taskComments[markerId] = [];
-                    let alreadyHasCat = window.taskComments[markerId].some(c => c.category === cat && c.date === startDate);
-                    if (!alreadyHasCat) {
-                        window.taskComments[markerId].push({ date: startDate || '', category: cat, text: blockText.slice(0, 500) });
-                    }
+            // Ищем, с какой категории начинается строка
+            let foundCat = null;
+            for (const kw of keywords) {
+                // Если в начале строки есть ключевое слово
+                if (lowerLine.startsWith(kw.key) || lowerLine.startsWith(kw.key + ':')) {
+                    // Если это "опечатка", но есть "смысловая", пропускаем
+                    if (kw.key === 'опечатка' && lowerLine.includes('смысловая опечатка')) continue;
+                    
+                    foundCat = kw.full;
+                    break;
                 }
             }
-        }
+
+            if (foundCat) {
+                // Берем текст после двоеточия (или весь текст, если двоеточия нет)
+                let blockText = cleanLine;
+                const colonIndex = cleanLine.indexOf(':');
+                if (colonIndex !== -1) {
+                    blockText = cleanLine.slice(colonIndex + 1).trim();
+                }
+
+                // Если там есть текст — это ошибка
+                if (blockText && blockText.length > 2) {
+                    taskCats.add(foundCat);
+                    taskHasErrors = true;
+                    if (!window.taskComments[markerId]) window.taskComments[markerId] = [];
+                    window.taskComments[markerId].push({ date: startDate || '', category: foundCat, text: blockText.slice(0, 500) });
+                }
+            } else {
+                // Если это продолжение предыдущей категории (например, вторая строка текста ошибки)
+                // Мы можем присоединить её к последней найденной категории, если она была.
+                // Но пока для простоты просто игнорируем, чтобы не было лишних ошибок.
+            }
+        });
 
         if (taskHasErrors) {
-            user.totalErrors++; // Увеличиваем счетчик "С ошибками" на 1 для этой задачи
+            user.totalErrors++;
             taskCats.forEach(cat => {
-                user.cats[cat] = (user.cats[cat] || 0) + 1; // Добавляем 1 в нужные категории
+                user.cats[cat] = (user.cats[cat] || 0) + 1;
             });
         }
 
