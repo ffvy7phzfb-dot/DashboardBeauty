@@ -2139,9 +2139,12 @@ function processData() {
     const mainRaw = document.getElementById('mainData').value;
     const namesRaw = document.getElementById('namesData').value;
     const output = document.getElementById('output');
-    if (!mainRaw.trim()) { output.innerHTML = '<p style="color:var(--c-red); text-align:center;">вставь данные в первое окно.</p>'; return; }
-    const employees = parseNames(namesRaw);
+    if (!mainRaw.trim()) {
+        output.innerHTML = '<p style="color:var(--c-red); text-align:center;">вставь данные в первое окно.</p>';
+        return;
+    }
 
+    const employees = parseNames(namesRaw);
     const lines = mainRaw.split(/\r?\n/);
     const parsedRows = [];
     let currentRow = [];
@@ -2165,10 +2168,11 @@ function processData() {
     parsedRows.forEach(cols => {
         const markerId = (cols[0] || '').trim();
         if (!markerId) return;
+
         const startDate = (cols[1] || '').trim();
-        const endDate   = (cols[2] || '').trim();
-        const quality   = (cols[3] || '').trim();
-        const comment   = (cols[4] || '').trim();
+        const endDate = (cols[2] || '').trim();
+        const quality = (cols[3] || '').trim();
+        const comment = (cols[4] || '').trim();
         const qNum = parseFloat(quality.replace(',', '.'));
         if (isNaN(qNum)) return;
 
@@ -2179,97 +2183,132 @@ function processData() {
         }
         const user = report[markerId];
         const startDateOnly = startDate.split('T')[0];
-        const endDateOnly   = endDate.split('T')[0];
-        const startFull = startDate.includes('T') ? startDate : (startDateOnly ? startDateOnly + 'T00:00:00' : '');
+        const endDateOnly = endDate.split('T')[0];
+        const startFull = startDate.includes('T')
+            ? startDate
+            : (startDateOnly ? startDateOnly + 'T00:00:00' : '');
 
         let taskHasErrors = false;
         const taskCats = {};
         categoriesList.forEach(c => taskCats[c] = false);
 
-if (comment) {
-    // убираем служебную фразу
-    let cleanComment = comment.replace(/Исправлено валидатором/gi, '').trim();
+        if (comment) {
+            const cleanComment = comment.replace(/Исправлено валидатором/gi, '').trim();
 
-    if (currentTemplateKey === 'ssu') {
-        // === SSU — оставляем как было (построчно) ===
-        cleanComment.split(/\r?\n/).forEach(line => {
-            const colonIndex = line.indexOf(':');
-            if (colonIndex === -1) return;
-            const catName = line.slice(0, colonIndex).trim();
-            const blockText = line.slice(colonIndex + 1).trim();
-            const actualCat = categoriesList.find(c => c.toLowerCase() === catName.toLowerCase());
-            if (!actualCat) return;
+            if (currentTemplateKey === 'ssu') {
+                // SSU: прежняя построчная логика сохранена без изменений.
+                cleanComment.split(/\r?\n/).forEach(line => {
+                    const colonIndex = line.indexOf(':');
+                    if (colonIndex === -1) return;
 
-            const val = blockText.trim().toLowerCase();
-            let isError;
-            if (catName.toLowerCase().includes('рекомендация')) isError = false;
-            else if (val === '' || val.startsWith('без ошибок') || val === '-' || val === '—' || val === '–') isError = false;
-            else isError = true;
+                    const catName = line.slice(0, colonIndex).trim();
+                    const blockText = line.slice(colonIndex + 1).trim();
+                    const actualCat = categoriesList.find(c => c.toLowerCase() === catName.toLowerCase());
+                    if (!actualCat) return;
 
-            if (isError) {
-                taskCats[actualCat] = true;
-                taskHasErrors = true;
-                taskComments[markerId].push({
-                    date: startDateOnly || endDateOnly || '',
-                    taskStart: startFull,
-                    category: actualCat,
-                    text: blockText.slice(0, 500)
+                    const val = blockText.trim().toLowerCase();
+                    let isError;
+                    if (catName.toLowerCase().includes('рекомендация')) isError = false;
+                    else if (val === '' || val.startsWith('без ошибок') || val === '-' || val === '—' || val === '–') isError = false;
+                    else isError = true;
+
+                    if (isError) {
+                        taskCats[actualCat] = true;
+                        taskHasErrors = true;
+                        taskComments[markerId].push({
+                            date: startDateOnly || endDateOnly || '',
+                            taskStart: startFull,
+                            category: actualCat,
+                            text: blockText.slice(0, 500)
+                        });
+                    }
+                });
+            } else {
+                // Beautiful Answers: категории ищутся как отдельные заголовки,
+                // в том числе в Markdown-виде **маркдаун** и без двоеточия.
+                const src = cleanComment
+                    .replace(/\*\*/g, '')
+                    .replace(/^[\s]*[-•*]\s+/gm, '')
+                    .replace(/\r/g, '');
+
+                const hits = [];
+                categoriesList.forEach(cat => {
+                    if (/рекомендац/i.test(cat)) return;
+                    const esc = cat.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                    const re = new RegExp('(^|[\\s\\n,;|])(' + esc + ')(?=\\s*:|\\s|$)', 'gi');
+                    let m;
+                    while ((m = re.exec(src)) !== null) {
+                        const catStart = m.index + m[1].length;
+                        const catEnd = catStart + m[2].length;
+                        hits.push({ cat, start: catStart, end: catEnd });
+                        if (re.lastIndex <= m.index) re.lastIndex = m.index + 1;
+                    }
+                });
+
+                hits.sort((a, b) => a.start - b.start || (b.end - a.end));
+                // Убираем совпадения, которые начинаются внутри уже найденного заголовка.
+                const uniqueHits = [];
+                hits.forEach(hit => {
+                    const prev = uniqueHits[uniqueHits.length - 1];
+                    if (prev && hit.start < prev.end) return;
+                    uniqueHits.push(hit);
+                });
+
+                const boundary = '(^|[^а-яёa-z0-9])';
+                const tail = '(?=$|[^а-яёa-z0-9])';
+                const noisePatterns = [
+                    new RegExp(boundary + 'без\\s+ошибк(?:а|и|у|ой|е)?' + tail, 'gi'),
+                    new RegExp(boundary + '(?:ok|ок)\\.?' + tail, 'gi'),
+                    new RegExp(boundary + 'доработка' + tail, 'gi'),
+                    new RegExp(boundary + 'расч[её]т по критериям оценки' + tail, 'gi'),
+                    new RegExp(boundary + 'рекомендуемое время' + tail, 'gi'),
+                    new RegExp(boundary + 'рекомендованное время' + tail, 'gi'),
+                    new RegExp(boundary + 'или' + tail, 'gi')
+                ];
+
+                uniqueHits.forEach((hit, index) => {
+                    const nextStart = uniqueHits[index + 1]?.start ?? src.length;
+                    let blockText = src.slice(hit.end, nextStart).trim();
+                    const normalized = blockText.toLowerCase().replace(/\s+/g, ' ').trim();
+
+                    // Явная отметка «без ошибки/без ошибок» обнуляет категорию.
+                    const noErrorPattern = /(^|[^а-яёa-z0-9])без\s+(?:ошибк(?:а|и|у|ой|е)?|ошибок)(?=$|[^а-яёa-z0-9])/i;
+                    if (noErrorPattern.test(normalized)) return;
+
+                    let meaningful = blockText;
+                    noisePatterns.forEach(re => {
+                        meaningful = meaningful.replace(re, (match, prefix) => (prefix || '') + ' ');
+                    });
+                    meaningful = meaningful
+                        .replace(/(?:^|[\s,;|])[-–—.]+(?=$|[\s,;|])/g, ' ')
+                        .replace(/\s+/g, ' ')
+                        .replace(/^[\s,;|]+|[\s,;|]+$/g, '')
+                        .trim();
+
+                    if (!meaningful || /^[-–—]+$/.test(meaningful)) return;
+
+                    taskCats[hit.cat] = true;
+                    taskHasErrors = true;
+                    taskComments[markerId].push({
+                        date: startDateOnly || endDateOnly || '',
+                        taskStart: startFull,
+                        category: hit.cat,
+                        text: meaningful.slice(0, 500)
+                    });
                 });
             }
-        });
-    } else {
-        // === Beautiful Answers — новый разбор по категориям ===
-        // снимаем **, маркеры списков
-        const src = cleanComment
-            .replace(/\*\*/g, '')
-            .replace(/^[\s]*[-•*]\s+/gm, '')
-            .replace(/\r/g, '');
-
-        // находим все вхождения категорий из шаблона
-        const hits = [];
-        categoriesList.forEach(cat => {
-            if (/рекомендац/i.test(cat)) return; // рекомендации игнорируем
-            const esc = cat.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-            const re = new RegExp(esc + '\\s*:?', 'gi');
-            let m;
-            while ((m = re.exec(src)) !== null) {
-                hits.push({ cat, start: m.index, end: m.index + m[0].length });
-            }
-        });
-        hits.sort((a, b) => a.start - b.start);
-
-        const seenCats = new Set();
-        const blocks = [];
-        for (let i = 0; i < hits.length; i++) {
-            const h = hits[i];
-            if (seenCats.has(h.cat)) continue; // одна категория = максимум 1 ошибка
-            seenCats.add(h.cat);
-            const nextStart = hits.slice(i + 1).find(x => x.start > h.end)?.start ?? src.length;
-            blocks.push({ cat: h.cat, text: src.slice(h.end, nextStart).trim() });
         }
 
-        const IGNORE = ['без ошибки', 'без ошибок', 'ок', 'ок.', 'ok', 'ok.',
-                        'доработка', 'расчёт по критериям оценки',
-                        'расчет по критериям оценки', 'рекомендуемое время'];
-
-        blocks.forEach(b => {
-            const low = b.text.toLowerCase().replace(/\s+/g, ' ').trim();
-            if (!low || low === '-' || low === '—' || low === '–') return;
-            if (IGNORE.some(w => low === w || low.startsWith(w + ' '))) return;
-            // только "без ошибок" и ничего больше → не ошибка
-            if (/\bбез ошиб/i.test(low) && low.replace(/без ошиб\w*/i, '').trim() === '') return;
-
-            taskCats[b.cat] = true;
-            taskHasErrors = true;
-            taskComments[markerId].push({
-                date: startDateOnly || endDateOnly || '',
-                taskStart: startFull,
-                category: b.cat,
-                text: b.text.slice(0, 500)
-            });
+        // Каждая исходная строка/запись — отдельная задача, даже если Marker ID повторяется.
+        user.tasks.push({
+            startDate: startDateOnly,
+            endDate: endDateOnly,
+            hasErrors: taskHasErrors,
+            cats: taskCats,
+            projectId: currentProjectId
         });
-    }
-}
+    });
+
     globalReport = Object.values(report);
     window.globalReport = globalReport;
     populateFilters();
