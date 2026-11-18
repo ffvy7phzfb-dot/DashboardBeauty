@@ -2186,26 +2186,49 @@ function processData() {
         const taskCats = {};
         categoriesList.forEach(c => taskCats[c] = false);
 
-if (comment) {
-    // убираем служебную фразу
-    let cleanComment = comment.replace(/Исправлено валидатором/gi, '').trim();
+       if (comment) {
+    // Очищаем от служебной фразы
+    const cleanComment = comment.replace(/Исправлено валидатором/gi, '').trim();
+    
+    // Разбиваем комментарий на строки (каждая категория обычно с новой строки)
+    const lines = cleanComment.split(/\r?\n/);
 
-    if (currentTemplateKey === 'ssu') {
-        // === SSU — оставляем как было (построчно) ===
-        cleanComment.split(/\r?\n/).forEach(line => {
-            const colonIndex = line.indexOf(':');
-            if (colonIndex === -1) return;
-            const catName = line.slice(0, colonIndex).trim();
-            const blockText = line.slice(colonIndex + 1).trim();
-            const actualCat = categoriesList.find(c => c.toLowerCase() === catName.toLowerCase());
-            if (!actualCat) return;
+    lines.forEach(line => {
+        const colonIndex = line.indexOf(':');
+        if (colonIndex === -1) return; // если нет двоеточия, пропускаем
 
-            const val = blockText.trim().toLowerCase();
-            let isError;
-            if (catName.toLowerCase().includes('рекомендация')) isError = false;
-            else if (val === '' || val.startsWith('без ошибок') || val === '-' || val === '—' || val === '–') isError = false;
-            else isError = true;
+        const catName = line.slice(0, colonIndex).trim();
+        const blockText = line.slice(colonIndex + 1).trim();
 
+        // Ищем, есть ли такая категория в нашем списке
+        const actualCat = categoriesList.find(c => c.toLowerCase() === catName.toLowerCase());
+
+        if (actualCat) {
+            let isError = false;
+            
+if (currentTemplateKey === 'ssu') {
+    const val = blockText.trim().toLowerCase();
+    const lowerCat = catName.toLowerCase();
+
+    // 1. Если это Рекомендация — это ВСЕГДА не ошибка (даже если там есть текст)
+    if (lowerCat.includes('рекомендация')) {
+        isError = false;
+    } 
+    // 2. Если написано "без ошибок" (с точкой или без) или стоит прочерк — это не ошибка
+ else if (val === '' || val.startsWith('без ошибок') || val === '-' || val === '—' || val === '–') {
+                    isError = false;
+    } 
+    // 3. Во всех остальных случаях — это ошибка
+    else {
+        isError = true;
+    }
+} 
+else {
+    // Для Beautiful Answers (оставляем без изменений)
+    if (blockText.length > 0) {
+        isError = true;
+    }
+}
             if (isError) {
                 taskCats[actualCat] = true;
                 taskHasErrors = true;
@@ -2216,59 +2239,29 @@ if (comment) {
                     text: blockText.slice(0, 500)
                 });
             }
-        });
-    } else {
-        // === Beautiful Answers — новый разбор по категориям ===
-        // снимаем **, маркеры списков
-        const src = cleanComment
-            .replace(/\*\*/g, '')
-            .replace(/^[\s]*[-•*]\s+/gm, '')
-            .replace(/\r/g, '');
-
-        // находим все вхождения категорий из шаблона
-        const hits = [];
-        categoriesList.forEach(cat => {
-            if (/рекомендац/i.test(cat)) return; // рекомендации игнорируем
-            const esc = cat.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-            const re = new RegExp(esc + '\\s*:?', 'gi');
-            let m;
-            while ((m = re.exec(src)) !== null) {
-                hits.push({ cat, start: m.index, end: m.index + m[0].length });
-            }
-        });
-        hits.sort((a, b) => a.start - b.start);
-
-        const seenCats = new Set();
-        const blocks = [];
-        for (let i = 0; i < hits.length; i++) {
-            const h = hits[i];
-            if (seenCats.has(h.cat)) continue; // одна категория = максимум 1 ошибка
-            seenCats.add(h.cat);
-            const nextStart = hits.slice(i + 1).find(x => x.start > h.end)?.start ?? src.length;
-            blocks.push({ cat: h.cat, text: src.slice(h.end, nextStart).trim() });
         }
-
-        const IGNORE = ['без ошибки', 'без ошибок', 'ок', 'ок.', 'ok', 'ok.',
-                        'доработка', 'расчёт по критериям оценки',
-                        'расчет по критериям оценки', 'рекомендуемое время'];
-
-        blocks.forEach(b => {
-            const low = b.text.toLowerCase().replace(/\s+/g, ' ').trim();
-            if (!low || low === '-' || low === '—' || low === '–') return;
-            if (IGNORE.some(w => low === w || low.startsWith(w + ' '))) return;
-            // только "без ошибок" и ничего больше → не ошибка
-            if (/\bбез ошиб/i.test(low) && low.replace(/без ошиб\w*/i, '').trim() === '') return;
-
-            taskCats[b.cat] = true;
-            taskHasErrors = true;
-            taskComments[markerId].push({
-                date: startDateOnly || endDateOnly || '',
-                taskStart: startFull,
-                category: b.cat,
-                text: b.text.slice(0, 500)
-            });
+    });
+}
+        user.tasks.push({
+            startDate: startDateOnly, endDate: endDateOnly,
+            startTime: startFull,
+            hasErrors: taskHasErrors, cats: taskCats, quality: qNum,
+            projectId: currentProjectId
         });
-    }
+    });
+
+    globalReport = Object.values(report);
+    window.globalReport = globalReport;
+    populateFilters();
+    populateCompareTargets();
+
+    document.getElementById('filtersPanel').style.display = 'block';
+    document.getElementById('marksPanel').style.display = 'flex';
+    document.getElementById('exportBtn').style.display = 'inline-block';
+    document.getElementById('tabsSection').style.display = 'block';
+
+    applyFilters();
+    saveToCloud();
 }
 
 function populateFilters() {
